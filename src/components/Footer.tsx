@@ -60,7 +60,7 @@ export default function Footer() {
         {/* Séparateur */}
         <div className="border-t border-gray-700 mb-8"></div>
 
-        {/* Copyright */}
+        {/* Copyright & Trustpilot */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="text-sm text-gray-400">
             © {new Date().getFullYear()} FENUA SIM. Tous droits réservés.
@@ -73,13 +73,15 @@ export default function Footer() {
               className="inline-flex items-center gap-2 group"
             >
               <Image 
-                src="https://consumer.trustpilot.com/images/trustpilot-logo-white.svg" 
+                src="/images/trustpilot.svg"  // <-- image locale ici
                 alt="Trustpilot" 
                 width={80}
                 height={32}
-                className="h-8 drop-shadow-lg group-hover:scale-110 transition-transform"
+                className="h-8 w-auto drop-shadow-lg group-hover:scale-110 transition-transform"
               />
-              <span className="text-xs text-white/80 group-hover:text-fenua-orange transition-colors font-semibold tracking-wide">Voir nos avis</span>
+              <span className="text-xs text-white/80 group-hover:text-fenua-orange transition-colors font-semibold tracking-wide">
+                Voir nos avis
+              </span>
             </a>
           </div>
         </div>

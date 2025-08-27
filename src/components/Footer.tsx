@@ -12,12 +12,7 @@ export default function Footer() {
           {/* À propos */}
           <div>
             <div className="relative h-12 w-32 mb-4">
-              <Image
-                src="/logo.png"
-                alt="FENUA SIM Logo"
-                fill
-                className="object-contain"
-              />
+              <Image src="/logo.png" alt="FENUA SIM Logo" fill className="object-contain" />
             </div>
             <p className="text-gray-300 text-sm leading-relaxed">
               FENUA SIM, votre partenaire pour rester connecté partout dans le monde avec des forfaits eSIM adaptés à vos besoins.
@@ -56,4 +51,39 @@ export default function Footer() {
             </ul>
             <div className="flex gap-4 mt-2">
               <a href="#" aria-label="Instagram" className="hover:text-fenua-orange transition-colors"><Instagram size={22} /></a>
-              <a href="#" aria-label="Facebook" className="hover:text-fenua-orange transition-colo
+              <a href="#" aria-label="Facebook" className="hover:text-fenua-orange transition-colors"><Facebook size={22} /></a>
+              <a href="#" aria-label="LinkedIn" className="hover:text-fenua-orange transition-colors"><Linkedin size={22} /></a>
+            </div>
+          </div>
+        </div>
+
+        {/* Séparateur */}
+        <div className="border-t border-gray-700 mb-8"></div>
+
+        {/* Copyright */}
+        <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="text-sm text-gray-400">
+            © {new Date().getFullYear()} FENUA SIM. Tous droits réservés.
+          </div>
+          <div className="flex items-center gap-4">
+            <a 
+              href="https://www.trustpilot.com/review/fenuasim.com" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 group"
+            >
+              <Image 
+                src="https://consumer.trustpilot.com/images/trustpilot-logo-white.svg" 
+                alt="Trustpilot" 
+                width={80}
+                height={32}
+                className="h-8 drop-shadow-lg group-hover:scale-110 transition-transform"
+              />
+              <span className="text-xs text-white/80 group-hover:text-fenua-orange transition-colors font-semibold tracking-wide">Voir nos avis</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </footer>
+  )
+}

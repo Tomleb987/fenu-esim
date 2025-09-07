@@ -9,7 +9,7 @@ export default function ConcoursPage() {
         <div>
           <h2 className="text-lg font-semibold text-purple-600">Article 1 – Organisation</h2>
           <p>
-            La société <strong>FENUA SIM SASU</strong>, immatriculée au RCS de Paris sous le numéro [à compléter], dont le siège social est situé au 58 rue Monceau, 75008 Paris, organise un jeu-concours intitulé <strong>« Voyagez Connecté »</strong>, accessible à l’adresse <a href="/concours" className="text-purple-700 underline">https://fenuasim.com/concours</a>, sans obligation d’achat.
+            La société <strong>FENUA SIM SASU</strong>, immatriculée au RCS de Paris sous le numéro 943 713 875, dont le siège social est situé au 58 rue Monceau, 75008 Paris, organise un jeu-concours intitulé <strong>« Voyagez Connecté »</strong>, accessible à l’adresse <a href="/concours" className="text-purple-700 underline">https://fenuasim.com/concours</a>, sans obligation d’achat.
           </p>
         </div>
 
@@ -34,14 +34,14 @@ export default function ConcoursPage() {
         <div>
           <h2 className="text-lg font-semibold text-purple-600">Article 4 – Durée du concours</h2>
           <p>
-            Le concours est ouvert du <strong>27 août 2025 à 00h00</strong> au <strong>6 septembre 2025 à 23h59 (heure de Tahiti)</strong>.
+            Le concours est ouvert du <strong>27 août 2025 à 00h00</strong> au <strong>7 septembre 2025 à 23h59 (heure de Tahiti)</strong>.
           </p>
         </div>
 
         <div>
           <h2 className="text-lg font-semibold text-purple-600">Article 5 – Désignation du gagnant</h2>
           <p>
-            Le ou la gagnant(e) sera tiré(e) au sort le <strong>7 septembre 2025</strong> et contacté(e) par email. Le résultat sera également annoncé sur la page Facebook <strong>@fenuasim</strong>.
+            Le ou la gagnant(e) sera tiré(e) au sort le <strong>8 septembre 2025</strong> et contacté(e) par email. Le résultat sera également annoncé sur la page Facebook <strong>@fenuasim</strong>.
           </p>
         </div>
 

@@ -7,8 +7,8 @@ export default function Contact() {
         <div className="space-y-1">
           <p className="font-semibold">📞 Whatsapp :</p>
           <p>
-            <a href="tel:+33756860601" className="text-purple-600 hover:underline">
-              +33 7 56 86 06 01
+            <a href="tel:+33749782101" className="text-purple-600 hover:underline">
+              +33 7 49 78 21 01
             </a>
           </p>
         </div>
@@ -25,7 +25,7 @@ export default function Contact() {
         <div className="space-y-1">
           <p className="font-semibold">📱 WhatsApp :</p>
           <p>
-            <a href="https://wa.me/33756860601" target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:underline">
+            <a href="https://wa.me/33749782101" target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:underline">
               Envoyer un message WhatsApp
             </a>
           </p>

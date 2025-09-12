@@ -115,7 +115,34 @@ export default function Confidentialite() {
             La présente politique de confidentialité a été modifiée pour la dernière fois le 1er juillet 2024.
           </p>
         </section>
+
+        <section>
+          <h2 className="text-xl font-semibold text-purple-700 mb-4">12. Utilisation des cookies</h2>
+          <p className="text-gray-700 mb-4">
+            Le site FENUA SIM utilise uniquement des cookies <strong>essentiels</strong> au bon fonctionnement du site et de l’espace client.
+          </p>
+
+          <h3 className="text-lg font-semibold text-purple-600 mb-2">12.1 Cookies essentiels</h3>
+          <p className="text-gray-700 mb-4">
+            Ces cookies sont nécessaires pour :
+          </p>
+          <ul className="list-disc list-inside text-gray-700 space-y-2 mb-4">
+            <li>Sécuriser les connexions à l’espace client (via Supabase)</li>
+            <li>Garantir les fonctionnalités de base du site</li>
+          </ul>
+
+          <h3 className="text-lg font-semibold text-purple-600 mb-2">12.2 Analyse de trafic sans cookies</h3>
+          <p className="text-gray-700 mb-4">
+            Nous utilisons <strong>Plausible Analytics</strong>, une solution de mesure d’audience respectueuse de la vie privée, qui ne repose sur aucun cookie et ne collecte aucune donnée personnelle identifiable.
+          </p>
+
+          <h3 className="text-lg font-semibold text-purple-600 mb-2">12.3 Consentement</h3>
+          <p className="text-gray-700">
+            En l’absence de cookies non essentiels ou à des fins publicitaires, aucun bandeau de consentement n’est requis conformément à la réglementation en vigueur.
+          </p>
+        </section>
       </div>
     </div>
   )
-} 
+}
+

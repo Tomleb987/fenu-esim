@@ -74,7 +74,9 @@ export default function Home() {
         minData: Math.min(...pkgs.map((p) => p.data_amount ?? 0)),
         maxData: Math.max(...pkgs.map((p) => p.data_amount ?? 0)),
         minDays: Math.min(...pkgs.map((p) => p.validity ?? 0)),
-        maxDays: Math.max(...pkgs.map((p) => parseInt(p.validity?.toString().split(' ')[0] || "0") ?? 0)),
+        maxDays: Math.max(
+          ...pkgs.map((p) => parseInt(p.validity?.toString().split(" ")[0] || "0") ?? 0)
+        ),
         minPrice: Math.min(...pkgs.map((p) => p.final_price_eur ?? 0)),
         packageCount: pkgs.length,
       };
@@ -115,32 +117,46 @@ export default function Home() {
             />
           </svg>
         </div>
+
+        {/* Inner container (optimisé) */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 lg:py-24 relative">
-          <div className="text-center">
-            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl tracking-tight font-extrabold text-white leading-tight">
-              <span className="block">Simplifiez vos voyages</span>
-              <span className="block text-orange-200 mt-2">
-                et restez connecté partout dans le Monde
-              </span>
-            </h1>
-            <p className="mt-4 sm:mt-6 max-w-2xl mx-auto text-lg sm:text-xl text-white px-4">
-              Avec nos forfaits eSIM, profitez d'une connexion 4G/5G instantanée
-              dans plus de 100 pays. Plus besoin de carte SIM physique, activez
-              votre forfait en quelques clics.
-            </p>
-            <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 px-4">
-              <Link
-                href="/shop"
-                className="inline-flex items-center justify-center px-6 sm:px-8 py-3 border border-transparent text-base font-medium rounded-full text-purple-600 bg-white hover:bg-orange-50 transition-colors duration-200"
-              >
-                Voir les forfaits
-              </Link>
-              <Link
-                href="/compatibilite"
-                className="inline-flex items-center justify-center px-6 sm:px-8 py-3 border border-white text-base font-medium rounded-full text-white hover:bg-white/10 transition-colors duration-200"
-              >
-                Vérifier la compatibilité
-              </Link>
+          <div className="flex flex-col-reverse md:flex-row items-center justify-between gap-10">
+            {/* Texte */}
+            <div className="md:w-1/2 text-center md:text-left">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl tracking-tight font-extrabold text-white leading-tight">
+                Votre eSIM{" "}
+                <span className="text-orange-200">partout dans le Monde</span>
+              </h1>
+              <p className="mt-4 sm:mt-6 max-w-2xl mx-auto md:mx-0 text-lg sm:text-xl text-white/95">
+                Activez votre forfait instantanément dans plus de 100 pays. Plus
+                besoin de carte physique, activez votre forfait en quelques clics.
+              </p>
+              <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row justify-center md:justify-start gap-3 sm:gap-4">
+                <Link
+                  href="/shop"
+                  className="inline-flex items-center justify-center px-6 sm:px-8 py-3 rounded-full font-semibold text-purple-700 bg-white shadow hover:bg-orange-50 transition"
+                >
+                  Voir les forfaits
+                </Link>
+                <Link
+                  href="/compatibilite"
+                  className="inline-flex items-center justify-center px-6 sm:px-8 py-3 rounded-full font-semibold border border-white text-white hover:bg-white/10 transition"
+                >
+                  Vérifier la compatibilité
+                </Link>
+              </div>
+            </div>
+
+            {/* Visuel 3D optimisé (Next/Image) */}
+            <div className="md:w-1/2 flex justify-center">
+              <Image
+                src="/images/hero-esim.png" // mets ici ton PNG/SVG final
+                alt="Voyageurs FenuaSIM sélectionnant une destination eSIM"
+                width={520}
+                height={520}
+                priority
+                className="w-full h-auto max-w-xs sm:max-w-md"
+              />
             </div>
           </div>
         </div>
@@ -173,39 +189,43 @@ export default function Home() {
           )}
         </div>
       </div>
+
+      {/* Avis Clients */}
       <div className="max-w-3xl mx-auto my-12">
-  <div className="bg-gradient-to-r from-purple-50 to-orange-50 rounded-2xl shadow-lg p-8 flex flex-col items-center border border-purple-100">
-    <h3 className="text-2xl sm:text-3xl font-bold text-purple-800 mb-2 text-center">
-      Ce que nos clients disent de FenuaSIM
-    </h3>
-    <p className="text-gray-700 text-center mb-6 max-w-xl">
-      Votre satisfaction est notre priorité. Découvrez les avis de nos clients ou partagez votre expérience pour aider d'autres voyageurs à rester connectés partout dans le monde !
-    </p>
-    <div
-      className="trustpilot-widget w-full"
-      data-locale="fr-FR"
-      data-template-id="53aa8807dec7e10d38f59f32"
-      data-businessunit-id="t5j5yxc20tHVgyo"
-      data-style-height="500px"
-      data-style-width="100%"
-      data-theme="light"
-    >
-      <a
-        href="https://fr.trustpilot.com/review/fenuasim.com"
-        target="_blank"
-        rel="noopener"
-        className="text-purple-700 underline flex justify-center"
-      >
-        Voir tous les avis sur Trustpilot
-      </a>
-    </div>
-    <div className="mt-6 text-center">
-      <span className="inline-block bg-green-100 text-green-800 text-sm font-semibold px-4 py-2 rounded-full">
-        Merci à tous nos clients pour leur confiance !
-      </span>
-    </div>
-  </div>
-</div>
+        <div className="bg-gradient-to-r from-purple-50 to-orange-50 rounded-2xl shadow-lg p-8 flex flex-col items-center border border-purple-100">
+          <h3 className="text-2xl sm:text-3xl font-bold text-purple-800 mb-2 text-center">
+            Ce que nos clients disent de FenuaSIM
+          </h3>
+          <p className="text-gray-700 text-center mb-6 max-w-xl">
+            Votre satisfaction est notre priorité. Découvrez les avis de nos clients
+            ou partagez votre expérience pour aider d'autres voyageurs à rester
+            connectés partout dans le monde !
+          </p>
+          <div
+            className="trustpilot-widget w-full"
+            data-locale="fr-FR"
+            data-template-id="53aa8807dec7e10d38f59f32"
+            data-businessunit-id="t5j5yxc20tHVgyo"
+            data-style-height="500px"
+            data-style-width="100%"
+            data-theme="light"
+          >
+            <a
+              href="https://fr.trustpilot.com/review/fenuasim.com"
+              target="_blank"
+              rel="noopener"
+              className="text-purple-700 underline flex justify-center"
+            >
+              Voir tous les avis sur Trustpilot
+            </a>
+          </div>
+          <div className="mt-6 text-center">
+            <span className="inline-block bg-green-100 text-green-800 text-sm font-semibold px-4 py-2 rounded-full">
+              Merci à tous nos clients pour leur confiance !
+            </span>
+          </div>
+        </div>
+      </div>
 
       {/* Avantages Section */}
       <div className="py-12 sm:py-16 bg-gray-50">
@@ -442,3 +462,4 @@ export default function Home() {
     </div>
   );
 }
+

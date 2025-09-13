@@ -1,211 +1,132 @@
-import type { NextApiRequest, NextApiResponse } from "next";
-import { OpenAI } from "openai";
-import { createClient } from "@supabase/supabase-js";
-import Stripe from "stripe";
+"use client";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-04-30.basil",
-});
+import { useState } from "react";
 
-// --- Dictionnaire de synonymes (FR + EN + abréviations)
-const COUNTRY_SYNONYMS: Record<string, string> = {
-  "usa": "États-Unis",
-  "us": "États-Unis",
-  "united states": "États-Unis",
-  "etats unis": "États-Unis",
-  "etats-unis": "États-Unis",
-  "france hexagonale": "France",
-  "hexagone": "France",
-  "australia": "Australie",
-  "japan": "Japon",
-  "new zealand": "Nouvelle-Zélande",
-  "nz": "Nouvelle-Zélande",
-  "fiji": "Fidji",
-  "uk": "Royaume-Uni",
-  "england": "Royaume-Uni",
-  "spain": "Espagne",
-  "germany": "Allemagne",
-  "canada": "Canada",
-  "mexico": "Mexique",
-  "brazil": "Brésil",
-  "indonesia": "Indonésie",
-  "reunion": "La Réunion",
-  "martinique": "Martinique",
-  "guadeloupe": "Guadeloupe",
-  "guyane": "Guyane",
+type Message = {
+  role: "user" | "assistant";
+  content: string;
 };
 
-// --- Normalisation du pays
-function normalizeCountry(country: string): string {
-  if (!country) return country;
-  const key = country.trim().toLowerCase();
-  return COUNTRY_SYNONYMS[key] || country;
-}
+const QUICK_DESTINATIONS = ["États-Unis", "France", "Japon", "Australie", "Nouvelle-Zélande"];
 
-// --- Prompt amélioré
-const systemPrompt = {
-  role: "system",
-  content: `Tu es l'assistant virtuel officiel de FENUA SIM, spécialisé dans la vente d'eSIM.
+export default function ChatWidget() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([
+    { role: "assistant", content: "👋 Bonjour ! Je suis votre assistant eSIM. Pour quelle destination souhaitez-vous un forfait ?" },
+  ]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
 
-Règles :
-- Toujours demander le pays de destination et la durée du séjour si ce n’est pas précisé.
-- Utiliser les synonymes : si un client dit "USA", tu comprends "États-Unis".
-- Répondre dans la langue du client (FR, EN ou ES).
-- Mettre en avant les destinations populaires pour les voyageurs venant de Polynésie française, Réunion, Martinique, Guadeloupe, Guyane : France, USA, Japon, Australie, Nouvelle-Zélande.
-- Après un achat, rappeler au client qu’il recevra son eSIM par email avec un QR code.
-- Être poli, clair et professionnel, avec des phrases concises et utiles.
-- Si la question n’est pas liée aux eSIM : répondre brièvement et rediriger vers nos services.
-`,
-};
+  // Envoi message
+  async function sendMessage(message: string) {
+    const newMessages = [...messages, { role: "user", content: message }];
+    setMessages(newMessages);
+    setInput("");
+    setLoading(true);
 
-// --- Récupérer les forfaits par pays
-async function getPlans(country: string) {
-  const normalized = normalizeCountry(country);
-  const { data, error } = await supabase
-    .from("airalo_packages")
-    .select("*")
-    .ilike("region_fr", `%${normalized}%`)
-    .order("final_price_eur", { ascending: true });
-  if (error) throw error;
-  return data;
-}
+    try {
+      const res = await fetch("/api/assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: newMessages }),
+      });
 
-// --- Récupérer un forfait par ID
-async function getPlanById(id: string) {
-  const { data, error } = await supabase
-    .from("airalo_packages")
-    .select("*")
-    .eq("id", id)
-    .single();
-  if (error) throw error;
-  return data;
-}
-
-// --- Créer un paiement Stripe
-async function createPayment(planId: string, email: string) {
-  const plan = await getPlanById(planId);
-  if (!plan) throw new Error("Forfait introuvable");
-
-  const session = await stripe.checkout.sessions.create({
-    payment_method_types: ["card"],
-    line_items: [
-      {
-        price_data: {
-          currency: "eur",
-          product_data: {
-            name: plan.name,
-            description: plan.description || "",
-          },
-          unit_amount: Math.round(plan.final_price_eur * 100),
-        },
-        quantity: 1,
-      },
-    ],
-    mode: "payment",
-    success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/checkout/cancel`,
-    customer_email: email,
-    metadata: {
-      plan_id: planId,
-      email: email,
-    },
-  });
-
-  return session.url;
-}
-
-// --- Handler principal
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Méthode non autorisée" });
-  }
-
-  try {
-    const { messages } = req.body;
-    if (!messages || !Array.isArray(messages)) {
-      return res.status(400).json({ error: "messages array required" });
-    }
-
-    const fullMessages = [systemPrompt, ...messages];
-
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: fullMessages,
-      temperature: 0.7,
-      functions: [
-        {
-          name: "getPlans",
-          description: "Récupère la liste des forfaits eSIM disponibles",
-          parameters: {
-            type: "object",
-            properties: {
-              country: { type: "string", description: "Nom du pays" },
-            },
-            required: ["country"],
-          },
-        },
-        {
-          name: "getPlanById",
-          description: "Récupère les détails d'un forfait spécifique",
-          parameters: {
-            type: "object",
-            properties: {
-              planId: { type: "string", description: "ID du forfait" },
-            },
-            required: ["planId"],
-          },
-        },
-        {
-          name: "createPayment",
-          description: "Crée un paiement Stripe pour un forfait",
-          parameters: {
-            type: "object",
-            properties: {
-              planId: { type: "string", description: "ID du forfait" },
-              email: { type: "string", description: "Email du client" },
-            },
-            required: ["planId", "email"],
-          },
-        },
-      ],
-      function_call: "auto",
-    });
-
-    const response = completion.choices[0].message;
-
-    if (response.function_call) {
-      const { name, arguments: args } = response.function_call;
-      const parsedArgs = JSON.parse(args);
-
-      switch (name) {
-        case "getPlans":
-          const plans = await getPlans(parsedArgs.country);
-          return res.status(200).json({ plans });
-        case "getPlanById":
-          const plan = await getPlanById(parsedArgs.planId);
-          return res.status(200).json({ plan });
-        case "createPayment":
-          if (!parsedArgs.email) {
-            return res.status(400).json({ error: "Email is required for payment" });
-          }
-          const paymentUrl = await createPayment(parsedArgs.planId, parsedArgs.email);
-          return res.status(200).json({ paymentUrl });
-        default:
-          return res.status(400).json({ error: "Invalid function call" });
+      const data = await res.json();
+      if (data.reply) {
+        setMessages([...newMessages, { role: "assistant", content: data.reply }]);
+      } else {
+        setMessages([
+          ...newMessages,
+          { role: "assistant", content: "⚠️ Désolé, je n’ai pas pu répondre. Réessayez plus tard." },
+        ]);
       }
+    } catch (error) {
+      setMessages([
+        ...newMessages,
+        { role: "assistant", content: "❌ Erreur de connexion au serveur." },
+      ]);
+    } finally {
+      setLoading(false);
     }
-
-    const reply =
-      response.content ||
-      "Je vais essayer de mieux comprendre votre demande. Pourriez-vous me donner plus de détails ?";
-    res.status(200).json({ reply });
-  } catch (err) {
-    console.error("Erreur assistant GPT:", err);
-    res.status(500).json({ error: "Erreur GPT" });
   }
+
+  return (
+    <div>
+      {/* Bouton flottant */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="fixed bottom-4 right-4 bg-purple-600 text-white p-4 rounded-full shadow-lg hover:bg-purple-700 transition"
+      >
+        💬
+      </button>
+
+      {/* Fenêtre du chat */}
+      {isOpen && (
+        <div className="fixed bottom-20 right-4 w-80 sm:w-96 bg-white rounded-xl shadow-xl flex flex-col overflow-hidden border border-purple-200">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-purple-600 to-orange-500 text-white px-4 py-3 flex justify-between items-center">
+            <h3 className="font-semibold">Assistant FENUA SIM</h3>
+            <button onClick={() => setIsOpen(false)}>✖️</button>
+          </div>
+
+          {/* Messages */}
+          <div className="flex-1 p-4 overflow-y-auto space-y-3 text-sm">
+            {messages.map((m, i) => (
+              <div
+                key={i}
+                className={`p-3 rounded-lg max-w-[80%] ${
+                  m.role === "user"
+                    ? "ml-auto bg-purple-100 text-purple-900"
+                    : "mr-auto bg-gray-100 text-gray-900"
+                }`}
+              >
+                {m.content}
+              </div>
+            ))}
+
+            {loading && (
+              <div className="mr-auto bg-gray-100 text-gray-500 p-3 rounded-lg max-w-[80%]">
+                ⏳ Je cherche les meilleurs forfaits pour vous...
+              </div>
+            )}
+          </div>
+
+          {/* Suggestions rapides */}
+          <div className="px-3 py-2 border-t border-gray-200 flex flex-wrap gap-2">
+            {QUICK_DESTINATIONS.map((dest) => (
+              <button
+                key={dest}
+                onClick={() => sendMessage(dest)}
+                className="text-xs bg-purple-50 text-purple-700 px-2 py-1 rounded-full hover:bg-purple-100"
+              >
+                {dest}
+              </button>
+            ))}
+          </div>
+
+          {/* Input */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (input.trim()) sendMessage(input.trim());
+            }}
+            className="flex border-t border-gray-200"
+          >
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Écrivez votre message..."
+              className="flex-1 p-2 text-sm focus:outline-none"
+            />
+            <button
+              type="submit"
+              className="bg-purple-600 text-white px-4 py-2 text-sm font-semibold hover:bg-purple-700"
+            >
+              Envoyer
+            </button>
+          </form>
+        </div>
+      )}
+    </div>
+  );
 }

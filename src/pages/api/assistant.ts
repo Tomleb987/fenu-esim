@@ -1,103 +1,112 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { OpenAI } from "openai";
-import { createClient } from '@supabase/supabase-js';
-import Stripe from 'stripe';
+import { createClient } from "@supabase/supabase-js";
+import Stripe from "stripe";
 
-// Init clients
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
-
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
-
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-04-30.basil',
+  apiVersion: "2025-04-30.basil",
 });
 
-// Prompt système
-const systemPrompt = {
-  role: 'system',
-  content: `Tu es un assistant virtuel spécialisé dans la vente d'eSIM pour FENUA SIM.
-Tu dois aider les clients à choisir le meilleur forfait pour leurs besoins.
-Tu dois toujours demander le pays de destination et la durée du séjour.
-Tu dois proposer les forfaits les plus adaptés en fonction de leurs besoins.
-Tu dois toujours vérifier que le client a bien reçu son eSIM par email après le paiement.
-Tu dois être poli, professionnel et concis.`
+// --- Dictionnaire de synonymes (FR + EN + abréviations)
+const COUNTRY_SYNONYMS: Record<string, string> = {
+  "usa": "États-Unis",
+  "us": "États-Unis",
+  "united states": "États-Unis",
+  "etats unis": "États-Unis",
+  "etats-unis": "États-Unis",
+  "france hexagonale": "France",
+  "hexagone": "France",
+  "australia": "Australie",
+  "japan": "Japon",
+  "new zealand": "Nouvelle-Zélande",
+  "nz": "Nouvelle-Zélande",
+  "fiji": "Fidji",
+  "uk": "Royaume-Uni",
+  "england": "Royaume-Uni",
+  "spain": "Espagne",
+  "germany": "Allemagne",
+  "canada": "Canada",
+  "mexico": "Mexique",
+  "brazil": "Brésil",
+  "indonesia": "Indonésie",
+  "reunion": "La Réunion",
+  "martinique": "Martinique",
+  "guadeloupe": "Guadeloupe",
+  "guyane": "Guyane",
 };
 
-// === Normalisation du pays ===
-function normalizeCountry(input: string): string {
-  const map: Record<string, string> = {
-    "australie": "Australia",
-    "états-unis": "United States",
-    "usa": "United States",
-    "royaume-uni": "United Kingdom",
-    "angleterre": "United Kingdom",
-    "espagne": "Spain",
-    "allemagne": "Germany",
-    "japon": "Japan",
-    "corée du sud": "South Korea",
-    "chine": "China",
-    "brésil": "Brazil",
-    "canada": "Canada",
-    "nouvelle-zélande": "New Zealand",
-    "thailande": "Thailand",
-    "thaïlande": "Thailand",
-    "inde": "India",
-    "maroc": "Morocco",
-    "polynésie française": "French Polynesia",
-    "nouvelles-zélande": "New Zealand"
-  };
-
-  const key = input.trim().toLowerCase();
-  return map[key] || input;
+// --- Normalisation du pays
+function normalizeCountry(country: string): string {
+  if (!country) return country;
+  const key = country.trim().toLowerCase();
+  return COUNTRY_SYNONYMS[key] || country;
 }
 
-// === Fonctions eSIM ===
+// --- Prompt amélioré
+const systemPrompt = {
+  role: "system",
+  content: `Tu es l'assistant virtuel officiel de FENUA SIM, spécialisé dans la vente d'eSIM.
 
+Règles :
+- Toujours demander le pays de destination et la durée du séjour si ce n’est pas précisé.
+- Utiliser les synonymes : si un client dit "USA", tu comprends "États-Unis".
+- Répondre dans la langue du client (FR, EN ou ES).
+- Mettre en avant les destinations populaires pour les voyageurs venant de Polynésie française, Réunion, Martinique, Guadeloupe, Guyane : France, USA, Japon, Australie, Nouvelle-Zélande.
+- Après un achat, rappeler au client qu’il recevra son eSIM par email avec un QR code.
+- Être poli, clair et professionnel, avec des phrases concises et utiles.
+- Si la question n’est pas liée aux eSIM : répondre brièvement et rediriger vers nos services.
+`,
+};
+
+// --- Récupérer les forfaits par pays
 async function getPlans(country: string) {
   const normalized = normalizeCountry(country);
-
   const { data, error } = await supabase
-    .from('airalo_packages')
-    .select('*')
-    .ilike('region', `%${normalized}%`)
-    .order('final_price_eur', { ascending: true });
-
+    .from("airalo_packages")
+    .select("*")
+    .ilike("region_fr", `%${normalized}%`)
+    .order("final_price_eur", { ascending: true });
   if (error) throw error;
   return data;
 }
 
-async function getPlanById(planId: string) {
+// --- Récupérer un forfait par ID
+async function getPlanById(id: string) {
   const { data, error } = await supabase
-    .from('airalo_packages')
-    .select('*')
-    .eq('id', planId)
+    .from("airalo_packages")
+    .select("*")
+    .eq("id", id)
     .single();
-
   if (error) throw error;
   return data;
 }
 
+// --- Créer un paiement Stripe
 async function createPayment(planId: string, email: string) {
   const plan = await getPlanById(planId);
-  if (!plan) throw new Error('Forfait introuvable');
+  if (!plan) throw new Error("Forfait introuvable");
 
   const session = await stripe.checkout.sessions.create({
-    payment_method_types: ['card'],
-    line_items: [{
-      price_data: {
-        currency: 'eur',
-        product_data: {
-          name: plan.name,
-          description: plan.description || '',
+    payment_method_types: ["card"],
+    line_items: [
+      {
+        price_data: {
+          currency: "eur",
+          product_data: {
+            name: plan.name,
+            description: plan.description || "",
+          },
+          unit_amount: Math.round(plan.final_price_eur * 100),
         },
-        unit_amount: Math.round(plan.final_price_eur * 100),
+        quantity: 1,
       },
-      quantity: 1,
-    }],
-    mode: 'payment',
+    ],
+    mode: "payment",
     success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/checkout/cancel`,
     customer_email: email,
@@ -110,20 +119,16 @@ async function createPayment(planId: string, email: string) {
   return session.url;
 }
 
-// === Handler API principal ===
-
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Méthode non autorisée' });
+// --- Handler principal
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Méthode non autorisée" });
   }
 
   try {
     const { messages } = req.body;
     if (!messages || !Array.isArray(messages)) {
-      return res.status(400).json({ error: "Le tableau 'messages' est requis" });
+      return res.status(400).json({ error: "messages array required" });
     }
 
     const fullMessages = [systemPrompt, ...messages];
@@ -131,99 +136,76 @@ export default async function handler(
     const completion = await openai.chat.completions.create({
       model: "gpt-4",
       messages: fullMessages,
-      temperature: 0.4,
-      tools: [
+      temperature: 0.7,
+      functions: [
         {
-          type: "function",
-          function: {
-            name: 'getPlans',
-            description: 'Récupère les forfaits eSIM pour un pays donné',
-            parameters: {
-              type: 'object',
-              properties: {
-                country: { type: 'string', description: 'Nom du pays de destination' }
-              },
-              required: ['country']
-            }
-          }
+          name: "getPlans",
+          description: "Récupère la liste des forfaits eSIM disponibles",
+          parameters: {
+            type: "object",
+            properties: {
+              country: { type: "string", description: "Nom du pays" },
+            },
+            required: ["country"],
+          },
         },
         {
-          type: "function",
-          function: {
-            name: 'getPlanById',
-            description: 'Récupère les détails d’un forfait spécifique',
-            parameters: {
-              type: 'object',
-              properties: {
-                planId: { type: 'string', description: 'ID du forfait' }
-              },
-              required: ['planId']
-            }
-          }
+          name: "getPlanById",
+          description: "Récupère les détails d'un forfait spécifique",
+          parameters: {
+            type: "object",
+            properties: {
+              planId: { type: "string", description: "ID du forfait" },
+            },
+            required: ["planId"],
+          },
         },
         {
-          type: "function",
-          function: {
-            name: 'createPayment',
-            description: 'Crée un paiement Stripe pour un forfait',
-            parameters: {
-              type: 'object',
-              properties: {
-                planId: { type: 'string', description: 'ID du forfait' },
-                email: { type: 'string', description: 'Email du client' }
-              },
-              required: ['planId', 'email']
-            }
-          }
-        }
+          name: "createPayment",
+          description: "Crée un paiement Stripe pour un forfait",
+          parameters: {
+            type: "object",
+            properties: {
+              planId: { type: "string", description: "ID du forfait" },
+              email: { type: "string", description: "Email du client" },
+            },
+            required: ["planId", "email"],
+          },
+        },
       ],
-      tool_choice: "auto"
+      function_call: "auto",
     });
 
     const response = completion.choices[0].message;
-    console.log("GPT Response:", JSON.stringify(response, null, 2));
 
-    if (response.tool_calls) {
-      for (const toolCall of response.tool_calls) {
-        const { function: func } = toolCall;
-        const args = JSON.parse(func.arguments);
+    if (response.function_call) {
+      const { name, arguments: args } = response.function_call;
+      const parsedArgs = JSON.parse(args);
 
-        switch (func.name) {
-          case 'getPlans': {
-            const plans = await getPlans(args.country);
-            if (!plans || plans.length === 0) {
-              return res.status(200).json({
-                reply: `Aucun forfait trouvé pour "${args.country}". Veuillez vérifier le pays ou essayer un autre.`
-              });
-            }
-            return res.status(200).json({ plans });
+      switch (name) {
+        case "getPlans":
+          const plans = await getPlans(parsedArgs.country);
+          return res.status(200).json({ plans });
+        case "getPlanById":
+          const plan = await getPlanById(parsedArgs.planId);
+          return res.status(200).json({ plan });
+        case "createPayment":
+          if (!parsedArgs.email) {
+            return res.status(400).json({ error: "Email is required for payment" });
           }
-
-          case 'getPlanById': {
-            const plan = await getPlanById(args.planId);
-            return res.status(200).json({ plan });
-          }
-
-          case 'createPayment': {
-            if (!args.email) {
-              return res.status(400).json({ error: 'Email requis pour le paiement' });
-            }
-            const paymentUrl = await createPayment(args.planId, args.email);
-            return res.status(200).json({ paymentUrl });
-          }
-
-          default:
-            return res.status(400).json({ error: 'Fonction inconnue' });
-        }
+          const paymentUrl = await createPayment(parsedArgs.planId, parsedArgs.email);
+          return res.status(200).json({ paymentUrl });
+        default:
+          return res.status(400).json({ error: "Invalid function call" });
       }
     }
 
-    const reply = response.content || "Je n'ai pas bien compris votre demande. Pouvez-vous me préciser le pays de destination et la durée de votre séjour ?";
-    return res.status(200).json({ reply });
-
+    const reply =
+      response.content ||
+      "Je vais essayer de mieux comprendre votre demande. Pourriez-vous me donner plus de détails ?";
+    res.status(200).json({ reply });
   } catch (err) {
     console.error("Erreur assistant GPT:", err);
-    return res.status(500).json({ error: "Erreur du serveur assistant GPT" });
+    res.status(500).json({ error: "Erreur GPT" });
   }
 }
-

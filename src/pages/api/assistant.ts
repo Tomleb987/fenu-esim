@@ -1,173 +1,201 @@
-"use client";
+import type { NextApiRequest, NextApiResponse } from "next";
+import { OpenAI } from "openai";
+import { createClient } from "@supabase/supabase-js";
+import Stripe from "stripe";
 
-import { useEffect, useState } from "react";
+// -------------------- CONFIG --------------------
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: "2025-04-30.basil",
+});
 
-type Role = "user" | "assistant";
-type Message = {
-  role: Role;
+// -------------------- TYPES --------------------
+type ChatRole = "system" | "user" | "assistant";
+
+interface ChatMessage {
+  role: ChatRole;
   content: string;
+}
+
+interface RequestBody {
+  messages: ChatMessage[];
+}
+
+// -------------------- SYSTEM PROMPT --------------------
+const systemPrompt: ChatMessage = {
+  role: "system",
+  content: `Tu es un assistant virtuel spécialisé dans la vente d'eSIM pour FENUA SIM.
+  - Demande toujours la destination et la durée du séjour.
+  - Propose les forfaits adaptés en fonction des besoins.
+  - Vérifie que le client a bien reçu son eSIM par email après le paiement.
+  - Reste poli, professionnel et concis.
+  
+  Si la question n’est pas directement liée aux eSIM :
+  1. Essaie de comprendre l’intention
+  2. Réponds de manière utile et pertinente
+  3. Fais le lien avec nos services eSIM si possible
+  4. Si vraiment aucun rapport : explique que tu es spécialisé eSIM mais aide quand même.`
 };
 
-const QUICK_DESTINATIONS = ["États-Unis", "France", "Japon", "Australie", "Nouvelle-Zélande"];
+// -------------------- SUPABASE HELPERS --------------------
+async function getPlans(country: string) {
+  const { data, error } = await supabase
+    .from("airalo_packages")
+    .select("*")
+    .ilike("region_fr", `%${country}%`)
+    .order("final_price_eur", { ascending: true });
 
-export default function ChatWidget() {
-  const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: "assistant",
-      content:
-        "👋 Bonjour ! Je suis votre assistant eSIM. Pour quelle destination souhaitez-vous un forfait ?",
-    } as const,
-  ]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
+  if (error) throw error;
+  return data;
+}
 
-  // Empêche le scroll du fond quand le chat est ouvert (mobile-friendly)
-  useEffect(() => {
-    if (isOpen) {
-      const prev = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
-      return () => {
-        document.body.style.overflow = prev;
-      };
-    }
-  }, [isOpen]);
+async function getPlanById(id: string) {
+  const { data, error } = await supabase
+    .from("airalo_packages")
+    .select("*")
+    .eq("id", id)
+    .single();
 
-  async function sendMessage(message: string) {
-    const newMessages: Message[] = [...messages, { role: "user" as const, content: message }];
-    setMessages(newMessages);
-    setInput("");
-    setLoading(true);
+  if (error) throw error;
+  return data;
+}
 
-    try {
-      const res = await fetch("/api/assistant", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: newMessages }),
-      });
+async function createPayment(planId: string, email: string) {
+  const plan = await getPlanById(planId);
+  if (!plan) throw new Error("Forfait introuvable");
 
-      const data = await res.json();
-
-      if (typeof data?.reply === "string" && data.reply.length > 0) {
-        setMessages([...newMessages, { role: "assistant" as const, content: data.reply }]);
-      } else if (data?.plans) {
-        // Fallback: si l'API renvoie des plans (cas function_call direct)
-        const list = data.plans
-          .map(
-            (p: any) =>
-              `- ${p.name} : ${p.data_amount} Go, ${p.validity} jours, ${p.final_price_eur} €`
-          )
-          .join("\n");
-        setMessages([
-          ...newMessages,
-          {
-            role: "assistant" as const,
-            content:
-              list?.length > 0
-                ? `Voici les forfaits disponibles :\n${list}`
-                : "Désolé, aucun forfait trouvé pour cette destination. Pouvez-vous préciser le pays ou la durée ?",
+  const session = await stripe.checkout.sessions.create({
+    payment_method_types: ["card"],
+    line_items: [
+      {
+        price_data: {
+          currency: "eur",
+          product_data: {
+            name: plan.name,
+            description: plan.description || "",
           },
-        ]);
-      } else {
-        setMessages([
-          ...newMessages,
-          {
-            role: "assistant" as const,
-            content:
-              "⚠️ Désolé, je n’ai pas pu répondre pour le moment. Pourriez-vous préciser votre destination et la durée du séjour ?",
-          },
-        ]);
-      }
-    } catch (error) {
-      setMessages([
-        ...newMessages,
-        { role: "assistant" as const, content: "❌ Erreur de connexion au serveur." },
-      ]);
-    } finally {
-      setLoading(false);
-    }
+          unit_amount: Math.round(plan.final_price_eur * 100),
+        },
+        quantity: 1,
+      },
+    ],
+    mode: "payment",
+    success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/checkout/cancel`,
+    customer_email: email,
+    metadata: {
+      plan_id: planId,
+      email: email,
+    },
+  });
+
+  return session.url;
+}
+
+// -------------------- API HANDLER --------------------
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Méthode non autorisée" });
   }
 
-  return (
-    <div>
-      {/* Bouton flottant (z-index élevé) */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-4 right-4 z-50 bg-purple-600 text-white p-4 rounded-full shadow-lg hover:bg-purple-700 transition"
-        aria-label={isOpen ? "Fermer l’assistant" : "Ouvrir l’assistant"}
-      >
-        💬
-      </button>
+  try {
+    const { messages } = req.body as RequestBody;
 
-      {/* Fenêtre du chat */}
-      {isOpen && (
-        <div className="fixed bottom-[calc(64px+env(safe-area-inset-bottom))] right-4 left-4 sm:left-auto sm:w-96 w-auto z-50 bg-white rounded-xl shadow-xl flex flex-col overflow-hidden border border-purple-200 max-h-[75vh]">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-purple-600 to-orange-500 text-white px-4 py-3 flex justify-between items-center">
-            <h3 className="font-semibold">Assistant FENUA SIM</h3>
-            <button onClick={() => setIsOpen(false)} aria-label="Fermer">✖️</button>
-          </div>
+    if (!messages || !Array.isArray(messages)) {
+      return res.status(400).json({ error: "messages array required" });
+    }
 
-          {/* Messages */}
-          <div className="flex-1 p-4 overflow-y-auto space-y-3 text-sm">
-            {messages.map((m, i) => (
-              <div
-                key={i}
-                className={`p-3 rounded-lg max-w-[80%] whitespace-pre-wrap ${
-                  m.role === "user"
-                    ? "ml-auto bg-purple-100 text-purple-900"
-                    : "mr-auto bg-gray-100 text-gray-900"
-                }`}
-              >
-                {m.content}
-              </div>
-            ))}
+    // Ajout du system prompt
+    const fullMessages: ChatMessage[] = [systemPrompt, ...messages];
 
-            {loading && (
-              <div className="mr-auto bg-gray-100 text-gray-600 p-3 rounded-lg max-w-[80%]">
-                ⏳ Je cherche les meilleurs forfaits pour vous...
-              </div>
-            )}
-          </div>
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4",
+      messages: fullMessages,
+      temperature: 0.7,
+      functions: [
+        {
+          name: "getPlans",
+          description: "Récupère la liste des forfaits eSIM disponibles",
+          parameters: {
+            type: "object",
+            properties: {
+              country: { type: "string", description: "Nom du pays" },
+            },
+            required: ["country"],
+          },
+        },
+        {
+          name: "getPlanById",
+          description: "Récupère les détails d'un forfait spécifique",
+          parameters: {
+            type: "object",
+            properties: {
+              planId: { type: "string", description: "ID du forfait" },
+            },
+            required: ["planId"],
+          },
+        },
+        {
+          name: "createPayment",
+          description: "Crée un paiement Stripe pour un forfait",
+          parameters: {
+            type: "object",
+            properties: {
+              planId: { type: "string", description: "ID du forfait" },
+              email: { type: "string", description: "Email du client" },
+            },
+            required: ["planId", "email"],
+          },
+        },
+      ],
+      function_call: "auto",
+    });
 
-          {/* Suggestions rapides */}
-          <div className="px-3 py-2 border-t border-gray-200 flex flex-wrap gap-2">
-            {QUICK_DESTINATIONS.map((dest) => (
-              <button
-                key={dest}
-                onClick={() => sendMessage(dest)}
-                className="text-xs bg-purple-50 text-purple-700 px-2 py-1 rounded-full hover:bg-purple-100"
-              >
-                {dest}
-              </button>
-            ))}
-          </div>
+    const response = completion.choices[0].message;
 
-          {/* Input (évite le zoom iOS avec font-size >= 16px) */}
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (input.trim()) sendMessage(input.trim());
-            }}
-            className="flex border-t border-gray-200 pb-[env(safe-area-inset-bottom)]"
-          >
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Écrivez votre message..."
-              className="flex-1 p-3 text-[16px] focus:outline-none"
-              inputMode="text"
-              autoComplete="off"
-            />
-            <button
-              type="submit"
-              className="bg-purple-600 text-white px-4 py-2 text-sm font-semibold hover:bg-purple-700"
-            >
-              Envoyer
-            </button>
-          </form>
-        </div>
-      )}
-    </div>
-  );
+    if (response.function_call) {
+      const { name, arguments: args } = response.function_call;
+      const parsedArgs = JSON.parse(args || "{}");
+
+      switch (name) {
+        case "getPlans": {
+          const plans = await getPlans(parsedArgs.country);
+          return res.status(200).json({ plans });
+        }
+        case "getPlanById": {
+          const plan = await getPlanById(parsedArgs.planId);
+          return res.status(200).json({ plan });
+        }
+        case "createPayment": {
+          if (!parsedArgs.email) {
+            return res
+              .status(400)
+              .json({ error: "Email is required for payment" });
+          }
+          const paymentUrl = await createPayment(
+            parsedArgs.planId,
+            parsedArgs.email
+          );
+          return res.status(200).json({ paymentUrl });
+        }
+        default:
+          return res.status(400).json({ error: "Invalid function call" });
+      }
+    }
+
+    const reply =
+      response.content ||
+      "Je n’ai pas bien compris votre demande. Pouvez-vous préciser ?";
+    res.status(200).json({ reply });
+  } catch (err) {
+    console.error("Erreur assistant GPT:", err);
+    res.status(500).json({ error: "Erreur GPT" });
+  }
 }

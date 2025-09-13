@@ -128,7 +128,7 @@ export default function Home() {
                 <span className="text-orange-200">partout dans le Monde</span>
               </h1>
               <p className="mt-4 sm:mt-6 max-w-2xl mx-auto md:mx-0 text-lg sm:text-xl text-white/95">
-                Activez votre forfait instantanément dans plus de 100 pays. Plus
+                Activez votre forfait instantanément dans plus de 180 pays. Plus
                 besoin de carte physique, activez votre forfait en quelques clics.
               </p>
               <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row justify-center md:justify-start gap-3 sm:gap-4">

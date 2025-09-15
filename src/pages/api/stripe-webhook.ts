@@ -240,7 +240,7 @@ export default async function handler(
           airaloOrderData,
         );
 
-        console.log("Airalo order data:", firstName, lastName);
+        console.log("First name: ", firstName, "Last name: ", lastName);
         const orderToInsert = {
           stripe_session_id: session.id,
           first_name: firstName,

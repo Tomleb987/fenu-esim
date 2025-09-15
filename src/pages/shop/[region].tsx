@@ -72,7 +72,7 @@ function slugToRegionFr(slug: string): string {
 
 async function validateAndApplyPromoCode(
   code: string,
-  packagePrice: number
+  packagePrice: number,
 ): Promise<{
   isValid: boolean;
   discountedPrice: number;
@@ -165,6 +165,8 @@ export default function RegionPage() {
   const [destinationInfo, setDestinationInfo] = useState();
   const [form, setForm] = useState({
     nom: "",
+    first_name: "",
+    last_name: "",
     prenom: "",
     email: "",
     codePromo: "",
@@ -257,11 +259,11 @@ export default function RegionPage() {
     const checkScreenSize = () => {
       setIsMobile(window.innerWidth < 768);
     };
-    
+
     checkScreenSize();
-    window.addEventListener('resize', checkScreenSize);
-    
-    return () => window.removeEventListener('resize', checkScreenSize);
+    window.addEventListener("resize", checkScreenSize);
+
+    return () => window.removeEventListener("resize", checkScreenSize);
   }, []);
 
   if (loading) {
@@ -300,8 +302,11 @@ export default function RegionPage() {
 
   // Fonction d'ajout au panier
   function handleAddToCart(pkg: Package) {
-    const margin = parseFloat(localStorage.getItem('global_margin') || '0');
-    const pkgWithMargin = { ...pkg, final_price_eur: pkg.final_price_eur! * (1 + margin) };
+    const margin = parseFloat(localStorage.getItem("global_margin") || "0");
+    const pkgWithMargin = {
+      ...pkg,
+      final_price_eur: pkg.final_price_eur! * (1 + margin),
+    };
     setCart((prev) => [...prev, pkgWithMargin]);
     setShowCartModal(true);
   }
@@ -335,7 +340,7 @@ export default function RegionPage() {
     if (form.codePromo) {
       const promoResult = await validateAndApplyPromoCode(
         form.codePromo,
-        finalPrice
+        finalPrice,
       );
       if (!promoResult.isValid) {
         setFormError(promoResult.error || "Code promo invalide");
@@ -363,6 +368,9 @@ export default function RegionPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          first_name: form.prenom,
+          last_name: form.nom,
+          customer_email: form.email,
           cartItems: [
             {
               id: selectedPackage.id,
@@ -373,7 +381,6 @@ export default function RegionPage() {
               partner_code: form.codePartenaire || undefined,
             },
           ],
-          customer_email: form.email,
         }),
       });
 
@@ -385,7 +392,7 @@ export default function RegionPage() {
     } catch (err) {
       console.error("Erreur lors de la redirection Stripe:", err);
       setFormError(
-        "Une erreur est survenue lors de la redirection vers le paiement. Veuillez réessayer."
+        "Une erreur est survenue lors de la redirection vers le paiement. Veuillez réessayer.",
       );
     }
   }
@@ -397,7 +404,7 @@ export default function RegionPage() {
     setCurrentIndex((prev) => (prev === packages.length - 1 ? 0 : prev + 1));
   };
 
-  const margin = parseFloat(localStorage.getItem('global_margin')!);
+  const margin = parseFloat(localStorage.getItem("global_margin")!);
   const selectedPackagePrice = () => {
     let price = selectedPackage?.final_price_eur;
     let symbol = "€";
@@ -538,82 +545,86 @@ export default function RegionPage() {
               {/* Carousel Cards */}
               {packages.length > 0 && (
                 <div className="w-full max-w-2xl mx-auto flex justify-center gap-4">
-                  {packages.slice(currentIndex, currentIndex + (isMobile ? 1 : 2)).map((pkg) => {
-                    let price = pkg.final_price_eur;
-                    let symbol = "€";
-                    if (currency === "USD") {
-                      price = pkg.final_price_usd;
-                      symbol = "$";
-                    } else if (currency === "XPF") {
-                      price = pkg.final_price_xpf;
-                      symbol = "₣";
-                    }
-                    const margin = parseFloat(localStorage.getItem('global_margin') || '0');
-                    const priceWithMargin = price! * (1 + margin);
-                    const countryCode = pkg.country
-                      ? pkg.country.toLowerCase()
-                      : "xx";
-                    return (
-                      <div
-                        key={pkg.id}
-                        className={`w-full sm:w-1/2 bg-white rounded-xl border-2 p-6 flex flex-col items-center shadow transition-all duration-200 ${
-                          selectedPackage?.id === pkg.id
-                            ? "border-purple-500 shadow-lg"
-                            : "border-gray-100 hover:border-purple-300"
-                        }`}
-                        onClick={() => setSelectedPackage(pkg)}
-                      >
-                        {/* Flag and Name */}
-                        <div className="flex items-center gap-3 mb-3">
-                          <img
-                            src={pkg.image_url}
-                            alt={""}
-                            width={40}
-                            height={28}
-                            className="rounded object-cover border"
-                          />
-                          <h3 className="text-lg font-bold text-purple-800">
-                            {pkg.name}
-                          </h3>
-                        </div>
-                        {/* Data, Duration, Badges */}
-                        <div className="flex flex-wrap gap-2 mb-3 justify-center">
-                          <span className="text-xs sm:text-xs bg-blue-50 text-blue-700 px-3 py-1 rounded-full font-bold">
-                            {pkg.includes_voice
-                              ? "Appels inclus"
-                              : "Pas d'appels"}
-                          </span>
-                          <span className="text-xs sm:text-xs bg-orange-100 text-orange-700 px-3 py-1 rounded-full font-bold">
-                            {pkg.includes_sms ? "SMS inclus" : "Pas de SMS"}
-                          </span>
-                        </div>
-                        {/* Description */}
-                        <div className="text-gray-700 text-sm mb-3 text-center min-h-[40px]">
-                          {pkg.description}
-                        </div>
-                        {/* Price */}
-                        <div className="text-xl font-bold text-purple-700 mb-4">
-                          {priceWithMargin && priceWithMargin > 0 ? (
-                            `${priceWithMargin.toFixed(2)} ${symbol}`
-                          ) : (
-                            <span className="text-gray-400">
-                              Prix indisponible
-                            </span>
-                          )}
-                        </div>
-                        {/* Buy Button */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleAcheter(pkg);
-                          }}
-                          className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-orange-500 text-white font-semibold rounded-xl hover:from-purple-700 hover:to-orange-600 transition-all duration-300 text-base"
+                  {packages
+                    .slice(currentIndex, currentIndex + (isMobile ? 1 : 2))
+                    .map((pkg) => {
+                      let price = pkg.final_price_eur;
+                      let symbol = "€";
+                      if (currency === "USD") {
+                        price = pkg.final_price_usd;
+                        symbol = "$";
+                      } else if (currency === "XPF") {
+                        price = pkg.final_price_xpf;
+                        symbol = "₣";
+                      }
+                      const margin = parseFloat(
+                        localStorage.getItem("global_margin") || "0",
+                      );
+                      const priceWithMargin = price! * (1 + margin);
+                      const countryCode = pkg.country
+                        ? pkg.country.toLowerCase()
+                        : "xx";
+                      return (
+                        <div
+                          key={pkg.id}
+                          className={`w-full sm:w-1/2 bg-white rounded-xl border-2 p-6 flex flex-col items-center shadow transition-all duration-200 ${
+                            selectedPackage?.id === pkg.id
+                              ? "border-purple-500 shadow-lg"
+                              : "border-gray-100 hover:border-purple-300"
+                          }`}
+                          onClick={() => setSelectedPackage(pkg)}
                         >
-                          Acheter - Paiement Sécurisé
-                        </button>
-                      </div>
-                    );
-                  })}
+                          {/* Flag and Name */}
+                          <div className="flex items-center gap-3 mb-3">
+                            <img
+                              src={pkg.image_url}
+                              alt={""}
+                              width={40}
+                              height={28}
+                              className="rounded object-cover border"
+                            />
+                            <h3 className="text-lg font-bold text-purple-800">
+                              {pkg.name}
+                            </h3>
+                          </div>
+                          {/* Data, Duration, Badges */}
+                          <div className="flex flex-wrap gap-2 mb-3 justify-center">
+                            <span className="text-xs sm:text-xs bg-blue-50 text-blue-700 px-3 py-1 rounded-full font-bold">
+                              {pkg.includes_voice
+                                ? "Appels inclus"
+                                : "Pas d'appels"}
+                            </span>
+                            <span className="text-xs sm:text-xs bg-orange-100 text-orange-700 px-3 py-1 rounded-full font-bold">
+                              {pkg.includes_sms ? "SMS inclus" : "Pas de SMS"}
+                            </span>
+                          </div>
+                          {/* Description */}
+                          <div className="text-gray-700 text-sm mb-3 text-center min-h-[40px]">
+                            {pkg.description}
+                          </div>
+                          {/* Price */}
+                          <div className="text-xl font-bold text-purple-700 mb-4">
+                            {priceWithMargin && priceWithMargin > 0 ? (
+                              `${priceWithMargin.toFixed(2)} ${symbol}`
+                            ) : (
+                              <span className="text-gray-400">
+                                Prix indisponible
+                              </span>
+                            )}
+                          </div>
+                          {/* Buy Button */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAcheter(pkg);
+                            }}
+                            className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-orange-500 text-white font-semibold rounded-xl hover:from-purple-700 hover:to-orange-600 transition-all duration-300 text-base"
+                          >
+                            Acheter - Paiement Sécurisé
+                          </button>
+                        </div>
+                      );
+                    })}
                 </div>
               )}
 
@@ -675,7 +686,7 @@ export default function RegionPage() {
           {(() => {
             const tips = getDataTip(
               selectedPackage.data_amount,
-              selectedPackage.data_unit
+              selectedPackage.data_unit,
             );
             return (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 lg:gap-6">

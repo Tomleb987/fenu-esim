@@ -19,7 +19,7 @@ async function buffer(readable: any) {
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   if (req.method !== "POST") {
     return res.status(405).json({ message: "Method not allowed" });
@@ -33,7 +33,7 @@ export default async function handler(
     event = stripe.webhooks.constructEvent(
       buf,
       sig!,
-      process.env.STRIPE_WEBHOOK_SECRET!
+      process.env.STRIPE_WEBHOOK_SECRET!,
     );
   } catch (err: any) {
     console.error(`Webhook signature verification failed: ${err.message}`);
@@ -51,13 +51,20 @@ export default async function handler(
     }
 
     try {
-      const { packageId, is_top_up, sim_iccid, promo_code, partner_code } =
-        session.metadata || {};
+      const {
+        packageId,
+        firstName,
+        lastName,
+        is_top_up,
+        sim_iccid,
+        promo_code,
+        partner_code,
+      } = session.metadata || {};
       console.log("Package ID:", packageId);
       if (!packageId) {
         console.error(
           "Package ID not found in session metadata for session:",
-          session.id
+          session.id,
         );
         throw new Error("Package ID not found in session metadata");
       }
@@ -77,16 +84,16 @@ export default async function handler(
 
       if (packageError || !packageData) {
         console.error(
-          `Failed to retrieve package data for packageId ${packageId}: ${packageError?.message || "not found"}`
+          `Failed to retrieve package data for packageId ${packageId}: ${packageError?.message || "not found"}`,
         );
         throw new Error(
-          `Failed to retrieve package data: ${packageError?.message || "not found"}`
+          `Failed to retrieve package data: ${packageError?.message || "not found"}`,
         );
       }
 
       if (is_top_up === "true" && sim_iccid) {
         console.log(
-          `Processing top-up for ICCID: ${sim_iccid} with package ID: ${packageId}, session: ${session.id}`
+          `Processing top-up for ICCID: ${sim_iccid} with package ID: ${packageId}, session: ${session.id}`,
         );
 
         const topUpApiRoute = `${process.env.NEXT_PUBLIC_BASE_URL}/api/process-airalo-topup`;
@@ -107,16 +114,16 @@ export default async function handler(
 
         if (!topUpResponse.ok || !topUpApiResult.success) {
           console.error(
-            `Failed to process Airalo top-up via local API: ${topUpResponse.status} - ${topUpApiResult.message || "Unknown API error"}`
+            `Failed to process Airalo top-up via local API: ${topUpResponse.status} - ${topUpApiResult.message || "Unknown API error"}`,
           );
           throw new Error(
-            `Failed to process Airalo top-up: ${topUpApiResult.message || topUpResponse.statusText}`
+            `Failed to process Airalo top-up: ${topUpApiResult.message || topUpResponse.statusText}`,
           );
         }
 
         console.log(
           "Local Airalo top-up API processed successfully:",
-          topUpApiResult
+          topUpApiResult,
         );
 
         const orderToInsert = {
@@ -124,8 +131,7 @@ export default async function handler(
           airalo_order_id: packageId,
           email: customerEmail,
           // Use the Airalo top-up ID from the API response as airalo_order_id for consistency in 'orders'
-          package_id:
-            packageId.split("-topup")[0],
+          package_id: packageId.split("-topup")[0],
           status: "completed",
           amount: session.amount_total,
           created_at: new Date().toISOString(),
@@ -153,15 +159,15 @@ export default async function handler(
 
         if (orderError || !newOrderData) {
           console.error(
-            `Failed to save top-up financial transaction to 'orders' database: ${orderError?.message}`
+            `Failed to save top-up financial transaction to 'orders' database: ${orderError?.message}`,
           );
           throw new Error(
-            `Failed to save top-up financial transaction: ${orderError?.message}`
+            `Failed to save top-up financial transaction: ${orderError?.message}`,
           );
         }
         console.log(
           "Top-up financial transaction saved to 'orders' database successfully. Order ID:",
-          newOrderData.id
+          newOrderData.id,
         );
 
         /* @ts-ignore */
@@ -185,19 +191,18 @@ export default async function handler(
 
         if (airaloTopupError) {
           console.error(
-            `Failed to save top-up details to 'airalo_topups' database: ${airaloTopupError.message}`
+            `Failed to save top-up details to 'airalo_topups' database: ${airaloTopupError.message}`,
           );
           throw new Error(
-            `Failed to save top-up details to airalo_topups: ${airaloTopupError.message}`
+            `Failed to save top-up details to airalo_topups: ${airaloTopupError.message}`,
           );
         }
         console.log(
-          "Top-up details saved to 'airalo_topups' database successfully."
+          "Top-up details saved to 'airalo_topups' database successfully.",
         );
-        
       } else {
         console.log(
-          `Processing new order for package ID: ${packageId}, session: ${session.id}`
+          `Processing new order for package ID: ${packageId}, session: ${session.id}`,
         );
         const edgeFunctionResponse = await fetch(
           `${process.env.NEXT_PUBLIC_BASE_URL}/api/create-airalo-order`,
@@ -216,27 +221,30 @@ export default async function handler(
               quantity: 1,
               description: `Order from Stripe session ${session.id}`,
             }),
-          }
+          },
         );
 
         if (!edgeFunctionResponse.ok) {
           const errorText = await edgeFunctionResponse.text();
           console.error(
-            `Failed to create Airalo order via Edge Function: ${edgeFunctionResponse.status} - ${errorText}`
+            `Failed to create Airalo order via Edge Function: ${edgeFunctionResponse.status} - ${errorText}`,
           );
           throw new Error(
-            `Failed to create Airalo order: ${edgeFunctionResponse.status} - ${errorText}`
+            `Failed to create Airalo order: ${edgeFunctionResponse.status} - ${errorText}`,
           );
         }
 
         const airaloOrderData = await edgeFunctionResponse.json();
         console.log(
           "Airalo order created successfully via Edge Function:",
-          airaloOrderData
+          airaloOrderData,
         );
 
+        console.log("Airalo order data:", firstName, lastName);
         const orderToInsert = {
           stripe_session_id: session.id,
+          first_name: firstName,
+          last_name: lastName,
           package_id: packageId,
           email: customerEmail,
           airalo_order_id:
@@ -268,35 +276,36 @@ export default async function handler(
 
         if (orderError) {
           console.error(
-            `Failed to save new order to database: ${orderError.message}`
+            `Failed to save new order to database: ${orderError.message}`,
           );
           throw new Error(
-            `Failed to save new order to database: ${orderError.message}`
+            `Failed to save new order to database: ${orderError.message}`,
           );
         }
         console.log("New order saved to database successfully.");
 
-        console.log(airaloOrderData)
+        console.log(airaloOrderData);
         const { data: userEsims, error: userEsimsError } = await supabase
-        .from('user_sims')
-        .insert([
-          { user_email: customerEmail,
-            iccid: airaloOrderData.order.sim_iccid,
-            name: packageData.name,
-            status: 'completed', 
-          },
-        ])
-        .select();
+          .from("user_sims")
+          .insert([
+            {
+              user_email: customerEmail,
+              iccid: airaloOrderData.order.sim_iccid,
+              name: packageData.name,
+              status: "completed",
+            },
+          ])
+          .select();
 
-        if(userEsimsError){
+        if (userEsimsError) {
           console.error(
-            `Failed to save user esim to database: ${userEsimsError.message}`
+            `Failed to save user esim to database: ${userEsimsError.message}`,
           );
           throw new Error(
-            `Failed to save user esim to database: ${userEsimsError.message}`
+            `Failed to save user esim to database: ${userEsimsError.message}`,
           );
         }
-        console.log("User Esims: ", userEsims)
+        console.log("User Esims: ", userEsims);
       }
 
       if (promo_code) {

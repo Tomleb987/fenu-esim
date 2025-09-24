@@ -67,7 +67,8 @@ function slugToRegionFr(slug: string): string {
   return slug
     .split("-")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(" ");
+    .join(" ")
+    .toLowerCase();
 }
 
 async function validateAndApplyPromoCode(
@@ -217,11 +218,11 @@ export default function RegionPage() {
           ? params.region[0]
           : params.region;
         const regionFr = slugToRegionFr(regionParam.toLowerCase());
-
+        console.log(regionParam)
         const { data: pkgs, error: pkgError } = await supabase
           .from("airalo_packages")
           .select("*")
-          .eq("region_fr", regionFr);
+          .eq("slug", regionParam);
 
         const { data: dest, error: destError } = await supabase
           .from("destination_info")

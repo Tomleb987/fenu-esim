@@ -90,13 +90,13 @@ export default function PackageCard({
 
   // Prix dynamique selon la devise
   let margin = parseFloat(localStorage.getItem('global_margin')!);
-  let price = pkg.final_price_eur;
+  let price = minPrice;
   let symbol = "€";
   if (currency === "XPF") {
-    price = pkg.final_price_xpf;
+    price = minPrice;
     symbol = "₣";
   } else if (currency === "USD") {
-    price = pkg.final_price_usd;
+    price = minPrice;
     symbol = "$";
   }
   const priceWithMargin = price! * (1 + margin);
@@ -153,7 +153,7 @@ export default function PackageCard({
           <div className="flex items-center justify-between">
             <span className="text-xs sm:text-sm text-gray-600">Jusqu'à</span>
             <span className="text-xs sm:text-sm font-medium text-gray-800">
-              {maxDays} days
+              {minDays} days
             </span>
           </div>
 

@@ -81,7 +81,10 @@ export default function Home() {
       acc[region] = {
         minData: Math.min(...pkgs.map((p) => p.data_amount ?? 0)),
         maxData: Math.max(...pkgs.map((p) => p.data_amount ?? 0)),
-        minDays: Math.min(...pkgs.map((p) => p.validity ?? 0)),
+        minDays: Math.min(
+          ...pkgs.map((p) =>
+          parseInt(p.validity?.toString().split(" ")[0] || "0")
+        )),
         maxDays: Math.max(
           ...pkgs.map((p) =>
             parseInt(p.validity?.toString().split(" ")[0] || "0")

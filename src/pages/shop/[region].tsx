@@ -223,11 +223,10 @@ export default function RegionPage() {
           .from("airalo_packages")
           .select("*")
           .eq("slug", regionParam);
-
         const { data: dest, error: destError } = await supabase
           .from("destination_info")
           .select("*")
-          .eq("name", regionFr);
+          .eq("name", pkgs[0].region_fr);
         /* @ts-ignore */
         setDestinationInfo(dest);
 
@@ -266,6 +265,8 @@ export default function RegionPage() {
 
     return () => window.removeEventListener("resize", checkScreenSize);
   }, []);
+  
+  useEffect(()=>{console.log(destinationInfo)},[destinationInfo])
 
   if (loading) {
     return (

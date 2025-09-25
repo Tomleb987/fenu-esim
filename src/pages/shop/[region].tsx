@@ -226,7 +226,7 @@ export default function RegionPage() {
         const { data: dest, error: destError } = await supabase
           .from("destination_info")
           .select("*")
-          .eq("name", pkgs[0].region_fr);
+          .eq("name", pkgs?.[0].region_fr);
         /* @ts-ignore */
         setDestinationInfo(dest);
 

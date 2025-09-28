@@ -275,8 +275,30 @@ const TopUpInlineSection: React.FC<TopUpInlineSectionProps> = ({ order }) => {
         setFormError(promoResult.error || "Code promo invalide");
         return;
       }
-      finalPrice = promoResult.discountedPrice;
+      const usdToEur = 0.86;
+      const usdToXpf = 102.75;
+      if (currency === "EUR") {
+        finalPrice = promoResult.discountedPrice * usdToEur;
+      } else if (currency === "XPF") {
+        const desired = promoResult.discountedPrice * usdToXpf;
+        finalPrice = Math.round(desired);
+      } else{
+        finalPrice = promoResult.discountedPrice;
+      }
       promoCodeToSave = form.codePromo;
+    }
+    else {
+      const usdToEur = 0.86;
+      const usdToXpf = 102.75;
+      console.log("currency",currency)
+      if (currency === "EUR") {
+        finalPrice = finalPrice * usdToEur;
+      } else if (currency === "XPF") {
+        const desired = finalPrice * usdToXpf;
+        finalPrice = Math.round(desired);
+      } else{
+        finalPrice = finalPrice;
+      }
     }
     
     // Store customer info in localStorage
@@ -303,7 +325,7 @@ const TopUpInlineSection: React.FC<TopUpInlineSectionProps> = ({ order }) => {
               name: selectedTopUpPackage.name || selectedTopUpPackage.title,
               description: selectedTopUpPackage.description ?? "",
               price: finalPrice,
-              currency: "EUR",
+              currency: currency,
             },
           ],
           customer_email: form.email,
@@ -391,16 +413,19 @@ useEffect(() => {
 
         <div className={`w-full grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-3xl mx-auto`}>
           {displayPackages.map((pkg) => {
+            const usdToEur = 0.86;
+            const usdToXpf = 102.75;
             let price = pkg.price;
-            let symbol = "€";
-            if (currency === "USD") {
-              price = pkg.price;
-              symbol = "$";
+            let symbol = "$";
+            if (currency === "EUR") {
+              price = pkg.price * usdToEur;
+              symbol = "€";
             } else if (currency === "XPF") {
-              price = pkg.price;
+              const desired = pkg.price * usdToXpf;
+              price = Math.round(desired);
               symbol = "₣";
             }
-            let priceWithMargin = pkg.price * (1 + margin);
+            let priceWithMargin = price! * (1 + margin);
 
             return (
               <div

@@ -31,7 +31,7 @@ export default async function handler(
           name: item.name,
           description: item.description || `Top-up for ${sim_iccid}`,
         },
-        unit_amount: Math.round(item.price * 100),
+        unit_amount: item.currency.toLowerCase() === 'xpf' ? item.price : Math.round(item.price * 100),
       },
       quantity: 1,
     }));

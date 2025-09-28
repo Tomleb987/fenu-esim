@@ -81,6 +81,19 @@ export default function SuccessPage() {
 
     const checkOrderStatus = async () => {
       try {
+        // FIRST: Verify payment with Stripe
+        const stripeResponse = await fetch('/api/verify-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id })
+        });
+        
+        const stripeData = await stripeResponse.json();
+        if (!stripeData.paid) {
+          return setOrderStatus("error");
+        }
+    
+        // THEN: Check database
         const { data: orderData, error: orderError } = await supabase
           .from("orders")
           .select("*")
@@ -88,44 +101,17 @@ export default function SuccessPage() {
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
-
-        if (orderError) {
-          console.log(orderError);
-          throw orderError;
+    
+        if (orderError || !orderData) {
+          return setOrderStatus("error");
         }
-        if (!orderData) return setOrderStatus("error");
-
-        const { data: esimData, error: esimError } = await supabase
-          .from("airalo_orders")
-          .select("*")
-          .eq("package_id", orderData.package_id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        const { data: packageData, error: packageError } = await supabase
-          .from("airalo_packages")
-          .select("*")
-          .eq("id", esimData.package_id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        setPackageData(packageData);
-
-        if (packageError) throw packageError;
-
-        setOrderDetails({
-          ...orderData,
-          esim: esimData || null,
-        });
-
+        
         setOrderStatus("success");
       } catch (error) {
-        console.error("Error retrieving order details:", error);
         setOrderStatus("error");
       }
     };
+
 
     checkOrderStatus();
   }, [session_id]);

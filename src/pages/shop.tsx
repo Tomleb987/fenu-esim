@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "next/router"; // ✅ Pages Router
 import { supabase } from "@/lib/supabaseClient";
 import type { Database } from "@/lib/supabase/config";
 import Image from "next/image";
@@ -74,7 +74,6 @@ function DestinationCard({
 
   return (
     <div className={cardClasses} onClick={handleCardClick}>
-      {/* Premium Badge pour les top destinations */}
       {isTop && (
         <div className="absolute top-2 right-2 z-10">
           <div className="bg-gradient-to-r from-purple-600 to-orange-500 text-white px-2 py-1 rounded-full text-xs font-semibold flex items-center">
@@ -85,7 +84,6 @@ function DestinationCard({
       )}
 
       <div className="p-4 sm:p-6">
-        {/* Header avec drapeau et nom */}
         <div className="flex items-center mb-3 sm:mb-4">
           <div className="relative w-8 h-6 sm:w-12 sm:h-8 mr-2 sm:mr-3 rounded overflow-hidden shadow-sm flex-shrink-0">
             <Image
@@ -98,7 +96,11 @@ function DestinationCard({
           </div>
           <div className="min-w-0 flex-1">
             <h3
-              className={`font-bold truncate ${isTop ? "text-base sm:text-lg text-purple-800" : "text-sm sm:text-base text-gray-800"}`}
+              className={`font-bold truncate ${
+                isTop
+                  ? "text-base sm:text-lg text-purple-800"
+                  : "text-sm sm:text-base text-gray-800"
+              }`}
             >
               {region}
             </h3>
@@ -108,22 +110,23 @@ function DestinationCard({
           </div>
         </div>
 
-        {/* Informations principales */}
         <div className="space-y-2 sm:space-y-3 mb-4 sm:mb-6">
-          {/* Prix minimum */}
           <div className="flex items-center justify-between">
             <span className="text-xs sm:text-sm text-gray-600">
               À partir de
             </span>
             <span
-              className={`font-bold ${isTop ? "text-lg sm:text-2xl text-purple-600" : "text-base sm:text-xl text-purple-500"}`}
+              className={`font-bold ${
+                isTop
+                  ? "text-lg sm:text-2xl text-purple-600"
+                  : "text-base sm:text-xl text-purple-500"
+              }`}
             >
               {stats.minPrice.toFixed(2)}
               {getCurrencySymbol()}
             </span>
           </div>
 
-          {/* Durée maximum */}
           <div className="flex items-center justify-between">
             <span className="text-xs sm:text-sm text-gray-600">Jusqu'à</span>
             <span className="text-xs sm:text-sm font-medium text-gray-800">
@@ -131,7 +134,6 @@ function DestinationCard({
             </span>
           </div>
 
-          {/* Opérateur */}
           <div className="flex items-center justify-between">
             <span className="text-xs sm:text-sm text-gray-600">Opérateur</span>
             <span className="text-xs sm:text-sm font-medium text-gray-800 truncate ml-2 max-w-20 sm:max-w-none">
@@ -140,7 +142,6 @@ function DestinationCard({
           </div>
         </div>
 
-        {/* Bouton d'action */}
         <button
           className={`w-full py-2 sm:py-3 px-3 sm:px-4 rounded-lg sm:rounded-xl font-semibold text-sm sm:text-base transition-all duration-300 ${
             isTop
@@ -159,7 +160,6 @@ function DestinationCard({
         </button>
       </div>
 
-      {/* Effet de gradient en overlay pour les top destinations */}
       {isTop && (
         <div className="absolute inset-0 bg-gradient-to-br from-purple-50/20 to-orange-50/20 pointer-events-none" />
       )}
@@ -168,14 +168,44 @@ function DestinationCard({
 }
 
 export default function Shop() {
+  const router = useRouter();
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currency, setCurrency] = useState<"EUR" | "XPF" | "USD">("EUR");
   const [searchQuery, setSearchQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState<"all" | "local" | "global">("all");
+  const [typeFilter, setTypeFilter] = useState<"all" | "local" | "global">(
+    "all"
+  );
   const [margin, setMargin] = useState(0);
 
+  // ✅ Pré-remplissage & stockage local
+  useEffect(() => {
+    if (!router.isReady) return;
+
+    const promoCode =
+      (router.query.code as string) || localStorage.getItem("promoCode");
+    const partnerRef =
+      (router.query.ref as string) || localStorage.getItem("partnerRef");
+
+    if (promoCode) {
+      localStorage.setItem("promoCode", promoCode);
+      const inputPromo = document.querySelector<HTMLInputElement>(
+        'input[placeholder="Code promo (optionnel)"]'
+      );
+      if (inputPromo) inputPromo.value = promoCode;
+    }
+
+    if (partnerRef) {
+      localStorage.setItem("partnerRef", partnerRef);
+      const inputPartner = document.querySelector<HTMLInputElement>(
+        'input[placeholder="Code partenaire (optionnel)"]'
+      );
+      if (inputPartner) inputPartner.value = partnerRef;
+    }
+  }, [router.isReady, router.query]);
+
+  // ✅ Récupération des forfaits
   useEffect(() => {
     async function fetchPackages() {
       try {
@@ -186,7 +216,6 @@ export default function Shop() {
 
         if (error) throw error;
 
-        // Filter packages with valid prices for at least one currency
         const validPackages = (data || []).filter((pkg) => {
           const hasValidEur =
             pkg.final_price_eur != null && pkg.final_price_eur > 0;
@@ -209,6 +238,7 @@ export default function Shop() {
     fetchPackages();
   }, []);
 
+  // ✅ Récupération devise & marge
   useEffect(() => {
     if (typeof window !== "undefined") {
       const cur = localStorage.getItem("currency") as
@@ -217,13 +247,10 @@ export default function Shop() {
         | "XPF"
         | null;
       if (cur) setCurrency(cur);
-    }
-  }, []);
 
-  useEffect(() => {
-    // Only runs on client
-    const storedMargin = parseFloat(localStorage.getItem('global_margin') || '0');
-    setMargin(storedMargin);
+      const storedMargin = parseFloat(localStorage.getItem("global_margin") || "0");
+      setMargin(storedMargin);
+    }
   }, []);
 
   const getPrice = (pkg: Package, currency: string): number => {
@@ -236,7 +263,6 @@ export default function Shop() {
         return pkg.final_price_eur || 0;
     }
   };
-
   // Group packages by region and calculate stats
   const packagesByRegion = packages.reduce((acc, pkg) => {
     // Apply type filter
@@ -529,3 +555,4 @@ export default function Shop() {
     </div>
   );
 }
+

@@ -82,16 +82,16 @@ export default function SuccessPage() {
     const checkOrderStatus = async () => {
       try {
         // FIRST: Verify payment with Stripe
-        // const stripeResponse = await fetch('/api/verify-payment', {
-        //   method: 'POST',
-        //   headers: { 'Content-Type': 'application/json' },
-        //   body: JSON.stringify({ session_id })
-        // });
+        const stripeResponse = await fetch('/api/verify-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id })
+        });
         
-        // const stripeData = await stripeResponse.json();
-        // if (!stripeData.paid) {
-        //   return setOrderStatus("error");
-        // }
+        const stripeData = await stripeResponse.json();
+        if (!stripeData.paid) {
+          return setOrderStatus("error");
+        }
     
         // THEN: Check database
         const { data: orderData, error: orderError } = await supabase

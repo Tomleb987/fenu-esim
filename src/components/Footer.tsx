@@ -25,7 +25,6 @@ export default function Footer() {
             <ul className="space-y-2 text-sm">
               <li><Link href="/" className="hover:underline hover:text-fenua-orange transition-colors">Accueil</Link></li>
               <li><Link href="/shop" className="hover:underline hover:text-fenua-orange transition-colors">Nos eSIM</Link></li>
-              <li><Link href="/recharge" className="hover:underline hover:text-fenua-orange transition-colors">Recharger</Link></li>
               <li><Link href="/contact" className="hover:underline hover:text-fenua-orange transition-colors">Contact</Link></li>
               <li><Link href="/about" className="hover:underline hover:text-fenua-orange transition-colors">À propos</Link></li>
               <li><Link href="/concours" className="hover:underline hover:text-fenua-orange transition-colors">Concours</Link></li>

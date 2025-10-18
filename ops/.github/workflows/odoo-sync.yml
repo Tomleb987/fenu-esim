@@ -1,0 +1,59 @@
+name: Odoo ⇄ Supabase Sync
+
+on:
+  schedule:
+    # 06:00 Tahiti (UTC-10) = 16:00 UTC
+    - cron: "0 16 * * *"
+  workflow_dispatch:
+    inputs:
+      env:
+        description: "Environment (dev|prod)"
+        required: true
+        default: "dev"
+      dry_run:
+        description: "Dry-run (true|false)"
+        required: true
+        default: "true"
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    concurrency:
+      group: odoo-sync-${{ github.ref_name }}-${{ inputs.env || 'dev' }}
+      cancel-in-progress: true
+    environment: ${{ inputs.env || 'dev' }}
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Sync deps
+        working-directory: ops/odoo-sync
+        run: uv sync
+
+      - name: Run sync
+        working-directory: ops/odoo-sync
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          ODOO_URL: ${{ secrets.ODOO_URL }}
+          ODOO_DB: ${{ secrets.ODOO_DB }}
+          ODOO_USER: ${{ secrets.ODOO_USER }}
+          ODOO_PASSWORD: ${{ secrets.ODOO_PASSWORD }}
+          DRY_RUN: ${{ inputs.dry_run || 'true' }}
+        run: uv run python sync_supabase_odoo.py
+
+      - name: Post-failure hint
+        if: failure()
+        run: echo "Échec du job — vérifiez l’Environment (dev/prod) et les secrets."

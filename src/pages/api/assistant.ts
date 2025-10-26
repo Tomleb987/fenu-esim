@@ -5,33 +5,6 @@ import { createClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
-// --- Normalisation des noms de destinations --- //
-const destinationAliases: Record<string, string> = {
-  "usa": "États-Unis",
-  "us": "États-Unis",
-  "états-unis": "États-Unis",
-  "états unis": "États-Unis",
-  "etat unis": "États-Unis",
-  "etat-unis": "États-Unis",
-  "united states": "États-Unis",
-  "nz": "Nouvelle-Zélande",
-  "new zealand": "Nouvelle-Zélande",
-  "france": "France",
-};
-
-const destinationPages: Record<string, string> = {
-  "france": "https://fenuasim.com/shop/france",
-  "états-unis": "https://fenuasim.com/shop/united-states",
-  "etats-unis": "https://fenuasim.com/shop/united-states",
-  "usa": "https://fenuasim.com/shop/united-states",
-  "us": "https://fenuasim.com/shop/united-states",
-};
-
-function normalizeDestination(input: string): string {
-  const cleaned = input.trim().toLowerCase();
-  return destinationAliases[cleaned] || input;
-}
-
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -41,9 +14,24 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-04-30.basil",
 });
 
+const destinationAliases: Record<string, string> = {
+  "usa": "États-Unis",
+  "us": "États-Unis",
+  "united states": "États-Unis",
+  "états unis": "États-Unis",
+  "états-unis": "États-Unis",
+  "nz": "Nouvelle-Zélande",
+  "new zealand": "Nouvelle-Zélande",
+};
+
+function normalizeDestination(input: string): string {
+  const cleaned = input.trim().toLowerCase();
+  return destinationAliases[cleaned] || input;
+}
+
 const systemPrompt: ChatCompletionMessageParam = {
   role: "system",
-  content: `Tu es un assistant virtuel pour FENUA SIM. Quand un utilisateur demande une destination, si c'est France ou États-Unis, donne simplement le lien de la page dédiée. Sinon, poursuis avec les autres règles normales.`
+  content: `Tu es l'assistant de FENUA SIM. Normalise toujours les noms de pays : ex. USA = États-Unis. Si une destination est connue, donne le lien de la page correspondante.`,
 };
 
 async function getPlans(country: string) {
@@ -100,6 +88,16 @@ async function createPayment(planId: string, email: string) {
   return session.url;
 }
 
+async function getDestinationInfo(normalized: string) {
+  const { data } = await supabase
+    .from("destination_info")
+    .select("slug, name")
+    .ilike("name", `%${normalized}%`)
+    .single();
+
+  return data;
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Méthode non autorisée" });
@@ -108,6 +106,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const { messages } = req.body as { messages: ChatCompletionMessageParam[] };
     const fullMessages: ChatCompletionMessageParam[] = [systemPrompt, ...messages];
+
+    const lastUserMessage = messages[messages.length - 1]?.content || "";
+    const normalized = normalizeDestination(lastUserMessage);
+    const destinationInfo = await getDestinationInfo(normalized);
+
+    if (destinationInfo) {
+      return res.status(200).json({
+        reply: `Oui, nous avons des forfaits pour ${destinationInfo.name}. Voici le lien : https://fenuasim.com/${destinationInfo.slug}`,
+      });
+    }
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4",
@@ -161,36 +169,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       let functionResponse;
 
       switch (name) {
-        case "getPlans": {
-          if (!parsedArgs.country) {
-            return res.status(400).json({ reply: "La destination n’a pas été comprise." });
-          }
-          const normalizedCountry = normalizeDestination(parsedArgs.country);
-          const pageUrl = destinationPages[normalizedCountry.toLowerCase()];
-
-          if (pageUrl) {
-            return res.status(200).json({
-              reply: `✅ Oui, nous avons des forfaits eSIM pour **${normalizedCountry}**.\n\n🔗 Consultez la page ici : ${pageUrl}`,
-            });
-          }
-
-          functionResponse = await getPlans(normalizedCountry);
-
-          if (!functionResponse || functionResponse.length === 0) {
-            return res.status(200).json({ reply: `Aucun forfait disponible pour ${normalizedCountry} pour le moment.` });
-          }
-
-          return res.status(200).json({ reply: JSON.stringify(functionResponse) });
-        }
-
+        case "getPlans":
+          const country = normalizeDestination(parsedArgs.country);
+          functionResponse = await getPlans(country);
+          break;
         case "getPlanById":
           functionResponse = await getPlanById(parsedArgs.planId);
           break;
-
         case "createPayment":
           functionResponse = await createPayment(parsedArgs.planId, parsedArgs.email);
           break;
-
         default:
           return res.status(400).json({ error: "Invalid function call" });
       }
@@ -212,8 +200,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     return res.status(200).json({ reply: response.content });
-  } catch (err: any) {
+  } catch (err) {
     console.error("Erreur assistant GPT:", err);
-    res.status(500).json({ reply: `Erreur GPT : ${err.message}` });
+    res.status(500).json({ error: "Erreur serveur GPT" });
   }
 }

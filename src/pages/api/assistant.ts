@@ -5,10 +5,12 @@ import Stripe from "stripe";
 
 // -------------------- CONFIG --------------------
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
+
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-04-30.basil",
 });
@@ -19,6 +21,11 @@ type ChatRole = "system" | "user" | "assistant";
 interface ChatMessage {
   role: ChatRole;
   content: string;
+  name?: string;
+  function_call?: {
+    name: string;
+    arguments?: string;
+  };
 }
 
 interface RequestBody {
@@ -28,17 +35,23 @@ interface RequestBody {
 // -------------------- SYSTEM PROMPT --------------------
 const systemPrompt: ChatMessage = {
   role: "system",
-  content: `Tu es un assistant virtuel spécialisé dans la vente d'eSIM pour FENUA SIM.
-  - Demande toujours la destination et la durée du séjour.
-  - Propose les forfaits adaptés en fonction des besoins.
-  - Vérifie que le client a bien reçu son eSIM par email après le paiement.
-  - Reste poli, professionnel et concis.
-  
-  Si la question n’est pas directement liée aux eSIM :
-  1. Essaie de comprendre l’intention
-  2. Réponds de manière utile et pertinente
-  3. Fais le lien avec nos services eSIM si possible
-  4. Si vraiment aucun rapport : explique que tu es spécialisé eSIM mais aide quand même.`
+  content: `
+Tu es l’assistant officiel de FENUA SIM, un service de vente de cartes eSIM pour les voyageurs.
+
+Tu aides les utilisateurs à :
+- Comprendre les forfaits disponibles selon la destination et la durée du séjour
+- Vérifier que leur commande a bien été reçue
+- Expliquer comment activer leur eSIM après l’achat (QR code, paramètres mobiles)
+- Expliquer comment recharger une eSIM déjà achetée
+- Proposer des options adaptées si le client n’a plus de données
+
+Règles :
+- Demande toujours la destination et la durée du séjour pour proposer un forfait
+- Ne donne pas d’informations inventées
+- Si la question n’est pas liée aux eSIM, essaie d’aider tout de même
+- Reste professionnel, clair, direct et courtois
+- Si tu ne sais pas, propose de contacter le support via contact@fenuasim.com
+`
 };
 
 // -------------------- SUPABASE HELPERS --------------------
@@ -112,7 +125,6 @@ export default async function handler(
       return res.status(400).json({ error: "messages array required" });
     }
 
-    // Ajout du system prompt
     const fullMessages: ChatMessage[] = [systemPrompt, ...messages];
 
     const completion = await openai.chat.completions.create({
@@ -160,42 +172,57 @@ export default async function handler(
 
     const response = completion.choices[0].message;
 
+    // -------------------- APPEL DE FUNCTION --------------------
     if (response.function_call) {
       const { name, arguments: args } = response.function_call;
       const parsedArgs = JSON.parse(args || "{}");
 
+      let functionResponse;
+
       switch (name) {
-        case "getPlans": {
-          const plans = await getPlans(parsedArgs.country);
-          return res.status(200).json({ plans });
-        }
-        case "getPlanById": {
-          const plan = await getPlanById(parsedArgs.planId);
-          return res.status(200).json({ plan });
-        }
-        case "createPayment": {
+        case "getPlans":
+          functionResponse = await getPlans(parsedArgs.country);
+          break;
+        case "getPlanById":
+          functionResponse = await getPlanById(parsedArgs.planId);
+          break;
+        case "createPayment":
           if (!parsedArgs.email) {
-            return res
-              .status(400)
-              .json({ error: "Email is required for payment" });
+            return res.status(400).json({ error: "Email is required for payment" });
           }
-          const paymentUrl = await createPayment(
-            parsedArgs.planId,
-            parsedArgs.email
-          );
-          return res.status(200).json({ paymentUrl });
-        }
+          functionResponse = await createPayment(parsedArgs.planId, parsedArgs.email);
+          break;
         default:
           return res.status(400).json({ error: "Invalid function call" });
       }
+
+      // 🔁 Reboucle vers GPT avec la réponse de la fonction
+      const followUp = await openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+          ...fullMessages,
+          response,
+          {
+            role: "function",
+            name,
+            content: JSON.stringify(functionResponse),
+          },
+        ],
+      });
+
+      const finalReply = followUp.choices[0].message.content;
+      return res.status(200).json({ reply: finalReply });
     }
 
+    // -------------------- RÉPONSE SIMPLE SANS FUNCTION --------------------
     const reply =
       response.content ||
       "Je n’ai pas bien compris votre demande. Pouvez-vous préciser ?";
     res.status(200).json({ reply });
+
   } catch (err) {
     console.error("Erreur assistant GPT:", err);
     res.status(500).json({ error: "Erreur GPT" });
   }
 }
+

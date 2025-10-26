@@ -5,6 +5,33 @@ import { createClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
+// --- Normalisation des noms de destinations --- //
+const destinationAliases: Record<string, string> = {
+  "usa": "États-Unis",
+  "us": "États-Unis",
+  "united states": "États-Unis",
+  "etat unis": "États-Unis",
+  "états unis": "États-Unis",
+  "états-unis": "États-Unis",
+  "nz": "Nouvelle-Zélande",
+  "new zealand": "Nouvelle-Zélande",
+  "france": "France",
+  "japan": "Japon",
+  "europe": "Europe",
+  "mexico": "Mexique",
+  "fiji": "Fidji",
+  "australia": "Australie",
+  "asia": "Asie",
+  "africa": "Afrique",
+  "spain": "Espagne",
+  "portugal": "Portugal",
+};
+
+function normalizeDestination(input: string): string {
+  const cleaned = input.trim().toLowerCase();
+  return destinationAliases[cleaned] || input;
+}
+
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -14,24 +41,9 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-04-30.basil",
 });
 
-const destinationAliases: Record<string, string> = {
-  "usa": "États-Unis",
-  "us": "États-Unis",
-  "united states": "États-Unis",
-  "états unis": "États-Unis",
-  "états-unis": "États-Unis",
-  "nz": "Nouvelle-Zélande",
-  "new zealand": "Nouvelle-Zélande",
-};
-
-function normalizeDestination(input: string): string {
-  const cleaned = input.trim().toLowerCase();
-  return destinationAliases[cleaned] || input;
-}
-
 const systemPrompt: ChatCompletionMessageParam = {
   role: "system",
-  content: `Tu es l'assistant de FENUA SIM. Normalise toujours les noms de pays : ex. USA = États-Unis. Si une destination est connue, donne le lien de la page correspondante.`,
+  content: `Tu es l'assistant de FENUA SIM. Normalise toujours les noms de pays : ex. USA = États-Unis.`
 };
 
 async function getPlans(country: string) {
@@ -42,6 +54,17 @@ async function getPlans(country: string) {
     .order("final_price_eur", { ascending: true });
 
   if (error) throw error;
+  return data;
+}
+
+async function getDestinationInfo(name: string) {
+  const { data, error } = await supabase
+    .from("destination_info")
+    .select("*")
+    .ilike("name", name)
+    .single();
+
+  if (error || !data) return null;
   return data;
 }
 
@@ -88,16 +111,6 @@ async function createPayment(planId: string, email: string) {
   return session.url;
 }
 
-async function getDestinationInfo(normalized: string) {
-  const { data } = await supabase
-    .from("destination_info")
-    .select("slug, name")
-    .ilike("name", `%${normalized}%`)
-    .single();
-
-  return data;
-}
-
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Méthode non autorisée" });
@@ -108,12 +121,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const fullMessages: ChatCompletionMessageParam[] = [systemPrompt, ...messages];
 
     const lastUserMessage = messages[messages.length - 1]?.content || "";
-    const normalized = normalizeDestination(lastUserMessage);
+
+    const lastMessageText = typeof lastUserMessage === "string"
+      ? lastUserMessage
+      : Array.isArray(lastUserMessage)
+        ? lastUserMessage.map(part => (typeof part === "string" ? part : part.text || "")).join(" ")
+        : "";
+
+    const normalized = normalizeDestination(lastMessageText);
     const destinationInfo = await getDestinationInfo(normalized);
 
     if (destinationInfo) {
       return res.status(200).json({
-        reply: `Oui, nous avons des forfaits pour ${destinationInfo.name}. Voici le lien : https://fenuasim.com/${destinationInfo.slug}`,
+        reply: `D'accord, voici le lien vers notre page dédiée aux forfaits eSIM pour ${destinationInfo.name} : [Page ${destinationInfo.name}](https://fenuasim.com/${destinationInfo.slug})`
       });
     }
 
@@ -170,8 +190,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       switch (name) {
         case "getPlans":
-          const country = normalizeDestination(parsedArgs.country);
-          functionResponse = await getPlans(country);
+          const normalizedCountry = normalizeDestination(parsedArgs.country);
+          functionResponse = await getPlans(normalizedCountry);
           break;
         case "getPlanById":
           functionResponse = await getPlanById(parsedArgs.planId);

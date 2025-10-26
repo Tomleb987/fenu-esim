@@ -10,121 +10,62 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// Normalisation manuelle
-function normalizeDestination(input: string): string {
-  const cleaned = input.trim().toLowerCase();
-  const map: Record<string, string> = {
-    "usa": "united states",
-    "us": "united states",
-    "états-unis": "united states",
-    "état unis": "united states",
-    "etat-unis": "united states",
-    "united states": "united states",
-    "nz": "new zealand",
-    "australie": "australia",
-    "fidji": "fiji",
-    "royaume-uni": "united kingdom",
-    "grande bretagne": "united kingdom",
-    "coree du sud": "south korea",
-    "coree": "south korea",
-    "japon": "japan",
-    "espagne": "spain",
-    "allemagne": "germany",
-    "europe": "europe",
-    "asie": "asia",
-    "afrique": "africa",
-    "france": "france",
-    "mexique": "mexico"
-  };
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
-  return map[cleaned] || cleaned;
+function normalizeDestination(input: string): string {
+  return input
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/[^\w\s-]/gi, "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-");
 }
 
-// Récupère les infos destination depuis Supabase
-async function getDestinationInfo(normalized: string) {
+async function getDestinationInfo(slug: string) {
   const { data, error } = await supabase
     .from("destination_info")
-    .select("normalized_name, url")
-    .ilike("normalized_name", normalized);
+    .select("name, slug")
+    .ilike("slug", slug);
 
-  if (error) {
-    console.error("Erreur Supabase:", error);
-    return null;
-  }
-
-  return data && data.length > 0 ? data[0] : null;
+  if (error || !data || data.length === 0) return null;
+  return data[0];
 }
-
-// Instance OpenAI
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Méthode non autorisée" });
   }
 
-  try {
-    const { messages } = req.body as { messages: ChatCompletionMessageParam[] };
+  const { messages } = req.body;
 
-    const lastUserMessage = messages[messages.length - 1]?.content || "";
-    const lastMessageText =
-      typeof lastUserMessage === "string"
-        ? lastUserMessage
-        : Array.isArray(lastUserMessage)
-        ? lastUserMessage
-            .map(part => (typeof part === "string" ? part : (part as any)?.text || ""))
-            .join(" ")
-        : "";
+  const lastUserMessage = messages[messages.length - 1]?.content || "";
+  const lastMessageText = typeof lastUserMessage === "string"
+    ? lastUserMessage
+    : Array.isArray(lastUserMessage)
+    ? lastUserMessage.map(part => typeof part === 'string' ? part : ("text" in part ? part.text : ""))?.join(" ")
+    : "";
 
-    const normalized = normalizeDestination(lastMessageText);
-    const destinationInfo = await getDestinationInfo(normalized);
+  const normalized = normalizeDestination(lastMessageText);
+  const destinationInfo = await getDestinationInfo(normalized);
 
-    // 🔁 Cas spécifique destination
-    if (destinationInfo) {
-      return res.status(200).json({
-        reply: `<p>D'accord, voici le lien vers notre page dédiée aux forfaits eSIM pour <strong>${capitalize(normalized)}</strong> :</p><p>👉 <a href="${destinationInfo.url}" target="_blank" style="color: #0070f3;">Voir les offres</a></p>`,
-      });
-    }
+  if (destinationInfo) {
+    const url = `https://www.fenuasim.com/shop/${destinationInfo.slug.toLowerCase()}`;
+    const message = `D'accord, voici le lien vers notre page dédiée aux forfaits eSIM pour <strong>${destinationInfo.name}</strong> : 👉 <a href="${url}" target="_blank">Voir les offres</a>`;
 
-    // 🔁 Cas spécifique : recharge
-    if (lastMessageText.toLowerCase().includes("recharge")) {
-      return res.status(200).json({
-        reply:
-          "Pour recharger votre eSIM, connectez-vous à votre espace client avec l'adresse e-mail utilisée lors de l'achat. Sélectionnez la eSIM dans vos forfaits, cliquez sur <strong>« Recharger »</strong>, choisissez le forfait souhaité et procédez au paiement.",
-      });
-    }
-
-    // 🔁 Cas spécifique : support
-    if (
-      lastMessageText.toLowerCase().includes("support") ||
-      lastMessageText.toLowerCase().includes("assistance") ||
-      lastMessageText.toLowerCase().includes("aide") ||
-      lastMessageText.toLowerCase().includes("contacter")
-    ) {
-      return res.status(200).json({
-        reply: `Vous pouvez contacter notre support :<ul>
-        <li>📧 par email : <a href="mailto:contact@fenuasim.com">contact@fenuasim.com</a> ou <a href="mailto:sav@fenuasim.com">sav@fenuasim.com</a></li>
-        <li>💬 par WhatsApp : <a href="https://wa.me/33749782101" target="_blank">+33 7 49 78 21 01</a></li>
-        <li>📨 via le <a href="https://www.fenuasim.com/contact" target="_blank">formulaire de contact</a></li>
-      </ul>`,
-      });
-    }
-
-    // Si pas de cas spéciaux → appel GPT
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [systemPrompt, ...messages],
-      temperature: 0.7,
-    });
-
-    return res.status(200).json({ reply: completion.choices[0].message.content });
-  } catch (error) {
-    console.error("Erreur GPT:", error);
-    return res.status(500).json({ error: "Erreur serveur assistant IA" });
+    return res.status(200).json({ reply: message });
   }
-}
 
-// Capitalize 1ère lettre
-function capitalize(str: string) {
-  return str.charAt(0).toUpperCase() + str.slice(1);
+  // Si pas de destination trouvée, fallback sur OpenAI
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      { role: "system", content: systemPrompt },
+      ...messages as ChatCompletionMessageParam[],
+    ],
+    temperature: 0.7,
+  });
+
+  const reply = completion.choices[0]?.message?.content || "Je n'ai pas compris votre demande.";
+  return res.status(200).json({ reply });
 }

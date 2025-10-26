@@ -36,7 +36,7 @@ const destinationMap: Record<string, string> = {
 function normalizeDestination(input: string): string {
   return input
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\u0300-\u036f]/g, "") // supprime les accents
     .toLowerCase()
     .trim();
 }
@@ -45,19 +45,36 @@ function capitalize(text: string) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
+// --- API Handler ---
 export default async function handler(req: any, res: any) {
   const { messages } = req.body;
+  const lastMessage = messages[messages.length - 1];
 
-  const lastUserMessage = messages[messages.length - 1]?.content ?? "";
-  const normalized = normalizeDestination(lastUserMessage);
+  let lastUserMessageText = "";
+
+  // Gérer différents formats de message (GPT-4o, multipart, etc.)
+  if (typeof lastMessage?.content === "string") {
+    lastUserMessageText = lastMessage.content;
+  } else if (Array.isArray(lastMessage?.content)) {
+    lastUserMessageText = lastMessage.content
+      .map((part: any) =>
+        typeof part === "string" ? part : part?.text || ""
+      )
+      .join(" ");
+  }
+
+  const normalized = normalizeDestination(lastUserMessageText);
   const destinationSlug = destinationMap[normalized];
 
   let assistantReply = "";
 
   if (destinationSlug) {
-    assistantReply = `D'accord, voici le lien vers notre page dédiée aux forfaits eSIM pour ${capitalize(normalized)} :\nhttps://www.fenuasim.com/shop/${destinationSlug}`;
+    assistantReply = `D'accord, vous pouvez consulter les offres eSIM pour ${capitalize(
+      normalized
+    )} ici : https://www.fenuasim.com/shop/${destinationSlug}`;
   } else {
-    assistantReply = "Désolé, je n’ai pas compris cette destination. Pouvez-vous la reformuler ou vérifier son orthographe ?";
+    assistantReply =
+      "Désolé, je n’ai pas compris cette destination. Pouvez-vous la reformuler ou vérifier son orthographe ?";
   }
 
   const responseMessage: ChatCompletionMessageParam = {

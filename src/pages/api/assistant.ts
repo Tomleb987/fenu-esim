@@ -52,13 +52,17 @@ export default async function handler(req: any, res: any) {
 
   let lastUserMessageText = "";
 
-  // Gérer différents formats de message (GPT-4o, multipart, etc.)
+  // ✅ Gestion propre du format de message selon OpenAI
   if (typeof lastMessage?.content === "string") {
     lastUserMessageText = lastMessage.content;
   } else if (Array.isArray(lastMessage?.content)) {
     lastUserMessageText = lastMessage.content
       .map((part: any) =>
-        typeof part === "string" ? part : part?.text || ""
+        typeof part === "string"
+          ? part
+          : "text" in part
+          ? part.text
+          : ""
       )
       .join(" ");
   }

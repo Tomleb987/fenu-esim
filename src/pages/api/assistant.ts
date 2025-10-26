@@ -16,6 +16,35 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-04-30.basil",
 });
 
+// -------------------- DESTINATIONS --------------------
+const destinationMap: Record<string, string> = {
+  france: "france",
+  "united states": "united-states",
+  usa: "united-states",
+  us: "united-states",
+  fiji: "fiji",
+  fidji: "fiji",
+  australie: "australia",
+  australia: "australia",
+  japon: "japan",
+  japan: "japan",
+  mexique: "mexico",
+  mexico: "mexico",
+  europe: "europe",
+  asie: "asia",
+  asia: "asia",
+  monde: "discover-global",
+  global: "discover-global"
+};
+
+function normalizeDestination(input: string): string {
+  return input
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
 // -------------------- SYSTEM PROMPT --------------------
 const systemPrompt: ChatCompletionMessageParam = {
   role: "system",
@@ -109,6 +138,19 @@ export default async function handler(
       return res.status(400).json({ error: "messages array required" });
     }
 
+    const lastUserMessage = messages[messages.length - 1]?.content;
+
+    // --- 🔁 Réponse directe pour destination seule ---
+    if (typeof lastUserMessage === "string") {
+      const normalized = normalizeDestination(lastUserMessage);
+      const destinationSlug = destinationMap[normalized];
+      if (destinationSlug) {
+        const reply = `D'accord, vous pouvez consulter les offres eSIM pour ${normalized} ici : https://www.fenuasim.com/shop/${destinationSlug}`;
+        return res.status(200).json({ reply });
+      }
+    }
+
+    // --- Sinon, GPT prend le relais ---
     const fullMessages: ChatCompletionMessageParam[] = [systemPrompt, ...messages];
 
     const completion = await openai.chat.completions.create({
@@ -179,7 +221,6 @@ export default async function handler(
           return res.status(400).json({ error: "Invalid function call" });
       }
 
-      // 🔁 Reboucle vers GPT avec la réponse de la fonction
       const followUp = await openai.chat.completions.create({
         model: "gpt-4",
         messages: [
@@ -197,7 +238,6 @@ export default async function handler(
       return res.status(200).json({ reply: finalReply });
     }
 
-    // Réponse directe sans appel de fonction
     const reply =
       response.content ||
       "Je n’ai pas bien compris votre demande. Pouvez-vous préciser ?";

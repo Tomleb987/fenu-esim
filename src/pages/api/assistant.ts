@@ -1,44 +1,73 @@
+// /pages/api/assistant.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { OpenAI } from "openai";
 import { createClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
-// -------------------- CONFIG --------------------
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// --- Normalisation des noms de destinations --- //
+const destinationAliases: Record<string, string> = {
+  "usa": "États-Unis",
+  "us": "États-Unis",
+  "états-unis": "États-Unis",
+  "états unis": "États-Unis",
+  "united states": "États-Unis",
+  "nz": "Nouvelle-Zélande",
+  "new zealand": "Nouvelle-Zélande",
+  "france": "France",
+  "spain": "Espagne",
+  "italy": "Italie",
+  "turkey": "Turquie",
+  "united kingdom": "Royaume-Uni",
+  "germany": "Allemagne",
+  "mexico": "Mexique",
+  "thailand": "Thaïlande",
+  "hong kong": "Hong Kong",
+  "malaysia": "Malaisie",
+  "greece": "Grèce",
+  "canada": "Canada",
+  "south korea": "Corée du Sud",
+  "japan": "Japon",
+  "singapore": "Singapour",
+  "australia": "Australie",
+  "austria": "Autriche",
+  "argentina": "Argentine",
+  "india": "Inde",
+  "ireland": "Irlande",
+  "morocco": "Maroc",
+  "netherlands": "Pays-Bas",
+  "portugal": "Portugal",
+  "switzerland": "Suisse",
+  "sweden": "Suède",
+  "norway": "Norvège",
+  "finland": "Finlande",
+  "belgium": "Belgique",
+  "denmark": "Danemark",
+  "luxembourg": "Luxembourg",
+  "russia": "Russie",
+  "china": "Chine",
+  "fiji": "Fidji",
+};
 
+function normalizeDestination(input: string): string {
+  const cleaned = input.trim().toLowerCase();
+  return destinationAliases[cleaned] || input;
+}
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
-
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-04-30.basil",
 });
 
-// -------------------- SYSTEM PROMPT --------------------
 const systemPrompt: ChatCompletionMessageParam = {
   role: "system",
-  content: `
-Tu es l’assistant officiel de FENUA SIM, un service de vente de cartes eSIM pour les voyageurs.
-
-Tu aides les utilisateurs à :
-- Comprendre les forfaits disponibles selon la destination et la durée du séjour
-- Vérifier que leur commande a bien été reçue
-- Expliquer comment activer leur eSIM après l’achat (QR code, paramètres mobiles)
-- Expliquer comment recharger une eSIM déjà achetée
-- Proposer des options adaptées si le client n’a plus de données
-
-Règles :
-- Demande toujours la destination et la durée du séjour pour proposer un forfait
-- Ne donne pas d’informations inventées
-- Si la question n’est pas liée aux eSIM, essaie d’aider tout de même
-- Reste professionnel, clair, direct et courtois
-- Si tu ne sais pas, propose de contacter le support via contact@fenuasim.com
-`
+  content: `Tu es l'assistant de FENUA SIM. Normalise toujours les noms de pays : ex. USA = États-Unis.`
 };
 
-// -------------------- SUPABASE HELPERS --------------------
 async function getPlans(country: string) {
   const { data, error } = await supabase
     .from("airalo_packages")
@@ -93,11 +122,7 @@ async function createPayment(planId: string, email: string) {
   return session.url;
 }
 
-// -------------------- API HANDLER --------------------
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Méthode non autorisée" });
   }
@@ -105,16 +130,13 @@ export default async function handler(
   try {
     const { messages } = req.body as { messages: ChatCompletionMessageParam[] };
 
-    if (!messages || !Array.isArray(messages)) {
-      return res.status(400).json({ error: "messages array required" });
-    }
-
     const fullMessages: ChatCompletionMessageParam[] = [systemPrompt, ...messages];
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4",
       messages: fullMessages,
       temperature: 0.7,
+      function_call: "auto",
       functions: [
         {
           name: "getPlans",
@@ -129,29 +151,28 @@ export default async function handler(
         },
         {
           name: "getPlanById",
-          description: "Récupère les détails d'un forfait spécifique",
+          description: "Récupère un forfait",
           parameters: {
             type: "object",
             properties: {
-              planId: { type: "string", description: "ID du forfait" },
+              planId: { type: "string" },
             },
             required: ["planId"],
           },
         },
         {
           name: "createPayment",
-          description: "Crée un paiement Stripe pour un forfait",
+          description: "Crée un paiement Stripe",
           parameters: {
             type: "object",
             properties: {
-              planId: { type: "string", description: "ID du forfait" },
-              email: { type: "string", description: "Email du client" },
+              planId: { type: "string" },
+              email: { type: "string" },
             },
             required: ["planId", "email"],
           },
         },
       ],
-      function_call: "auto",
     });
 
     const response = completion.choices[0].message;
@@ -164,22 +185,19 @@ export default async function handler(
 
       switch (name) {
         case "getPlans":
-          functionResponse = await getPlans(parsedArgs.country);
+          const normalizedCountry = normalizeDestination(parsedArgs.country);
+          functionResponse = await getPlans(normalizedCountry);
           break;
         case "getPlanById":
           functionResponse = await getPlanById(parsedArgs.planId);
           break;
         case "createPayment":
-          if (!parsedArgs.email) {
-            return res.status(400).json({ error: "Email is required for payment" });
-          }
           functionResponse = await createPayment(parsedArgs.planId, parsedArgs.email);
           break;
         default:
           return res.status(400).json({ error: "Invalid function call" });
       }
 
-      // 🔁 Reboucle vers GPT avec la réponse de la fonction
       const followUp = await openai.chat.completions.create({
         model: "gpt-4",
         messages: [
@@ -193,18 +211,12 @@ export default async function handler(
         ],
       });
 
-      const finalReply = followUp.choices[0].message.content;
-      return res.status(200).json({ reply: finalReply });
+      return res.status(200).json({ reply: followUp.choices[0].message.content });
     }
 
-    // Réponse directe sans appel de fonction
-    const reply =
-      response.content ||
-      "Je n’ai pas bien compris votre demande. Pouvez-vous préciser ?";
-    res.status(200).json({ reply });
-
+    return res.status(200).json({ reply: response.content });
   } catch (err) {
     console.error("Erreur assistant GPT:", err);
-    res.status(500).json({ error: "Erreur GPT" });
+    res.status(500).json({ error: "Erreur serveur GPT" });
   }
 }

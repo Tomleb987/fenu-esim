@@ -5,33 +5,6 @@ import { createClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
-// --- Normalisation des noms de destinations --- //
-const destinationAliases: Record<string, string> = {
-  "usa": "États-Unis",
-  "us": "États-Unis",
-  "united states": "États-Unis",
-  "etat unis": "États-Unis",
-  "états unis": "États-Unis",
-  "états-unis": "États-Unis",
-  "nz": "Nouvelle-Zélande",
-  "new zealand": "Nouvelle-Zélande",
-  "france": "France",
-  "japan": "Japon",
-  "europe": "Europe",
-  "mexico": "Mexique",
-  "fiji": "Fidji",
-  "australia": "Australie",
-  "asia": "Asie",
-  "africa": "Afrique",
-  "spain": "Espagne",
-  "portugal": "Portugal",
-};
-
-function normalizeDestination(input: string): string {
-  const cleaned = input.trim().toLowerCase();
-  return destinationAliases[cleaned] || input;
-}
-
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -41,9 +14,37 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-04-30.basil",
 });
 
+// Normalisation des noms de destinations
+const destinationAliases: Record<string, string> = {
+  "usa": "États-Unis",
+  "us": "États-Unis",
+  "états-unis": "États-Unis",
+  "états unis": "États-Unis",
+  "united states": "États-Unis",
+  "new zealand": "Nouvelle-Zélande",
+  "nz": "Nouvelle-Zélande",
+  "france": "France",
+  "europe": "Europe",
+};
+
+function normalizeDestination(input: string): string {
+  const cleaned = input.trim().toLowerCase();
+  return destinationAliases[cleaned] || input;
+}
+
+async function getDestinationInfo(destination: string) {
+  const { data, error } = await supabase
+    .from("destination_info")
+    .select("name, slug")
+    .ilike("name", `%${destination}%`)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
 const systemPrompt: ChatCompletionMessageParam = {
   role: "system",
-  content: `Tu es l'assistant de FENUA SIM. Normalise toujours les noms de pays : ex. USA = États-Unis.`
+  content: `Tu es l'assistant de FENUA SIM. Normalise toujours les noms de pays (ex: USA = États-Unis). Si une destination est connue dans la table, donne le lien de la page correspondante.`
 };
 
 async function getPlans(country: string) {
@@ -54,17 +55,6 @@ async function getPlans(country: string) {
     .order("final_price_eur", { ascending: true });
 
   if (error) throw error;
-  return data;
-}
-
-async function getDestinationInfo(name: string) {
-  const { data, error } = await supabase
-    .from("destination_info")
-    .select("*")
-    .ilike("name", name)
-    .single();
-
-  if (error || !data) return null;
   return data;
 }
 
@@ -118,22 +108,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const { messages } = req.body as { messages: ChatCompletionMessageParam[] };
+
     const fullMessages: ChatCompletionMessageParam[] = [systemPrompt, ...messages];
 
     const lastUserMessage = messages[messages.length - 1]?.content || "";
 
-    const lastMessageText = typeof lastUserMessage === "string"
-      ? lastUserMessage
-      : Array.isArray(lastUserMessage)
-        ? lastUserMessage.map(part => (typeof part === "string" ? part : part.text || "")).join(" ")
-        : "";
+    let lastMessageText = "";
+    if (typeof lastUserMessage === "string") {
+      lastMessageText = lastUserMessage;
+    } else if (Array.isArray(lastUserMessage)) {
+      lastMessageText = lastUserMessage
+        .map(part => typeof part === "string" ? part : "text" in part ? part.text : "")
+        .join(" ");
+    }
 
     const normalized = normalizeDestination(lastMessageText);
     const destinationInfo = await getDestinationInfo(normalized);
 
     if (destinationInfo) {
       return res.status(200).json({
-        reply: `D'accord, voici le lien vers notre page dédiée aux forfaits eSIM pour ${destinationInfo.name} : [Page ${destinationInfo.name}](https://fenuasim.com/${destinationInfo.slug})`
+        reply: `D'accord, voici le lien vers notre page dédiée aux forfaits eSIM pour ${destinationInfo.name} : [Page ${destinationInfo.name}](https://fenuasim.com/${destinationInfo.slug})`,
       });
     }
 
@@ -141,85 +135,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       model: "gpt-4",
       messages: fullMessages,
       temperature: 0.7,
-      function_call: "auto",
-      functions: [
-        {
-          name: "getPlans",
-          description: "Récupère la liste des forfaits eSIM disponibles",
-          parameters: {
-            type: "object",
-            properties: {
-              country: { type: "string", description: "Nom du pays" },
-            },
-            required: ["country"],
-          },
-        },
-        {
-          name: "getPlanById",
-          description: "Récupère un forfait",
-          parameters: {
-            type: "object",
-            properties: {
-              planId: { type: "string" },
-            },
-            required: ["planId"],
-          },
-        },
-        {
-          name: "createPayment",
-          description: "Crée un paiement Stripe",
-          parameters: {
-            type: "object",
-            properties: {
-              planId: { type: "string" },
-              email: { type: "string" },
-            },
-            required: ["planId", "email"],
-          },
-        },
-      ],
     });
 
-    const response = completion.choices[0].message;
-
-    if (response.function_call) {
-      const { name, arguments: args } = response.function_call;
-      const parsedArgs = JSON.parse(args || "{}");
-
-      let functionResponse;
-
-      switch (name) {
-        case "getPlans":
-          const normalizedCountry = normalizeDestination(parsedArgs.country);
-          functionResponse = await getPlans(normalizedCountry);
-          break;
-        case "getPlanById":
-          functionResponse = await getPlanById(parsedArgs.planId);
-          break;
-        case "createPayment":
-          functionResponse = await createPayment(parsedArgs.planId, parsedArgs.email);
-          break;
-        default:
-          return res.status(400).json({ error: "Invalid function call" });
-      }
-
-      const followUp = await openai.chat.completions.create({
-        model: "gpt-4",
-        messages: [
-          ...fullMessages,
-          response,
-          {
-            role: "function",
-            name,
-            content: JSON.stringify(functionResponse),
-          },
-        ],
-      });
-
-      return res.status(200).json({ reply: followUp.choices[0].message.content });
-    }
-
-    return res.status(200).json({ reply: response.content });
+    const reply = completion.choices[0].message.content;
+    return res.status(200).json({ reply });
   } catch (err) {
     console.error("Erreur assistant GPT:", err);
     res.status(500).json({ error: "Erreur serveur GPT" });

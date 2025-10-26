@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { OpenAI } from "openai";
 import { createClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
+import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
 // -------------------- CONFIG --------------------
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -15,25 +16,8 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-04-30.basil",
 });
 
-// -------------------- TYPES --------------------
-type ChatRole = "system" | "user" | "assistant";
-
-interface ChatMessage {
-  role: ChatRole;
-  content: string;
-  name?: string;
-  function_call?: {
-    name: string;
-    arguments?: string;
-  };
-}
-
-interface RequestBody {
-  messages: ChatMessage[];
-}
-
 // -------------------- SYSTEM PROMPT --------------------
-const systemPrompt: ChatMessage = {
+const systemPrompt: ChatCompletionMessageParam = {
   role: "system",
   content: `
 Tu es l’assistant officiel de FENUA SIM, un service de vente de cartes eSIM pour les voyageurs.
@@ -119,13 +103,13 @@ export default async function handler(
   }
 
   try {
-    const { messages } = req.body as RequestBody;
+    const { messages } = req.body as { messages: ChatCompletionMessageParam[] };
 
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({ error: "messages array required" });
     }
 
-    const fullMessages: ChatMessage[] = [systemPrompt, ...messages];
+    const fullMessages: ChatCompletionMessageParam[] = [systemPrompt, ...messages];
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4",
@@ -172,7 +156,6 @@ export default async function handler(
 
     const response = completion.choices[0].message;
 
-    // -------------------- APPEL DE FUNCTION --------------------
     if (response.function_call) {
       const { name, arguments: args } = response.function_call;
       const parsedArgs = JSON.parse(args || "{}");
@@ -214,7 +197,7 @@ export default async function handler(
       return res.status(200).json({ reply: finalReply });
     }
 
-    // -------------------- RÉPONSE SIMPLE SANS FUNCTION --------------------
+    // Réponse directe sans appel de fonction
     const reply =
       response.content ||
       "Je n’ai pas bien compris votre demande. Pouvez-vous préciser ?";
@@ -225,4 +208,3 @@ export default async function handler(
     res.status(500).json({ error: "Erreur GPT" });
   }
 }
-

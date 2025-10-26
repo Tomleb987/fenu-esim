@@ -1,4 +1,3 @@
-
 // /pages/api/assistant.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { OpenAI } from "openai";
@@ -18,38 +17,14 @@ const destinationAliases: Record<string, string> = {
   "nz": "Nouvelle-Zélande",
   "new zealand": "Nouvelle-Zélande",
   "france": "France",
-  "spain": "Espagne",
-  "italy": "Italie",
-  "turkey": "Turquie",
-  "united kingdom": "Royaume-Uni",
-  "germany": "Allemagne",
-  "mexico": "Mexique",
-  "thailand": "Thaïlande",
-  "hong kong": "Hong Kong",
-  "malaysia": "Malaisie",
-  "greece": "Grèce",
-  "canada": "Canada",
-  "south korea": "Corée du Sud",
-  "japan": "Japon",
-  "singapore": "Singapour",
-  "australia": "Australie",
-  "austria": "Autriche",
-  "argentina": "Argentine",
-  "india": "Inde",
-  "ireland": "Irlande",
-  "morocco": "Maroc",
-  "netherlands": "Pays-Bas",
-  "portugal": "Portugal",
-  "switzerland": "Suisse",
-  "sweden": "Suède",
-  "norway": "Norvège",
-  "finland": "Finlande",
-  "belgium": "Belgique",
-  "denmark": "Danemark",
-  "luxembourg": "Luxembourg",
-  "russia": "Russie",
-  "china": "Chine",
-  "fiji": "Fidji",
+};
+
+const destinationPages: Record<string, string> = {
+  "france": "https://fenuasim.com/shop/france",
+  "états-unis": "https://fenuasim.com/shop/united-states",
+  "etats-unis": "https://fenuasim.com/shop/united-states",
+  "usa": "https://fenuasim.com/shop/united-states",
+  "us": "https://fenuasim.com/shop/united-states",
 };
 
 function normalizeDestination(input: string): string {
@@ -68,29 +43,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 
 const systemPrompt: ChatCompletionMessageParam = {
   role: "system",
-  content: `Tu es un assistant virtuel pour FENUA SIM, spécialisé dans la vente d'eSIM à l'international.
-
-Voici les règles à suivre pour chaque échange :
-- Demande toujours la destination et la durée du séjour.
-- Propose des forfaits eSIM adaptés.
-- Vérifie que le client a bien reçu son eSIM après le paiement.
-- Reste poli, professionnel et concis.
-
-📈 Format de réponse attendu pour les forfaits :
-- Présente chaque forfait sur plusieurs lignes pour une bonne lisibilité.
-- Pour chaque option, indique :
-  • le volume de data
-  • la durée de validité
-  • le prix en USD + sa conversion en euros (entre parenthèses)
-  • le lien image (si fourni) formaté en markdown
-- Sépare bien chaque forfait avec une ligne vide.
-
-🔹 Exemple :
-1. **1 Go – 7 jours**  
-💶 5 USD (**≈ 4,70 €**)  
-📱 [Voir le forfait](https://cdn.airalo.com/images/xxxxx.png)
-
-❗ N’utilise pas de bullet points collés, et évite d’empiler toutes les offres en une seule ligne.`
+  content: `Tu es un assistant virtuel pour FENUA SIM. Quand un utilisateur demande une destination, si c'est France ou États-Unis, donne simplement le lien de la page dédiée. Sinon, poursuis avec les autres règles normales.`
 };
 
 async function getPlans(country: string) {
@@ -208,17 +161,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       let functionResponse;
 
       switch (name) {
-        case "getPlans":
+        case "getPlans": {
           if (!parsedArgs.country) {
             return res.status(400).json({ reply: "La destination n’a pas été comprise." });
           }
           const normalizedCountry = normalizeDestination(parsedArgs.country);
+          const pageUrl = destinationPages[normalizedCountry.toLowerCase()];
+
+          if (pageUrl) {
+            return res.status(200).json({
+              reply: `✅ Oui, nous avons des forfaits eSIM pour **${normalizedCountry}**.\n\n🔗 Consultez la page ici : ${pageUrl}`,
+            });
+          }
+
           functionResponse = await getPlans(normalizedCountry);
 
           if (!functionResponse || functionResponse.length === 0) {
             return res.status(200).json({ reply: `Aucun forfait disponible pour ${normalizedCountry} pour le moment.` });
           }
-          break;
+
+          return res.status(200).json({ reply: JSON.stringify(functionResponse) });
+        }
 
         case "getPlanById":
           functionResponse = await getPlanById(parsedArgs.planId);

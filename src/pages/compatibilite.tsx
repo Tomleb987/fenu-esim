@@ -207,9 +207,18 @@ export default function Compatibilite() {
   return (
     <div className="max-w-2xl mx-auto py-16 px-4 text-center">
       <h1 className="text-3xl font-bold mb-6">Compatibilité eSIM</h1>
+
+      {/* 🔥 Préambule ajouté */}
+      <p className="mb-4 text-md text-gray-800 font-semibold bg-orange-50 border border-orange-200 px-4 py-3 rounded-lg">
+        Selon la version ou la région d’achat de votre téléphone, il est possible qu’il ne soit pas compatible eSIM.  
+        Pour vérifier rapidement, composez <strong>*#06#</strong> et contrôlez la présence d’un numéro <strong>EID</strong>  
+        (si seul l’IMEI apparaît, votre appareil n’est pas compatible eSIM).
+      </p>
+
       <p className="mb-6 text-lg text-gray-700">
         Voici une liste récente de terminaux compatibles* eSIM (non exhaustive, à vérifier selon les opérateurs) :
       </p>
+
       <div className="bg-white rounded-xl shadow p-6 border border-purple-100 text-left">
         {TERMINAUX_ESIM.map(({ brand, models }) => (
           <div key={brand} className="mb-6">
@@ -224,6 +233,7 @@ export default function Compatibilite() {
           </div>
         ))}
       </div>
+
       <div className="mt-8">
         <a
           href="https://www.airalo.com/help/fr/a-propos-dairalo/NFHQSUXFCZOM/quels-sont-les-appareils-compatibles/D2N6OZSVVM9W?srsltid=AfmBOooqcXE3J-YBy6XInyPUDhOzbKGVQetRsP7CzdoklUSPRNTamkV0"
@@ -235,5 +245,5 @@ export default function Compatibilite() {
         </a>
       </div>
     </div>
-  );
+  )
 }

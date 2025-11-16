@@ -36,6 +36,7 @@ export default async function handler(
       });
     }
 
+    // Configure SMTP (Brevo)
     const transporter = nodemailer.createTransport({
       host: "smtp-relay.brevo.com",
       port: 587,
@@ -46,7 +47,7 @@ export default async function handler(
       },
     });
 
-    // Create email HTML
+    // Build the HTML email
     const emailHTML = createEsimEmailHTML({
       customerName: customerName || "Client",
       packageName: packageName || "Forfait eSIM",
@@ -56,13 +57,17 @@ export default async function handler(
       validityDays: validityDays || 30,
       qrCodeUrl,
       sharingLink,
-      sharingLinkCode
+      sharingLinkCode,
     });
 
     // Email options
     const mailOptions = {
       from: `"FENUASIM" <hello@fenuasim.com>`,
       to: email,
+
+      // ⭐⭐⭐ Ajout indispensable : copie envoyée à Odoo ⭐⭐⭐
+      bcc: "clients@fenua-sim.odoo.com",
+
       subject: `Votre eSIM pour ${destinationName} est prête ! 🌐`,
       html: emailHTML,
       text:
@@ -74,8 +79,8 @@ export default async function handler(
         `- Validité: ${validityDays} jours\n` +
         (qrCodeUrl
           ? "\nPour installer votre eSIM, scannez le code QR disponible dans la version HTML de cet email.\n"
-          : "\nPour installer votre eSIM, veuillez suivre les instructions fournies dans votre espace client ou contactez notre support si besoin.\n") +
-        `\nCordialement,\nL'équipe eSIM Service\n`,
+          : "\nPour installer votre eSIM, veuillez suivre les instructions fournies dans votre espace client ou contactez notre support.\n") +
+        `\nCordialement,\nL'équipe FENUA SIM\n`,
       headers: {
         "List-Unsubscribe":
           "<mailto:unsubscribe@fenuasim.com>, <https://fenuasim.com/unsubscribe>",
@@ -84,7 +89,7 @@ export default async function handler(
       },
     };
 
-    // Send email
+    // Send the email
     const info = await transporter.sendMail(mailOptions);
 
     res.status(200).json({
@@ -93,6 +98,7 @@ export default async function handler(
       accepted: info.accepted,
       rejected: info.rejected,
     });
+
   } catch (error) {
     console.error("Error sending email:", error);
     res.status(500).json({

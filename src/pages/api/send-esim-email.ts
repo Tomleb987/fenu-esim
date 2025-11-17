@@ -42,7 +42,7 @@ export default async function handler(
       },
     });
 
-    // HTML
+    // HTML email body
     const emailHTML = createEsimEmailHTML({
       customerName: customerName || "Client",
       packageName: packageName || "Forfait eSIM",
@@ -55,19 +55,19 @@ export default async function handler(
       sharingLinkCode,
     });
 
-    // ----- EMAIL HEADER (compatible Odoo) -----
+    // 🔥 CONFIG ODOO OPTIMISÉE
     const mailOptions = {
-      // 🔥 Doit être notifications@ → c’est l’adresse d’envoi d’Odoo
-      from: `"FENUA SIM" <notifications@fenua-sim.odoo.com>`,
-
-      // Destinataire final : ton client
+      // Odoo associe l'email au client via "to:"
       to: email,
 
-      // 🔥 Le mail est enregistré automatiquement dans la fiche client Odoo
+      // Doit utiliser l'adresse d'envoi définie dans Odoo
+      from: `"FENUA SIM" <notifications@fenua-sim.odoo.com>`,
+
+      // Catchall → Odoo classe automatiquement le mail dans la fiche du client
       bcc: "clients@fenua-sim.odoo.com",
 
-      // Les réponses des clients vont dans ta vraie boîte pro
-      replyTo: "hello@fenuasim.com",
+      // IMPORTANT : aucune trace de hello@ pour éviter mauvaise association
+      replyTo: `"FENUA SIM" <notifications@fenua-sim.odoo.com>`,
 
       subject: `Votre eSIM pour ${destinationName} est prête ! 🌐`,
       html: emailHTML,
@@ -75,20 +75,18 @@ export default async function handler(
       text:
         `Bonjour ${customerName || "Client"},\n\n` +
         `Votre eSIM pour ${destinationName} est prête !\n\n` +
-        `Détails :\n` +
-        `- Forfait : ${packageName}\n` +
-        `- Données : ${dataAmount} ${dataUnit}\n` +
-        `- Validité : ${validityDays} jours\n` +
+        `Forfait : ${packageName}\n` +
+        `Données : ${dataAmount} ${dataUnit}\n` +
+        `Validité : ${validityDays} jours\n` +
         (qrCodeUrl
-          ? `\nScannez votre QR Code dans la version HTML.\n`
-          : `\nVeuillez suivre les instructions dans votre espace client.\n`) +
-        `\nCordialement,\nL'équipe FENUA SIM\n`,
+          ? `Installez votre eSIM via le QR code dans la version HTML.\n`
+          : `Instructions disponibles dans votre espace client.\n`) +
+        `\nL’équipe FENUA SIM\n`,
 
       headers: {
+        "X-Mailer": "FenuaSIM Mailer",
         "List-Unsubscribe":
           "<mailto:unsubscribe@fenuasim.com>, <https://fenuasim.com/unsubscribe>",
-        Precedence: "bulk",
-        "X-Mailer": "FenuaSIM Mailer 1.0",
       },
     };
 

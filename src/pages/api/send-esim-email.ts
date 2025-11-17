@@ -24,7 +24,6 @@ export default async function handler(
       sharingLinkCode,
     } = req.body;
 
-    // Basic validation
     if (!email || !destinationName) {
       return res.status(400).json({
         message: "Missing required fields",
@@ -43,7 +42,7 @@ export default async function handler(
       },
     });
 
-    // Build HTML content
+    // HTML
     const emailHTML = createEsimEmailHTML({
       customerName: customerName || "Client",
       packageName: packageName || "Forfait eSIM",
@@ -56,18 +55,18 @@ export default async function handler(
       sharingLinkCode,
     });
 
-    // Correct Odoo-friendly headers
+    // ----- EMAIL HEADER (compatible Odoo) -----
     const mailOptions = {
-      // 🔥 Odoo identifie l’email avec cette adresse
-      from: `"FENUA SIM" <clients@fenua-sim.odoo.com>`,
+      // 🔥 Doit être notifications@ → c’est l’adresse d’envoi d’Odoo
+      from: `"FENUA SIM" <notifications@fenua-sim.odoo.com>`,
 
-      // 🔥 Le client reçoit l’email normalement
+      // Destinataire final : ton client
       to: email,
 
-      // 🔥 Copie envoyée à Odoo → l'email se classe dans la fiche du client
+      // 🔥 Le mail est enregistré automatiquement dans la fiche client Odoo
       bcc: "clients@fenua-sim.odoo.com",
 
-      // 🔥 Les réponses arrivent dans ta vraie boîte pro
+      // Les réponses des clients vont dans ta vraie boîte pro
       replyTo: "hello@fenuasim.com",
 
       subject: `Votre eSIM pour ${destinationName} est prête ! 🌐`,
@@ -81,7 +80,7 @@ export default async function handler(
         `- Données : ${dataAmount} ${dataUnit}\n` +
         `- Validité : ${validityDays} jours\n` +
         (qrCodeUrl
-          ? `\nPour installer votre eSIM, scannez le QR Code indiqué dans la version HTML.\n`
+          ? `\nScannez votre QR Code dans la version HTML.\n`
           : `\nVeuillez suivre les instructions dans votre espace client.\n`) +
         `\nCordialement,\nL'équipe FENUA SIM\n`,
 
@@ -93,7 +92,6 @@ export default async function handler(
       },
     };
 
-    // Send email
     const info = await transporter.sendMail(mailOptions);
 
     return res.status(200).json({

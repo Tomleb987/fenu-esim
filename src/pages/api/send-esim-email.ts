@@ -55,18 +55,20 @@ export default async function handler(
       sharingLinkCode,
     });
 
-    // 🔥 CONFIG ODOO OPTIMISÉE
+    // -----------------------------------------------
+    // 🔥 CONFIG OPTIMISÉE POUR ODOO SAAS
+    // -----------------------------------------------
     const mailOptions = {
-      // Odoo associe l'email au client via "to:"
+      // 1️⃣ Le client → Odoo associe automatiquement l'email à sa fiche
       to: email,
 
-      // Doit utiliser l'adresse d'envoi définie dans Odoo
+      // 2️⃣ L'expéditeur reconnu par Odoo
       from: `"FENUA SIM" <notifications@fenua-sim.odoo.com>`,
 
-      // Catchall → Odoo classe automatiquement le mail dans la fiche du client
+      // 3️⃣ Le catchall Odoo → copie invisible → historique client OK
       bcc: "clients@fenua-sim.odoo.com",
 
-      // IMPORTANT : aucune trace de hello@ pour éviter mauvaise association
+      // 4️⃣ AUCUN "hello@" dans replyTo → sinon Odoo associe mal le message
       replyTo: `"FENUA SIM" <notifications@fenua-sim.odoo.com>`,
 
       subject: `Votre eSIM pour ${destinationName} est prête ! 🌐`,
@@ -80,7 +82,7 @@ export default async function handler(
         `Validité : ${validityDays} jours\n` +
         (qrCodeUrl
           ? `Installez votre eSIM via le QR code dans la version HTML.\n`
-          : `Instructions disponibles dans votre espace client.\n`) +
+          : `Retrouvez les instructions dans votre espace client.\n`) +
         `\nL’équipe FENUA SIM\n`,
 
       headers: {
@@ -90,6 +92,7 @@ export default async function handler(
       },
     };
 
+    // Envoi
     const info = await transporter.sendMail(mailOptions);
 
     return res.status(200).json({

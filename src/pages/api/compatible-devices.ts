@@ -25,23 +25,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const tokenText = await tokenResponse.text();
     if (!tokenResponse.ok) {
       console.error("Token error:", tokenText);
-      return res.status(400).json({ error: "Airalo token error", details: tokenText });
+      return res.status(400).json({
+        error: "Airalo token error",
+        details: tokenText,
+      });
     }
 
     const tokenData = JSON.parse(tokenText);
     const accessToken = tokenData.data.access_token;
 
-    // 2️⃣ Appel correct : /utilities/devices/compatibility-lite
+    // 2️⃣ Appel compatibilité
     const deviceResponse = await fetch(
       `${AIRALO_API_URL}/utilities/devices/compatibility-lite`,
       {
         method: "GET",
         headers: {
           Accept: "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
-    );
-
-    const raw = await deviceResponse.text();
-    if (!deviceResponse.ok) {

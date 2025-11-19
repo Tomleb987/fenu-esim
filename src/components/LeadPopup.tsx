@@ -13,7 +13,7 @@ export default function LeadPopup() {
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
 
-  // ⏳ Affiche automatiquement après 8 secondes
+  // Affiche automatiquement le popup après 8 sec
   useEffect(() => {
     const timer = setTimeout(() => {
       setOpen(true);
@@ -21,7 +21,7 @@ export default function LeadPopup() {
     return () => clearTimeout(timer);
   }, []);
 
-  // 📩 Soumission du formulaire
+  // Soumission du formulaire
   const submitLead = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setErrorMsg(null);
@@ -32,32 +32,30 @@ export default function LeadPopup() {
       first_name: firstName,
       last_name: lastName,
       email: email,
-      source: "popup",        // ✅ IMPORTANT pour ta table Supabase
-      discount_code: null
+      source: "popup",       // IMPORTANT
+      discount_code: null,
     });
 
     if (error) {
       console.error("Supabase error:", error);
-      setErrorMsg("Une erreur est survenue, merci de réessayer dans un instant.");
+      setErrorMsg("Une erreur est survenue, merci de réessayer.");
       return;
     }
 
-    // 👌 Succès
     setSubmitted(true);
-    setTimeout(() => setOpen(false), 2000);
   };
 
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-[99999] flex items-center justify-center">
-      {/* Backdrop flouté */}
+      {/* Backdrop */}
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm pointer-events-none" />
 
-      {/* Bloc popup */}
+      {/* POPUP */}
       <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6 animate-fade-in pointer-events-auto z-[100000]">
-        
-        {/* Bouton fermer */}
+
+        {/* Bouton X */}
         <button
           onClick={() => setOpen(false)}
           className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
@@ -65,26 +63,52 @@ export default function LeadPopup() {
           <X size={22} />
         </button>
 
-        {/* === MODE CONFIRMATION === */}
+        {/* === CONTENU === */}
         {submitted ? (
+          /* 🎉 MODE CONFIRMATION */
           <div className="text-center py-8">
-            <h2 className="text-2xl font-bold text-purple-700">Merci !</h2>
-            <p className="text-gray-600 mt-2">
-              Votre code de réduction –5% arrive dans votre email ✉️
+            <h2 className="text-2xl font-bold text-purple-700">Merci ! 🎉</h2>
+
+            <p className="text-gray-700 mt-3 text-lg font-semibold">
+              Voici votre code de réduction :
+            </p>
+
+            {/* Code FIRST */}
+            <p className="mt-4 text-3xl font-bold text-green-600 bg-green-100 px-4 py-2 rounded-xl inline-block">
+              FIRST
+            </p>
+
+            {/* Bouton copier */}
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText("FIRST");
+                const btn = document.getElementById("copy-btn");
+                if (btn) {
+                  btn.innerHTML = "✔ Copié !";
+                  setTimeout(() => (btn.innerHTML = "Copier le code"), 1500);
+                }
+              }}
+              id="copy-btn"
+              className="mt-4 bg-gradient-to-r from-purple-600 to-orange-500 text-white font-semibold px-5 py-2 rounded-xl shadow hover:opacity-90 transition"
+            >
+              Copier le code
+            </button>
+
+            <p className="text-gray-500 mt-4 text-sm">
+              Utilisez-le lors de votre prochain achat sur FENUA SIM.
             </p>
           </div>
         ) : (
+          /* 🎯 MODE FORMULAIRE */
           <>
-            {/* === TITRE === */}
             <h2 className="text-2xl font-bold text-purple-700 text-center">
               🎁 Profitez de –5% sur votre première eSIM !
             </h2>
 
             <p className="text-gray-600 text-center mt-2">
-              Inscrivez-vous et recevez immédiatement votre code exclusif.
+              Inscrivez-vous pour obtenir votre code exclusif.
             </p>
 
-            {/* === FORMULAIRE === */}
             <form onSubmit={submitLead} className="mt-6 space-y-4">
 
               <div>
@@ -121,12 +145,9 @@ export default function LeadPopup() {
               </div>
 
               {errorMsg && (
-                <p className="text-sm text-red-500">
-                  {errorMsg}
-                </p>
+                <p className="text-sm text-red-500 text-center">{errorMsg}</p>
               )}
 
-              {/* === BOUTON === */}
               <button
                 type="submit"
                 className="w-full bg-gradient-to-r from-purple-600 to-orange-500 text-white font-semibold py-3 rounded-xl shadow hover:opacity-90 transition"

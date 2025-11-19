@@ -12,7 +12,7 @@ export default function LeadPopup() {
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
 
-  // Affichage automatique après 8 secondes
+  // Affiche automatiquement après 8 secondes
   useEffect(() => {
     const timer = setTimeout(() => {
       setOpen(true);
@@ -22,6 +22,7 @@ export default function LeadPopup() {
 
   const submitLead = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    console.log("SUBMIT TRIGGERED");
 
     const { error } = await supabase.from("leads").insert({
       first_name: firstName,
@@ -29,10 +30,13 @@ export default function LeadPopup() {
       email: email,
     });
 
-    if (!error) {
-      setSubmitted(true);
-      setTimeout(() => setOpen(false), 2000);
+    if (error) {
+      console.error("Supabase error:", error);
+      return;
     }
+
+    setSubmitted(true);
+    setTimeout(() => setOpen(false), 2000);
   };
 
   if (!open) return null;
@@ -41,7 +45,7 @@ export default function LeadPopup() {
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 relative animate-fade-in">
 
-        {/* Fermer la popup */}
+        {/* Close button */}
         <button
           onClick={() => setOpen(false)}
           className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
@@ -49,7 +53,7 @@ export default function LeadPopup() {
           <X size={22} />
         </button>
 
-        {/* Confirmation */}
+        {/* MESSAGE DE CONFIRMATION */}
         {submitted ? (
           <div className="text-center py-8">
             <h2 className="text-2xl font-bold text-purple-700">Merci !</h2>
@@ -67,7 +71,7 @@ export default function LeadPopup() {
               Inscrivez-vous et recevez immédiatement votre code exclusif.
             </p>
 
-            {/* Formulaire */}
+            {/* FORMULAIRE */}
             <form onSubmit={submitLead} className="mt-6 space-y-4">
 
               <div>
@@ -103,7 +107,7 @@ export default function LeadPopup() {
                 />
               </div>
 
-              {/* BOUTON */}
+              {/* BOUTON SUBMIT */}
               <button
                 type="submit"
                 className="w-full bg-gradient-to-r from-purple-600 to-orange-500 text-white font-semibold py-3 rounded-xl shadow hover:opacity-90 transition"

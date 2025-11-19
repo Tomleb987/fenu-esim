@@ -20,7 +20,7 @@ export default function LeadPopup() {
     return () => clearTimeout(timer);
   }, []);
 
-  const submitLead = async (e) => {
+  const submitLead = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     const { error } = await supabase.from("leads").insert({

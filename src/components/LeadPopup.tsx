@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabase"; // ✅ IMPORTANT : bon client
 import { X } from "lucide-react";
 
 export default function LeadPopup() {
   const [open, setOpen] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -22,6 +23,7 @@ export default function LeadPopup() {
 
   const submitLead = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setErrorMsg(null);
     console.log("SUBMIT TRIGGERED");
 
     const { error } = await supabase.from("leads").insert({
@@ -32,6 +34,7 @@ export default function LeadPopup() {
 
     if (error) {
       console.error("Supabase error:", error);
+      setErrorMsg("Une erreur est survenue, merci de réessayer dans un instant.");
       return;
     }
 
@@ -43,14 +46,12 @@ export default function LeadPopup() {
 
   return (
     <div className="fixed inset-0 z-[99999] flex items-center justify-center">
+      {/* Backdrop NON cliquable */}
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm pointer-events-none" />
 
-      {/* BACKDROP NON CLIQUABLE */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm pointer-events-none"></div>
-
-      {/* FENÊTRE DU POPUP (capte les clics) */}
+      {/* Fenêtre du popup (capte les clics) */}
       <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6 animate-fade-in pointer-events-auto z-[100000]">
-
-        {/* Bouton close */}
+        {/* Bouton fermeture */}
         <button
           onClick={() => setOpen(false)}
           className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
@@ -58,7 +59,6 @@ export default function LeadPopup() {
           <X size={22} />
         </button>
 
-        {/* Contenu confirmation */}
         {submitted ? (
           <div className="text-center py-8">
             <h2 className="text-2xl font-bold text-purple-700">Merci !</h2>
@@ -76,9 +76,7 @@ export default function LeadPopup() {
               Inscrivez-vous et recevez immédiatement votre code exclusif.
             </p>
 
-            {/* FORMULAIRE */}
             <form onSubmit={submitLead} className="mt-6 space-y-4">
-
               <div>
                 <label className="text-sm text-gray-700">Prénom</label>
                 <input
@@ -112,14 +110,18 @@ export default function LeadPopup() {
                 />
               </div>
 
-              {/* Bouton submit */}
+              {errorMsg && (
+                <p className="text-sm text-red-500">
+                  {errorMsg}
+                </p>
+              )}
+
               <button
                 type="submit"
                 className="w-full bg-gradient-to-r from-purple-600 to-orange-500 text-white font-semibold py-3 rounded-xl shadow hover:opacity-90 transition"
               >
                 Obtenir mon code –5%
               </button>
-
             </form>
           </>
         )}

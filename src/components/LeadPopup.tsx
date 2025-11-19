@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";   // ✅ bon client Supabase
+import { supabase } from "@/lib/supabaseClient";
 import { X } from "lucide-react";
 
 export default function LeadPopup() {
@@ -12,7 +12,7 @@ export default function LeadPopup() {
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
 
-  // Affiche automatiquement après 8 secondes
+  // Affichage automatique après 8 secondes
   useEffect(() => {
     const timer = setTimeout(() => {
       setOpen(true);
@@ -42,10 +42,15 @@ export default function LeadPopup() {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[99999]">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 relative animate-fade-in z-[100000]">
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center">
 
-        {/* Close button */}
+      {/* BACKDROP NON CLIQUABLE */}
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm pointer-events-none"></div>
+
+      {/* FENÊTRE DU POPUP (capte les clics) */}
+      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6 animate-fade-in pointer-events-auto z-[100000]">
+
+        {/* Bouton close */}
         <button
           onClick={() => setOpen(false)}
           className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
@@ -53,7 +58,7 @@ export default function LeadPopup() {
           <X size={22} />
         </button>
 
-        {/* MESSAGE DE CONFIRMATION */}
+        {/* Contenu confirmation */}
         {submitted ? (
           <div className="text-center py-8">
             <h2 className="text-2xl font-bold text-purple-700">Merci !</h2>
@@ -107,7 +112,7 @@ export default function LeadPopup() {
                 />
               </div>
 
-              {/* BOUTON SUBMIT */}
+              {/* Bouton submit */}
               <button
                 type="submit"
                 className="w-full bg-gradient-to-r from-purple-600 to-orange-500 text-white font-semibold py-3 rounded-xl shadow hover:opacity-90 transition"
@@ -120,7 +125,7 @@ export default function LeadPopup() {
         )}
       </div>
 
-      {/* CSS animation */}
+      {/* Animation */}
       <style jsx global>{`
         @keyframes fade-in {
           from {

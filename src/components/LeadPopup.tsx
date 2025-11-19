@@ -85,4 +85,76 @@ export default function LeadPopup() {
             </p>
 
             {/* === FORMULAIRE === */}
-            <form onSubmit={submitLead} className="mt-6 space-y-4"
+            <form onSubmit={submitLead} className="mt-6 space-y-4">
+
+              <div>
+                <label className="text-sm text-gray-700">Prénom</label>
+                <input
+                  type="text"
+                  required
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  className="w-full border border-gray-300 rounded-xl px-4 py-2 mt-1 focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm text-gray-700">Nom</label>
+                <input
+                  type="text"
+                  required
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  className="w-full border border-gray-300 rounded-xl px-4 py-2 mt-1 focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm text-gray-700">Email</label>
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full border border-gray-300 rounded-xl px-4 py-2 mt-1 focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+
+              {errorMsg && (
+                <p className="text-sm text-red-500">
+                  {errorMsg}
+                </p>
+              )}
+
+              {/* === BOUTON === */}
+              <button
+                type="submit"
+                className="w-full bg-gradient-to-r from-purple-600 to-orange-500 text-white font-semibold py-3 rounded-xl shadow hover:opacity-90 transition"
+              >
+                Obtenir mon code –5%
+              </button>
+
+            </form>
+          </>
+        )}
+      </div>
+
+      {/* Animation */}
+      <style jsx global>{`
+        @keyframes fade-in {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fade-in {
+          animation: fade-in 0.3s ease-out;
+        }
+      `}</style>
+    </div>
+  );
+}

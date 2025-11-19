@@ -12,7 +12,7 @@ export default function LeadPopup() {
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
 
-  // ⏳ Affiche le popup automatiquement après 8 secondes
+  // Affichage automatique après 8 secondes
   useEffect(() => {
     const timer = setTimeout(() => {
       setOpen(true);
@@ -41,7 +41,7 @@ export default function LeadPopup() {
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 relative animate-fade-in">
 
-        {/* Bouton close */}
+        {/* Fermer la popup */}
         <button
           onClick={() => setOpen(false)}
           className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
@@ -49,7 +49,7 @@ export default function LeadPopup() {
           <X size={22} />
         </button>
 
-        {/* ✔️ Bloc confirmation */}
+        {/* Confirmation */}
         {submitted ? (
           <div className="text-center py-8">
             <h2 className="text-2xl font-bold text-purple-700">Merci !</h2>
@@ -67,7 +67,9 @@ export default function LeadPopup() {
               Inscrivez-vous et recevez immédiatement votre code exclusif.
             </p>
 
+            {/* Formulaire */}
             <form onSubmit={submitLead} className="mt-6 space-y-4">
+
               <div>
                 <label className="text-sm text-gray-700">Prénom</label>
                 <input
@@ -101,18 +103,20 @@ export default function LeadPopup() {
                 />
               </div>
 
+              {/* BOUTON */}
               <button
                 type="submit"
                 className="w-full bg-gradient-to-r from-purple-600 to-orange-500 text-white font-semibold py-3 rounded-xl shadow hover:opacity-90 transition"
               >
                 Obtenir mon code –5%
               </button>
+
             </form>
           </>
         )}
-
       </div>
 
+      {/* Animation */}
       <style jsx global>{`
         @keyframes fade-in {
           from {

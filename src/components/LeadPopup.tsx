@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabase";   // ✅ CORRECTION IMPORT
 import { X } from "lucide-react";
 
 export default function LeadPopup() {
@@ -120,7 +120,7 @@ export default function LeadPopup() {
         )}
       </div>
 
-      {/* Animation */}
+      {/* CSS animation */}
       <style jsx global>{`
         @keyframes fade-in {
           from {

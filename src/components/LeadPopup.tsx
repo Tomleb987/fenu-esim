@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";   // ✅ CORRECTION IMPORT
+import { supabase } from "@/lib/supabase";   // ✅ bon client Supabase
 import { X } from "lucide-react";
 
 export default function LeadPopup() {
@@ -42,8 +42,8 @@ export default function LeadPopup() {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 relative animate-fade-in">
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[99999]">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 relative animate-fade-in z-[100000]">
 
         {/* Close button */}
         <button

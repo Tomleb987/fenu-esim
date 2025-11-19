@@ -13,26 +13,36 @@ export default function LeadPopup() {
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
 
-  // Affiche automatiquement le popup après 8 sec
+  // Marquer comme "vu aujourd'hui"
+  const markAsSeen = () => {
+    const today = new Date().toISOString().slice(0, 10);
+    localStorage.setItem("lead_popup_seen", today);
+  };
+
+  // N'afficher qu'une fois par jour
   useEffect(() => {
+    const lastSeen = localStorage.getItem("lead_popup_seen");
+    const today = new Date().toISOString().slice(0, 10);
+
+    if (lastSeen === today) return; // déjà affiché aujourd'hui
+
     const timer = setTimeout(() => {
       setOpen(true);
     }, 8000);
+
     return () => clearTimeout(timer);
   }, []);
 
-  // Soumission du formulaire
+  // Soumission
   const submitLead = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setErrorMsg(null);
-
-    console.log("SUBMIT TRIGGERED");
 
     const { error } = await supabase.from("leads").insert({
       first_name: firstName,
       last_name: lastName,
       email: email,
-      source: "popup",       // IMPORTANT
+      source: "popup",
       discount_code: null,
     });
 
@@ -42,43 +52,45 @@ export default function LeadPopup() {
       return;
     }
 
+    markAsSeen();
     setSubmitted(true);
   };
 
   if (!open) return null;
 
+  const closePopup = () => {
+    markAsSeen();
+    setOpen(false);
+  };
+
   return (
     <div className="fixed inset-0 z-[99999] flex items-center justify-center">
-      {/* Backdrop */}
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm pointer-events-none" />
 
-      {/* POPUP */}
       <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6 animate-fade-in pointer-events-auto z-[100000]">
 
-        {/* Bouton X */}
         <button
-          onClick={() => setOpen(false)}
+          onClick={closePopup}
           className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
         >
           <X size={22} />
         </button>
 
-        {/* === CONTENU === */}
+        {/* MODE CONFIRMATION */}
         {submitted ? (
-          /* 🎉 MODE CONFIRMATION */
           <div className="text-center py-8">
+
             <h2 className="text-2xl font-bold text-purple-700">Merci ! 🎉</h2>
 
             <p className="text-gray-700 mt-3 text-lg font-semibold">
               Voici votre code de réduction :
             </p>
 
-            {/* Code FIRST */}
             <p className="mt-4 text-3xl font-bold text-green-600 bg-green-100 px-4 py-2 rounded-xl inline-block">
               FIRST
             </p>
 
-            {/* Bouton copier */}
+            {/* Bouton COPIER */}
             <button
               onClick={() => {
                 navigator.clipboard.writeText("FIRST");
@@ -94,12 +106,23 @@ export default function LeadPopup() {
               Copier le code
             </button>
 
+            {/* BOUTON UTILISER */}
+            <button
+              onClick={() => {
+                markAsSeen();
+                window.location.href = "/shop"; // 👉 Mets ici ta page boutique
+              }}
+              className="mt-4 w-full bg-purple-700 text-white font-semibold px-5 py-3 rounded-xl shadow hover:bg-purple-800 transition"
+            >
+              Utiliser maintenant →
+            </button>
+
             <p className="text-gray-500 mt-4 text-sm">
-              Utilisez-le lors de votre prochain achat sur FENUA SIM.
+              Valable immédiatement sur votre prochaine eSIM.
             </p>
+
           </div>
         ) : (
-          /* 🎯 MODE FORMULAIRE */
           <>
             <h2 className="text-2xl font-bold text-purple-700 text-center">
               🎁 Profitez de –5% sur votre première eSIM !
@@ -160,7 +183,6 @@ export default function LeadPopup() {
         )}
       </div>
 
-      {/* Animation */}
       <style jsx global>{`
         @keyframes fade-in {
           from {

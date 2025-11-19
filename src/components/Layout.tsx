@@ -1,9 +1,9 @@
-import { ReactNode } from 'react'
-import Navbar from './layout/Navbar'
-import Footer from './Footer'
+import { ReactNode } from "react";
+import Navbar from "./layout/Navbar";
+import Footer from "./Footer";
 
 interface LayoutProps {
-  children: ReactNode
+  children?: ReactNode; // ← optionnel pour pages/_app.tsx
 }
 
 export default function Layout({ children }: LayoutProps) {
@@ -20,5 +20,5 @@ export default function Layout({ children }: LayoutProps) {
       {/* Pied de page */}
       <Footer />
     </div>
-  )
+  );
 }

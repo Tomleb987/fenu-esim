@@ -59,7 +59,6 @@ export default function LeadPopup() {
           </div>
         ) : (
           <>
-            {/* 🔥 Titre */}
             <h2 className="text-2xl font-bold text-purple-700 text-center">
               🎁 Profitez de –5% sur votre première eSIM !
             </h2>
@@ -68,9 +67,7 @@ export default function LeadPopup() {
               Inscrivez-vous et recevez immédiatement votre code exclusif.
             </p>
 
-            {/* Formulaire */}
             <form onSubmit={submitLead} className="mt-6 space-y-4">
-
               <div>
                 <label className="text-sm text-gray-700">Prénom</label>
                 <input
@@ -104,21 +101,18 @@ export default function LeadPopup() {
                 />
               </div>
 
-              {/* Bouton conforme FENUA SIM */}
               <button
                 type="submit"
                 className="w-full bg-gradient-to-r from-purple-600 to-orange-500 text-white font-semibold py-3 rounded-xl shadow hover:opacity-90 transition"
               >
                 Obtenir mon code –5%
               </button>
-
             </form>
           </>
         )}
 
       </div>
 
-      {/* Animation CSS */}
       <style jsx global>{`
         @keyframes fade-in {
           from {

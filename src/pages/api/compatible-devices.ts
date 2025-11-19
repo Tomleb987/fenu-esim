@@ -8,7 +8,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const AIRALO_API_URL = process.env.AIRALO_API_URL;
 
-    // 1️⃣ Récupération du token Airalo (même méthode que tes autres API)
+    // 1️⃣ Token Airalo
     const tokenResponse = await fetch(`${AIRALO_API_URL}/token`, {
       method: "POST",
       headers: {
@@ -22,18 +22,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }),
     });
 
+    const tokenText = await tokenResponse.text();
     if (!tokenResponse.ok) {
-      const tokenError = await tokenResponse.text();
-      console.error("❌ Token error:", tokenError);
-      return res.status(400).json({ error: "Airalo token error", details: tokenError });
+      console.error("Token error:", tokenText);
+      return res.status(400).json({ error: "Airalo token error", details: tokenText });
     }
 
-    const tokenData = await tokenResponse.json();
+    const tokenData = JSON.parse(tokenText);
     const accessToken = tokenData.data.access_token;
 
-    // 2️⃣ Appel API Airalo → Devices (Lite)
+    // 2️⃣ Appel correct : /utilities/devices/compatibility-lite
     const deviceResponse = await fetch(
-      `${AIRALO_API_URL}/devices/compatibility-lite`,
+      `${AIRALO_API_URL}/utilities/devices/compatibility-lite`,
       {
         method: "GET",
         headers: {
@@ -45,18 +45,3 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const raw = await deviceResponse.text();
     if (!deviceResponse.ok) {
-      console.error("❌ Airalo devices error:", raw);
-      return res.status(400).json({ error: "Airalo API error", details: raw });
-    }
-
-    const data = JSON.parse(raw);
-
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    return res.status(200).json({ devices: data });
-  } catch (error: any) {
-    console.error("❌ API ERROR:", error);
-    return res.status(500).json({
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
-}

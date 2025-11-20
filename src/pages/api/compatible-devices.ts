@@ -6,68 +6,44 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const AIRALO_API_URL = process.env.AIRALO_API_URL;
+    const deviceName = req.query.device as string;
 
-    // --------------------------
-    // 1️⃣ Récupération du token
-    // --------------------------
-    const tokenResponse = await fetch(`${AIRALO_API_URL}/token`, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({
-        client_id: process.env.AIRALO_CLIENT_ID ?? "",
-        client_secret: process.env.AIRALO_CLIENT_SECRET ?? "",
-        grant_type: "client_credentials",
-      }),
-    });
-
-    const tokenText = await tokenResponse.text();
-
-    if (!tokenResponse.ok) {
-      return res.status(400).json({
-        error: "Airalo token error",
-        details: tokenText,
-      });
+    if (!deviceName) {
+      return res.status(400).json({ error: "Missing device parameter ?device=iPhone 14" });
     }
 
-    const tokenData = JSON.parse(tokenText);
-    const accessToken = tokenData.data.access_token;
+    const url = `https://partners.airalo.com/api/v2/compatible-devices-lite?device_name=${encodeURIComponent(
+      deviceName
+    )}`;
 
-    // --------------------------
-    // 2️⃣ Appel compatibilité
-    // --------------------------
-    const deviceResponse = await fetch(
-      `${AIRALO_API_URL}/utilities/devices/compatibility-lite`,
-      {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
-    );
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "accept": "application/json",
+        "x-client-id": process.env.AIRALO_CLIENT_ID ?? "",
+        "x-api-token": process.env.AIRALO_API_TOKEN ?? "",
+      },
+    });
 
-    const raw = await deviceResponse.text();
+    const raw = await response.text();
 
-    if (!deviceResponse.ok) {
+    if (!response.ok) {
       return res.status(400).json({
         error: "Airalo API error",
         details: raw,
       });
     }
 
-    const parsed = JSON.parse(raw);
+    const data = JSON.parse(raw);
 
-    // --------------------------
-    // 3️⃣ Réponse OK
-    // --------------------------
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Content-Type", "application/json");
 
-    return res.status(200).json(parsed);
+    return res.status(200).json({
+      status: "ok",
+      device: deviceName,
+      result: data,
+    });
 
   } catch (error: any) {
     return res.status(500).json({

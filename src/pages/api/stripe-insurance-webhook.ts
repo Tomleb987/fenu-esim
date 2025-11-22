@@ -1,10 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import Stripe from "stripe";
-import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { supabaseAdmin } from "@/lib/supabaseAdmin"; // Assurez-vous que ce fichier existe bien
 import { validateAvaAdhesion } from "@/lib/ava";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-04-30.basil", // Même version que votre autre webhook
+  apiVersion: "2025-04-30.basil", 
 });
 
 export const config = { api: { bodyParser: false } };
@@ -25,7 +25,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   let event: Stripe.Event;
 
   try {
-    event = stripe.webhooks.constructEvent(buf, sig!, process.env.STRIPE_WEBHOOK_SECRET!);
+    // ⚠️ CHANGEMENT ICI : Utilisez une nouvelle variable pour ne pas casser l'existant
+    event = stripe.webhooks.constructEvent(
+      buf, 
+      sig!, 
+      process.env.STRIPE_INSURANCE_WEBHOOK_SECRET! // <--- Nouvelle variable à ajouter dans .env
+    );
   } catch (err: any) {
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
@@ -34,7 +39,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const session = event.data.object as Stripe.Checkout.Session;
     const metadata = session.metadata || {};
 
-    // On ne traite QUE l'assurance ici (on ignore les eSIMs)
+    // On ne traite QUE l'assurance ici
     if (metadata.type === 'insurance_ava' && metadata.adhesion_number) {
       console.log(`🚑 Webhook Assurance : Validation contrat ${metadata.adhesion_number}`);
       
@@ -59,6 +64,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   }
 
-  // Si ce n'est pas une assurance, on répond 200 pour ne pas bloquer Stripe
+  // Si ce n'est pas une assurance, on ignore (200 OK) pour ne pas bloquer Stripe
   return res.status(200).json({ received: true, ignored: true });
 }

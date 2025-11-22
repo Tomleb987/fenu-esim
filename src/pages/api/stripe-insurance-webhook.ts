@@ -4,84 +4,81 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { validateAvaAdhesion } from "@/lib/ava";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-06-20", // ✔️ Version stable Stripe
+  apiVersion: "2024-06-20", // version stable Stripe
 });
 
-// Next.js doit désactiver le bodyParser → obligatoire pour les webhooks Stripe
+// Obligatoire : Stripe envoie un buffer brut
 export const config = { api: { bodyParser: false } };
 
-// Reconstituer le buffer brut
-async function buffer(readable: any) {
+// Fonction utilitaire pour récupérer le raw body
+async function buffer(stream: any) {
   const chunks = [];
-  for await (const chunk of readable) {
+  for await (const chunk of stream) {
     chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
   }
   return Buffer.concat(chunks);
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "POST")
+  if (req.method !== "POST") {
     return res.status(405).json({ message: "Method not allowed" });
+  }
 
-  const buf = await buffer(req);
-  const signature = req.headers["stripe-signature"];
+  const rawBody = await buffer(req);
+  const signature = req.headers["stripe-signature"] as string;
+
   let event: Stripe.Event;
 
-  // ----------------------------
-  //  ✔️ Vérification Stripe
-  // ----------------------------
+  // Vérification de la signature Stripe
   try {
     event = stripe.webhooks.constructEvent(
-      buf,
-      signature!,
-      process.env.STRIPE_INSURANCE_WEBHOOK_SECRET! // ✔️ Clé de ce webhook assurance uniquement
+      rawBody,
+      signature,
+      process.env.STRIPE_INSURANCE_WEBHOOK_SECRET! // DOIT être présent dans Vercel
     );
   } catch (err: any) {
-    console.error("❌ Erreur signature webhook:", err.message);
+    console.error("❌ Stripe webhook signature error:", err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  // ----------------------------
-  //  ✔️ Traitement de l'assurance AVA
-  // ----------------------------
+  // On traite seulement checkout.session.completed
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
     const metadata = session.metadata || {};
 
+    // Assurer qu'on traite bien les assurances AVA uniquement
     if (metadata.type === "insurance_ava" && metadata.adhesion_number) {
-      console.log(
-        `🚑 Webhook Assurance → Validation du contrat AVA #${metadata.adhesion_number}`
-      );
+      const adhesionNumber = metadata.adhesion_number;
+
+      console.log(`🟦 Insurance webhook: Trying to validate AVA adhesion #${adhesionNumber}`);
 
       try {
-        // 1) Vérification AVA
-        await validateAvaAdhesion(metadata.adhesion_number);
+        // Étape 1 : validation via AVA
+        await validateAvaAdhesion(adhesionNumber);
 
-        // 2) Mise à jour Supabase
+        // Étape 2 : mise à jour Supabase
         const { error: supaError } = await supabaseAdmin
           .from("insurances")
           .update({
             status: "validated",
             stripe_session_id: session.id,
           })
-          .eq("adhesion_number", metadata.adhesion_number);
+          .eq("adhesion_number", adhesionNumber);
 
         if (supaError) {
-          console.error("❌ Erreur Supabase:", supaError);
-          return res.status(500).json({ error: "Erreur Supabase" });
+          console.error("❌ Supabase update error:", supaError);
+          return res.status(500).json({ error: "Supabase update error" });
         }
 
-        console.log("✔️ Assurance validée et mise à jour Supabase.");
+        console.log("✅ AVA insurance validated successfully.");
         return res.status(200).json({ received: true, processed: true });
-      } catch (error) {
-        console.error("❌ Erreur validation Assurance AVA:", error);
-        return res.status(500).json({ error: "Erreur validation AVA" });
+      } catch (err) {
+        console.error("❌ Error validating AVA insurance:", err);
+        return res.status(500).json({ error: "AVA validation error" });
       }
     }
   }
 
-  // ----------------------------
-  //  ✔️ On ignore poliment si ce n'est pas une assurance AVA
-  // ----------------------------
+  // Tout autre événement est ignoré volontairement
   return res.status(200).json({ received: true, ignored: true });
 }

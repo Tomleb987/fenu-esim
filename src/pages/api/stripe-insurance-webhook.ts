@@ -3,16 +3,17 @@ import Stripe from "stripe";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { validateAvaAdhesion } from "@/lib/ava";
 
+// Stripe avec version imposée par ton compte : 2025-04-30.basil
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-06-20", // version stable Stripe
+  apiVersion: "2025-04-30.basil",
 });
 
-// Obligatoire : Stripe envoie un buffer brut
+// Stripe a besoin du RAW BODY → bodyParser OFF
 export const config = { api: { bodyParser: false } };
 
-// Fonction utilitaire pour récupérer le raw body
+// Convertir le stream en buffer brut (obligatoire pour Stripe)
 async function buffer(stream: any) {
-  const chunks = [];
+  const chunks: any[] = [];
   for await (const chunk of stream) {
     chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
   }
@@ -29,31 +30,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   let event: Stripe.Event;
 
-  // Vérification de la signature Stripe
+  // Vérification signature Stripe
   try {
     event = stripe.webhooks.constructEvent(
       rawBody,
       signature,
-      process.env.STRIPE_INSURANCE_WEBHOOK_SECRET! // DOIT être présent dans Vercel
+      process.env.STRIPE_INSURANCE_WEBHOOK_SECRET! // SECRET DU WEBHOOK AVA
     );
   } catch (err: any) {
-    console.error("❌ Stripe webhook signature error:", err.message);
+    console.error("❌ Stripe signature error:", err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  // On traite seulement checkout.session.completed
+  // On traite uniquement checkout.session.completed
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
     const metadata = session.metadata || {};
 
-    // Assurer qu'on traite bien les assurances AVA uniquement
+    // Assurer que c’est bien une assurance AVA
     if (metadata.type === "insurance_ava" && metadata.adhesion_number) {
       const adhesionNumber = metadata.adhesion_number;
 
-      console.log(`🟦 Insurance webhook: Trying to validate AVA adhesion #${adhesionNumber}`);
+      console.log(`🟦 Webhook AVA → Validation de l'adhésion #${adhesionNumber}`);
 
       try {
-        // Étape 1 : validation via AVA
+        // Étape 1 : vérification AVA
         await validateAvaAdhesion(adhesionNumber);
 
         // Étape 2 : mise à jour Supabase
@@ -70,15 +71,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           return res.status(500).json({ error: "Supabase update error" });
         }
 
-        console.log("✅ AVA insurance validated successfully.");
+        console.log("✅ Assurance AVA validée avec succès");
         return res.status(200).json({ received: true, processed: true });
       } catch (err) {
-        console.error("❌ Error validating AVA insurance:", err);
+        console.error("❌ Erreur validation AVA:", err);
         return res.status(500).json({ error: "AVA validation error" });
       }
     }
   }
 
-  // Tout autre événement est ignoré volontairement
+  // Tous les autres événements Stripe → on ignore pour éviter les erreurs
   return res.status(200).json({ received: true, ignored: true });
 }

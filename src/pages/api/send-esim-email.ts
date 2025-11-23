@@ -55,21 +55,17 @@ export default async function handler(
       sharingLinkCode,
     });
 
-    // -----------------------------------------------
-    // 🔥 CONFIG OPTIMISÉE POUR ODOO SAAS
-    // -----------------------------------------------
     const mailOptions = {
-      // 1️⃣ Le client → Odoo associe automatiquement l'email à sa fiche
       to: email,
 
-      // 2️⃣ L'expéditeur reconnu par Odoo
-      from: `"FENUA SIM" <notifications@fenua-sim.odoo.com>`,
+      // ✅ Expéditeur officiel (signé par Brevo / fenuasim.com)
+      from: `"FENUA SIM" <hello@fenuasim.com>`,
 
-      // 3️⃣ Le catchall Odoo → copie invisible → historique client OK
+      // ✅ Copie invisible vers Odoo pour suivi fiche client
       bcc: "clients@fenua-sim.odoo.com",
 
-      // 4️⃣ AUCUN "hello@" dans replyTo → sinon Odoo associe mal le message
-      replyTo: `"FENUA SIM" <notifications@fenua-sim.odoo.com>`,
+      // ✅ Le client répond à hello@, pas Odoo
+      replyTo: `"FENUA SIM" <hello@fenuasim.com>`,
 
       subject: `Votre eSIM pour ${destinationName} est prête ! 🌐`,
       html: emailHTML,

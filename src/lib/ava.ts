@@ -49,4 +49,139 @@ export async function getAvaToken() {
 
     console.log("🟩 [AVA] Auth → PARSED:", data);
 
-    if
+    if (!data.token) {
+      console.error("❌ [AVA] Auth → Token absent :", data);
+      return null;
+    }
+
+    return data.token;
+  } catch (err) {
+    console.error("❌ [AVA] Auth → Erreur:", err);
+    return null;
+  }
+}
+
+
+//-------------------------------------------------------
+//  2. CRÉATION D’ADHÉSION
+//-------------------------------------------------------
+export async function createAvaAdhesion(quoteData: any) {
+  console.log("🟦 [AVA] Création adhésion → Démarrage", quoteData);
+
+  const token = await getAvaToken();
+  if (!token) throw new Error("Token manquant (auth AVA impossible)");
+
+  const endpoint = `${process.env.AVA_URL}/assurance/adhesion/creationAdhesion.php`;
+
+  const formData = new URLSearchParams();
+
+  //---------------------------------------------------
+  // Champs obligatoires AVA
+  //---------------------------------------------------
+  formData.append("produit", quoteData.productType);
+  formData.append("dateDebut", formatDateFR(quoteData.startDate));
+  formData.append("dateFin", formatDateFR(quoteData.endDate));
+  formData.append("zone", "102"); // Monde entier
+  formData.append("prime", quoteData.tripCost || "2000");
+  formData.append("nombreAssures", `${1 + (quoteData.companions?.length || 0)}`);
+  formData.append("referenceInterne", quoteData.internalReference);
+
+  //---------------------------------------------------
+  // Souscripteur
+  //---------------------------------------------------
+  formData.append(
+    "infosSouscripteur",
+    JSON.stringify({
+      nom: quoteData.subscriber.lastName,
+      prenom: quoteData.subscriber.firstName,
+      datenaissance: formatDateFR(quoteData.subscriber.birthDate),
+      email: quoteData.subscriber.email,
+      nationalite: quoteData.subscriber.countryCode || "FR",
+      adresse: {
+        rue: quoteData.subscriber.address.street,
+        codepostal: quoteData.subscriber.address.zip,
+        ville: quoteData.subscriber.address.city,
+      },
+    })
+  );
+
+  //---------------------------------------------------
+  // Voyageurs supplémentaires
+  //---------------------------------------------------
+  formData.append(
+    "infosAssures",
+    JSON.stringify(
+      quoteData.companions?.map((c: any) => ({
+        nom: c.lastName,
+        prenom: c.firstName,
+        datenaissance: formatDateFR(c.birthDate),
+      })) || []
+    )
+  );
+
+  //---------------------------------------------------
+  // Options AVA
+  //---------------------------------------------------
+  formData.append("options", JSON.stringify(quoteData.options || {}));
+
+  console.log("🟦 [AVA] Création adhésion → FormData :", Object.fromEntries(formData.entries()));
+
+  //---------------------------------------------------
+  // Requête AVA
+  //---------------------------------------------------
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData.toString(),
+  });
+
+  const raw = await res.text();
+  console.log("🟧 [AVA] Création adhésion → RAW:", raw);
+
+  try {
+    const data = JSON.parse(raw);
+    console.log("🟩 [AVA] Création adhésion → PARSED:", data);
+    return data;
+  } catch {
+    return { error: "Réponse AVA invalide", raw };
+  }
+}
+
+
+//-------------------------------------------------------
+//  3. VALIDATION D’ADHÉSION (après paiement Stripe)
+//-------------------------------------------------------
+export async function validateAvaAdhesion(adhesionNumber: string) {
+  console.log("🟦 [AVA] Validation → numéro", adhesionNumber);
+
+  const token = await getAvaToken();
+  if (!token) throw new Error("Token manquant lors de la validation AVA");
+
+  const endpoint = `${process.env.AVA_URL}/assurance/adhesion/validationAdhesion.php`;
+
+  const body = new URLSearchParams();
+  body.append("numeroAdhesion", adhesionNumber);
+
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Bearer ${token}`,
+    },
+    body: body.toString(),
+  });
+
+  const raw = await res.text();
+  console.log("🟧 [AVA] Validation → RAW:", raw);
+
+  try {
+    const data = JSON.parse(raw);
+    console.log("🟩 [AVA] Validation → PARSED:", data);
+    return data;
+  } catch {
+    return { error: "Réponse AVA invalide", raw };
+  }
+}

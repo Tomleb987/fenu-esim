@@ -3,10 +3,10 @@ import nodemailer from "nodemailer";
 import { createEsimEmailHTML } from "@/utils/emailTemplates";
 import { createClient } from "@supabase/supabase-js";
 
-// 🔐 Connexion Supabase
+// 🔐 Connexion Supabase avec SERVICE_ROLE
 const supabase = createClient(
   process.env.SUPABASE_URL!,
-  process.env.SUPABASE_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY! // 👈 correction ici
 );
 
 export default async function handler(
@@ -90,7 +90,7 @@ export default async function handler(
     // Envoi du mail
     const info = await transporter.sendMail(mailOptions);
 
-    // Sauvegarde Supabase pour archivage Odoo (CRON)
+    // Sauvegarde Supabase pour archivage Odoo
     await supabase.from("emails_sent").insert([
       {
         email,

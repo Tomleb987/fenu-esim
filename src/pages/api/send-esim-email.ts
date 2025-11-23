@@ -1,6 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import nodemailer from "nodemailer";
 import { createEsimEmailHTML } from "@/utils/emailTemplates";
+import { createClient } from "@supabase/supabase-js";
+
+// 🔐 Connexion Supabase
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_KEY!
+);
 
 export default async function handler(
   req: NextApiRequest,
@@ -14,7 +21,6 @@ export default async function handler(
     const {
       email,
       customerName,
-      partnerId, // 🆕 ID du client dans Odoo (doit venir du frontend)
       packageName,
       destinationName,
       dataAmount,
@@ -25,26 +31,12 @@ export default async function handler(
       sharingLinkCode,
     } = req.body;
 
-    if (!email || !destinationName || !customerName) {
+    if (!email || !destinationName) {
       return res.status(400).json({
         message: "Missing required fields",
-        required: ["email", "destinationName", "customerName"],
+        required: ["email", "destinationName"],
       });
     }
-
-    const emailHTML = createEsimEmailHTML({
-      customerName: customerName || "Client",
-      packageName: packageName || "Forfait eSIM",
-      destinationName,
-      dataAmount: dataAmount || "3",
-      dataUnit: dataUnit || "GB",
-      validityDays: validityDays || 30,
-      qrCodeUrl,
-      sharingLink,
-      sharingLinkCode,
-    });
-
-    const subject = `Votre eSIM pour ${destinationName} est prête ! 🌐`;
 
     // SMTP Brevo
     const transporter = nodemailer.createTransport({
@@ -57,12 +49,26 @@ export default async function handler(
       },
     });
 
+    // HTML email body
+    const emailHTML = createEsimEmailHTML({
+      customerName: customerName || "Client",
+      packageName: packageName || "Forfait eSIM",
+      destinationName,
+      dataAmount: dataAmount || "3",
+      dataUnit: dataUnit || "GB",
+      validityDays: validityDays || 30,
+      qrCodeUrl,
+      sharingLink,
+      sharingLinkCode,
+    });
+
+    // Configuration de l'email
     const mailOptions = {
       to: email,
       from: `"FENUA SIM" <hello@fenuasim.com>`,
       bcc: "clients@fenua-sim.odoo.com",
       replyTo: `"FENUA SIM" <hello@fenuasim.com>`,
-      subject,
+      subject: `Votre eSIM pour ${destinationName} est prête ! 🌐`,
       html: emailHTML,
       text:
         `Bonjour ${customerName || "Client"},\n\n` +
@@ -81,27 +87,22 @@ export default async function handler(
       },
     };
 
-    // ✉️ Envoi du mail
+    // Envoi du mail
     const info = await transporter.sendMail(mailOptions);
 
-    // 🗃️ Enregistrement dans Supabase
-    await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/emails_sent`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: process.env.SUPABASE_ANON_KEY!,
-        Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE!}`,
-      },
-      body: JSON.stringify({
+    // Sauvegarde Supabase pour archivage Odoo (CRON)
+    await supabase.from("emails_sent").insert([
+      {
         email,
-        partner_id: partnerId || null,
-        subject,
+        subject: mailOptions.subject,
         html: emailHTML,
-      }),
-    });
+        customer_name: customerName || "Client",
+        archived_odoo: false,
+      },
+    ]);
 
     return res.status(200).json({
-      message: "Email sent and logged",
+      message: "Email sent successfully",
       messageId: info.messageId,
       accepted: info.accepted,
       rejected: info.rejected,

@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { createAvaAdhesion } from '@/lib/ava';
+import { getAvaPrice } from '@/lib/ava';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ message: 'Method not allowed' });
@@ -7,29 +7,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const { quoteData } = req.body;
     
-    // On génère une référence temporaire pour le devis
-    const internalRef = `QUOTE-${Date.now()}`;
-    
-    // On appelle AVA
-    const avaResult = await createAvaAdhesion({ 
-      ...quoteData, 
-      internalReference: internalRef 
-    });
+    console.log("💰 Calcul tarif pour :", quoteData.productType);
 
-    // Vérification d'erreur
+    const avaResult = await getAvaPrice(quoteData);
+
     if (!avaResult || avaResult.error) {
-      console.error("Erreur Devis AVA:", avaResult);
-      return res.status(400).json({ error: avaResult?.error || "Erreur inconnue" });
+      console.error("❌ Erreur Devis AVA:", avaResult);
+      // Gestion spéciale de l'erreur produit non autorisé
+      if (avaResult && avaResult["200 OK"]) {
+          return res.status(400).json({ error: avaResult["200 OK"] });
+      }
+      return res.status(400).json({ error: "Impossible de calculer le tarif", details: avaResult });
     }
 
-    // On renvoie juste ce dont le front a besoin : le PRIX
-    return res.status(200).json({ 
-      price: avaResult.montant_total || avaResult.prime_totale || 0,
-      currency: "EUR"
-    });
+    // AVA renvoie parfois montant_total, parfois prime_totale
+    const price = avaResult.montant_total || avaResult.prime_totale || 0;
+
+    return res.status(200).json({ price: price });
 
   } catch (error: any) {
-    console.error("Erreur Serveur Devis:", error);
+    console.error("💥 Erreur Serveur:", error);
     return res.status(500).json({ error: error.message });
   }
 }

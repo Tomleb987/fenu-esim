@@ -1,199 +1,188 @@
-// src/lib/ava.ts
+// lib/ava.ts
+const AVA_BASE_URL = "https://api-ava.fr/api";
 
-/**
- * Format une date ISO (2025-01-02) → 02/01/2025
- */
-function formatDateFR(dateStr: string) {
-  if (!dateStr) return "";
-  // Si déjà formaté, on renvoie tel quel
-  if (dateStr.includes('/')) return dateStr;
-  
-  const parts = dateStr.split('-');
-  // Sécurité : on s'assure qu'on a bien Année-Mois-Jour
-  if (parts.length === 3) {
-    const [year, month, day] = parts;
-    return `${day}/${month}/${year}`;
-  }
-  return "";
+if (!process.env.AVA_PARTNER_ID || !process.env.AVA_PASSWORD) {
+  throw new Error("AVA_PARTNER_ID et AVA_PASSWORD doivent être définis dans les variables d'environnement");
 }
 
-// 1. AUTHENTIFICATION
-export async function getAvaToken() {
-  const apiUrl = process.env.AVA_API_URL;
-  const partnerId = process.env.AVA_PARTNER_ID;
-  const password = process.env.AVA_PASSWORD;
+export type AvaProductType =
+  | "ava_pass"
+  | "ava_carte_sante"
+  | "ava_zap_voyages"
+  | "ava_tourist_card"
+  | "ava_incoming_classic"
+  | "ava_incoming_studies"
+  | "ava_incoming_safehealth"
+  | "ava_incoming_safehealth_studies"
+  | "plan_sante_studies"
+  | "plan_sante_campus"
+  | "plan_sante_working_holiday_pvt"
+  | "plan_sante_avanture"
+  | "plan_sante_diginomad"
+  | "avantages_360";
 
-  if (!apiUrl || !partnerId || !password) {
-    console.error("❌ ERREUR CONFIG : Variables AVA manquantes.");
-    throw new Error("Configuration serveur incomplète");
-  }
-
-  const endpoint = `${apiUrl}/authentification/connexion.php`;
-  const formData = new URLSearchParams();
-  formData.append("partnerId", partnerId);
-  formData.append("password", password);
-
-  try {
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formData.toString(),
-    });
-    const data = await res.json();
-    const token = data.Token || data.token;
-    if (!token) throw new Error("Pas de token reçu");
-    return token;
-  } catch (err) {
-    console.error("💥 [AVA] Auth Error:", err);
-    return null;
-  }
+export interface AvaSubscriberInfos {
+  subscriberCountry: string; // code ISO, ex: FR, PF
+  birthdate: string;         // "jj/mm/AAAA"
+  firstName?: string;
+  lastName?: string;
+  subscriberEmail?: string;
+  address?: {
+    street: string;
+    zip: string;
+    city: string;
+  };
 }
 
-// 2. OBTENIR LE TARIF (DEVIS)
-// Utilise "demandeTarif.php" -> Ne crée PAS de dossier
-export async function getAvaPrice(quoteData: any) {
-  const token = await getAvaToken();
-  if (!token) throw new Error("Auth AVA échouée");
+export interface AvaCompanionInfo {
+  firstName: string;
+  lastName: string;
+  birthdate: string;     // "jj/mm/AAAA"
+  parental_link: string; // "1","3","4","6","13","17","21"
+}
 
-  const isIncoming = quoteData.productType.includes('incoming');
-  const endpoint = `${process.env.AVA_API_URL}/assurance/${isIncoming ? 'tarification' : 'tarification'}/demandeTarif.php`;
+export interface AvaTarifInput {
+  productType: AvaProductType;
+  journeyStartDate: string; // "jj/mm/AAAA"
+  journeyEndDate: string;   // "jj/mm/AAAA"
+  journeyAmount: number;    // sans devise
+  journeyRegion?: string;   // 102 / 58 / 53… selon doc
+  numberAdultCompanions: number;
+  numberChildrenCompanions: number;
+  numberCompanions?: number;
+  subscriberInfos: AvaSubscriberInfos;
+  companionsInfos?: AvaCompanionInfo[];
+  option?: Record<string, any>; // structure JSON des options AVA
+  prod: boolean; // false = TEST, true = PROD
+  internalReference?: string;
+}
 
-  const formData = new URLSearchParams();
-  
-  // --- CORRECTION PRIX (Par personne) ---
-  // Le front envoie le total (tripCost) et le nombre de voyageurs.
-  // AVA veut le prix PAR PERSONNE.
-  const travelers = 1 + (quoteData.companions?.length || 0);
-  let pricePerPerson = 0;
+async function getAvaToken(): Promise<string> {
+  const body = new URLSearchParams();
+  body.append("partnerId", process.env.AVA_PARTNER_ID!);
+  body.append("password", process.env.AVA_PASSWORD!);
 
-  if (quoteData.tripCost) {
-    // Si on a le total, on divise
-    pricePerPerson = Math.round(quoteData.tripCost / travelers);
-  } else {
-    // Valeur par défaut
-    pricePerPerson = 2000;
-  }
-  formData.append("journeyAmount", pricePerPerson.toString());
-
-  // Dates
-  formData.append("productType", quoteData.productType);
-  formData.append("journeyStartDate", formatDateFR(quoteData.startDate));
-  formData.append("journeyEndDate", formatDateFR(quoteData.endDate));
-  formData.append("journeyRegion", "102");
-
-  // Compteurs
-  formData.append("numberAdultCompanions", (quoteData.companions?.length || 0).toString());
-  formData.append("numberChildrenCompanions", "0");
-  formData.append("numberCompanions", (quoteData.companions?.length || 0).toString());
-
-  // Infos Assuré (Date Naissance est cruciale pour le tarif)
-  formData.append("subscriberInfos", JSON.stringify({
-    birthdate: formatDateFR(quoteData.subscriber.birthDate),
-    subscriberCountry: quoteData.subscriber.countryCode || "PF"
-  }));
-
-  // Infos Accompagnateurs (Dates Naissance)
-  const companionsList = (quoteData.companions || []).map((c: any) => ({
-    birthdate: formatDateFR(c.birthDate),
-    parental_link: "13"
-  }));
-  formData.append("companionsInfos", JSON.stringify(companionsList));
-  
-  formData.append("option", JSON.stringify(quoteData.options || {}));
-  formData.append("prod", "false");
-
-  console.log("💰 [AVA] Demande Tarif - Prix/Pers:", pricePerPerson, "Dates:", formatDateFR(quoteData.startDate));
-
-  const res = await fetch(endpoint, {
+  const res = await fetch(`${AVA_BASE_URL}/authentification/connexion.php`, {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded", "Authorization": `Bearer ${token}` },
-    body: formData.toString(),
+    body,
   });
 
-  const raw = await res.text();
-  try { return JSON.parse(raw); } catch { return { error: "Format réponse invalide", raw }; }
+  if (!res.ok) {
+    const text = await res.text();
+    console.error("Erreur AVA auth:", text);
+    throw new Error("Échec de l'authentification AVA");
+  }
+
+  // La doc ne précise pas clairement le format; on part sur un JSON générique.
+  const data: any = await res.json().catch(async () => ({ raw: await res.text() }));
+  const token = data.token ?? data.access_token ?? data.raw;
+
+  if (!token) {
+    console.error("Réponse inattendue AVA auth:", data);
+    throw new Error("Token AVA introuvable dans la réponse");
+  }
+
+  return token;
 }
 
-// 3. CRÉATION ADHÉSION (CONTRAT)
-// Utilise "creationAdhesion.php" -> Crée le dossier "Brouillon"
-export async function createAvaAdhesion(quoteData: any) {
+export async function demandeTarifComplexe(input: AvaTarifInput): Promise<any> {
   const token = await getAvaToken();
-  if (!token) throw new Error("Token manquant");
 
-  const isIncoming = quoteData.productType.toLowerCase().includes('incoming');
-  const endpoint = `${process.env.AVA_API_URL}/assurance/${isIncoming ? 'tarification' : 'adhesion'}/creationAdhesion.php`;
+  const body = new URLSearchParams();
+  body.append("productType", input.productType);
+  body.append("journeyStartDate", input.journeyStartDate);
+  body.append("journeyEndDate", input.journeyEndDate);
+  body.append("journeyAmount", String(input.journeyAmount));
+  body.append("numberAdultCompanions", String(input.numberAdultCompanions));
+  body.append("numberChildrenCompanions", String(input.numberChildrenCompanions));
 
-  const formData = new URLSearchParams();
-
-  // --- CORRECTION PRIX (Par personne) ---
-  const travelers = 1 + (quoteData.companions?.length || 0);
-  let pricePerPerson = 2000;
-  if (quoteData.tripCost) {
-    pricePerPerson = Math.round(quoteData.tripCost / travelers);
+  if (typeof input.numberCompanions === "number") {
+    body.append("numberCompanions", String(input.numberCompanions));
   }
-  formData.append("journeyAmount", pricePerPerson.toString());
+  if (input.journeyRegion) {
+    body.append("journeyRegion", input.journeyRegion);
+  }
 
-  // Champs obligatoires
-  formData.append("productType", quoteData.productType);
-  formData.append("journeyStartDate", formatDateFR(quoteData.startDate));
-  formData.append("journeyEndDate", formatDateFR(quoteData.endDate));
-  formData.append("journeyRegion", "102");
-  formData.append("internalReference", quoteData.internalReference || "");
+  body.append("subscriberInfos", JSON.stringify(input.subscriberInfos));
 
-  formData.append("numberAdultCompanions", (quoteData.companions?.length || 0).toString());
-  formData.append("numberChildrenCompanions", "0");
-  formData.append("numberCompanions", (quoteData.companions?.length || 0).toString());
+  if (input.companionsInfos && input.companionsInfos.length > 0) {
+    body.append("companionsInfos", JSON.stringify(input.companionsInfos));
+  }
 
-  // Assuré Complet
-  formData.append("subscriberInfos", JSON.stringify({
-    firstName: quoteData.subscriber.firstName, 
-    lastName: quoteData.subscriber.lastName,   
-    birthdate: formatDateFR(quoteData.subscriber.birthDate),
-    subscriberEmail: quoteData.subscriber.email,
-    subscriberCountry: quoteData.subscriber.countryCode || "PF",
-    address: quoteData.subscriber.address,
-  }));
+  if (input.option) {
+    body.append("option", JSON.stringify(input.option));
+  }
 
-  // Accompagnateurs Complets
-  const companionsList = (quoteData.companions || []).map((c: any) => ({
-    firstName: c.firstName,
-    lastName: c.lastName,
-    birthdate: formatDateFR(c.birthDate),
-    parental_link: "13"
-  }));
-  formData.append("companionsInfos", JSON.stringify(companionsList));
+  body.append("prod", input.prod ? "true" : "false");
+  if (input.internalReference) {
+    body.append("internalReference", input.internalReference);
+  }
 
-  formData.append("option", JSON.stringify(quoteData.options || {}));
-  formData.append("prod", "false"); 
-
-  console.log("📝 [AVA] Création Dossier...");
-
-  const res = await fetch(endpoint, {
+  const res = await fetch(`${AVA_BASE_URL}/assurance/tarification/demandeTarif.php`, {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded", "Authorization": `Bearer ${token}` },
-    body: formData.toString(),
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body,
   });
 
-  const raw = await res.text();
-  try {
-    const data = JSON.parse(raw);
-    if (data.code && data.message && !data.id_adhesion && !data.id_contrat) {
-        if (Object.keys(data).length === 1 && data["200 OK"]) return { error: data["200 OK"], raw: data };
-        return { error: data.message, raw: data };
-    }
-    return data;
-  } catch {
-    return { error: "Format invalide", raw };
+  if (!res.ok) {
+    const text = await res.text();
+    console.error("Erreur AVA tarif:", text);
+    throw new Error("Échec de la demande de tarification AVA");
   }
+
+  const data = await res.json().catch(async () => ({ raw: await res.text() }));
+  return data;
 }
 
-// 4. VALIDATION
-export async function validateAvaAdhesion(adhesionNumber: string) {
+export async function creationAdhesion(input: AvaTarifInput): Promise<any> {
   const token = await getAvaToken();
-  const res = await fetch(`${process.env.AVA_API_URL}/assurance/adhesion/validationAdhesion.php`, {
+
+  const body = new URLSearchParams();
+  body.append("productType", input.productType);
+  body.append("journeyStartDate", input.journeyStartDate);
+  body.append("journeyEndDate", input.journeyEndDate);
+  body.append("journeyAmount", String(input.journeyAmount));
+  body.append("numberAdultCompanions", String(input.numberAdultCompanions));
+  body.append("numberChildrenCompanions", String(input.numberChildrenCompanions));
+
+  if (typeof input.numberCompanions === "number") {
+    body.append("numberCompanions", String(input.numberCompanions));
+  }
+  if (input.journeyRegion) {
+    body.append("journeyRegion", input.journeyRegion);
+  }
+
+  body.append("subscriberInfos", JSON.stringify(input.subscriberInfos));
+
+  if (input.companionsInfos && input.companionsInfos.length > 0) {
+    body.append("companionsInfos", JSON.stringify(input.companionsInfos));
+  }
+
+  if (input.option) {
+    body.append("option", JSON.stringify(input.option));
+  }
+
+  body.append("prod", input.prod ? "true" : "false");
+  if (input.internalReference) {
+    body.append("internalReference", input.internalReference);
+  }
+
+  const res = await fetch(`${AVA_BASE_URL}/assurance/adhesion/creationAdhesion.php`, {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded", "Authorization": `Bearer ${token}` },
-    body: new URLSearchParams({ numeroAdhesion: adhesionNumber }).toString(),
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body,
   });
-  return res.json();
+
+  if (!res.ok) {
+    const text = await res.text();
+    console.error("Erreur AVA création adhésion:", text);
+    throw new Error("Échec de la création d'adhésion AVA");
+  }
+
+  const data = await res.json().catch(async () => ({ raw: await res.text() }));
+  return data;
 }

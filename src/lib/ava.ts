@@ -6,11 +6,10 @@
  */
 function formatDateFR(date: string) {
   if (!date) return "";
-  // Si la date est déjà au format français, on la retourne telle quelle
   if (date.includes('/')) return date;
   
   const d = new Date(date);
-  if (isNaN(d.getTime())) return date; // Sécurité si date invalide
+  if (isNaN(d.getTime())) return date;
 
   const day = String(d.getUTCDate()).padStart(2, "0");
   const month = String(d.getUTCMonth() + 1).padStart(2, "0");
@@ -22,23 +21,16 @@ function formatDateFR(date: string) {
 //  1. AUTHENTIFICATION AVA
 //-------------------------------------------------------
 export async function getAvaToken() {
-  // 1. Récupération des variables
   const apiUrl = process.env.AVA_API_URL;
   const partnerId = process.env.AVA_PARTNER_ID;
   const password = process.env.AVA_PASSWORD;
 
-  // --- DIAGNOSTIC DE DÉMARRAGE (S'affichera dans les logs Vercel) ---
   if (!apiUrl || !partnerId || !password) {
-    console.error("❌ ERREUR CRITIQUE : Variables d'environnement manquantes !");
-    console.log("État des variables :");
-    console.log("- AVA_API_URL:", apiUrl ? "✅ OK" : "❌ MANQUANT");
-    console.log("- AVA_PARTNER_ID:", partnerId ? "✅ OK" : "❌ MANQUANT");
-    console.log("- AVA_PASSWORD:", password ? "✅ OK" : "❌ MANQUANT");
-    throw new Error("Configuration serveur incomplète (Variables AVA manquantes)");
+    console.error("❌ ERREUR CRITIQUE : Variables AVA manquantes.");
+    throw new Error("Configuration serveur incomplète");
   }
 
   const endpoint = `${apiUrl}/authentification/connexion.php`;
-  console.log(`🔵 [AVA] Tentative Auth vers: ${endpoint}`);
   
   const formData = new URLSearchParams();
   formData.append("partnerId", partnerId);
@@ -53,26 +45,22 @@ export async function getAvaToken() {
 
     const raw = await res.text();
     
-    if (!res.ok) {
-      console.error(`❌ [AVA] Erreur HTTP ${res.status}:`, raw);
-      throw new Error(`Erreur HTTP AVA: ${res.status}`);
-    }
-
     let data: any;
     try {
       data = JSON.parse(raw);
     } catch {
-      console.error("❌ [AVA] Réponse non-JSON reçue:", raw);
-      throw new Error("Réponse AVA invalide (Pas du JSON)");
+      console.error("❌ [AVA] Réponse non-JSON:", raw);
+      return null;
     }
 
-    if (!data.token) {
-      console.error("❌ [AVA] Auth refusée (Pas de token):", data);
-      throw new Error(data.message || "Authentification AVA échouée");
+    // ⚠️ CORRECTION ICI : "Token" avec majuscule
+    if (!data.Token) {
+      console.error("❌ [AVA] Auth refusée :", data);
+      throw new Error("Authentification AVA échouée");
     }
 
-    console.log("✅ [AVA] Token récupéré avec succès !");
-    return data.token;
+    console.log("✅ [AVA] Token récupéré !");
+    return data.Token; // ⚠️ CORRECTION ICI AUSSI
 
   } catch (err) {
     console.error("💥 [AVA] Exception Auth:", err);
@@ -82,50 +70,35 @@ export async function getAvaToken() {
 
 
 //-------------------------------------------------------
-//  2. CRÉATION D’ADHÉSION (DEVIS + CONTRAT)
+//  2. CRÉATION D’ADHÉSION
 //-------------------------------------------------------
 export async function createAvaAdhesion(quoteData: any) {
   console.log("🟦 [AVA] Création adhésion → Produit:", quoteData.productType);
 
-  // 1. On récupère le token
   const token = await getAvaToken();
-  if (!token) {
-    throw new Error("Impossible de récupérer le token AVA (Vérifiez vos logs serveur)");
-  }
+  if (!token) throw new Error("Token manquant");
 
-  // 2. Détection automatique de l'URL (Gamme Incoming vs Standard)
   const isIncoming = quoteData.productType.toLowerCase().includes('incoming');
   const baseUrl = process.env.AVA_API_URL;
-  // L'API AVA utilise "tarification" pour Incoming et "adhesion" pour le reste dans l'URL
   const endpoint = `${baseUrl}/assurance/${isIncoming ? 'tarification' : 'adhesion'}/creationAdhesion.php`;
 
   const formData = new URLSearchParams();
 
-  // ---------------------------------------------------
-  // CHAMPS OBLIGATOIRES
-  // ---------------------------------------------------
+  // Champs obligatoires
   formData.append("productType", quoteData.productType);
   formData.append("journeyStartDate", formatDateFR(quoteData.startDate));
   formData.append("journeyEndDate", formatDateFR(quoteData.endDate));
-  formData.append("journeyRegion", "102"); // 102 = Monde Entier (par défaut)
-  
-  // Le prix doit être une chaîne de caractères
-  const price = quoteData.tripCost ? quoteData.tripCost.toString() : "2000";
-  formData.append("journeyAmount", price);
-  
-  formData.append("internalReference", quoteData.internalReference || `REF-${Date.now()}`);
+  formData.append("journeyRegion", "102");
+  formData.append("journeyAmount", (quoteData.tripCost || 2000).toString());
+  formData.append("internalReference", quoteData.internalReference || "");
 
-  // ---------------------------------------------------
-  // COMPTEURS VOYAGEURS
-  // ---------------------------------------------------
+  // Compteurs
   const companionsCount = quoteData.companions ? quoteData.companions.length : 0;
   formData.append("numberAdultCompanions", companionsCount.toString());
   formData.append("numberChildrenCompanions", "0");
   formData.append("numberCompanions", companionsCount.toString());
 
-  // ---------------------------------------------------
-  // SOUSCRIPTEUR (JSON)
-  // ---------------------------------------------------
+  // Souscripteur
   const subscriberJson = JSON.stringify({
     firstName: quoteData.subscriber.firstName, 
     lastName: quoteData.subscriber.lastName,   
@@ -140,30 +113,19 @@ export async function createAvaAdhesion(quoteData: any) {
   });
   formData.append("subscriberInfos", subscriberJson);
 
-  // ---------------------------------------------------
-  // ACCOMPAGNATEURS (Tableau JSON)
-  // ---------------------------------------------------
+  // Accompagnateurs
   const companionsList = (quoteData.companions || []).map((c: any) => ({
     firstName: c.firstName,
     lastName: c.lastName,
     birthdate: formatDateFR(c.birthDate),
-    parental_link: "13" // "13" = Ami/Autre (Valeur par défaut)
+    parental_link: "13"
   }));
   formData.append("companionsInfos", JSON.stringify(companionsList));
 
-  // ---------------------------------------------------
-  // OPTIONS & CONFIG
-  // ---------------------------------------------------
+  // Options
   formData.append("option", JSON.stringify(quoteData.options || {}));
-  
-  // 'false' pour tester, passer à 'true' en production réelle
   formData.append("prod", "false"); 
 
-  // ---------------------------------------------------
-  // ENVOI REQUÊTE
-  // ---------------------------------------------------
-  console.log(`🚀 [AVA] Envoi requête vers ${endpoint}...`);
-  
   const res = await fetch(endpoint, {
     method: "POST",
     headers: {
@@ -178,7 +140,6 @@ export async function createAvaAdhesion(quoteData: any) {
   try {
     const data = JSON.parse(raw);
     
-    // Vérification d'erreur fonctionnelle renvoyée en JSON par AVA
     if (data.code && data.message && !data.id_adhesion && !data.id_contrat) {
         console.error("❌ [AVA] Erreur Métier:", data.message);
         return { error: data.message, raw: data };
@@ -194,13 +155,13 @@ export async function createAvaAdhesion(quoteData: any) {
 
 
 //-------------------------------------------------------
-//  3. VALIDATION D’ADHÉSION (WEBHOOK)
+//  3. VALIDATION D’ADHÉSION
 //-------------------------------------------------------
 export async function validateAvaAdhesion(adhesionNumber: string) {
   console.log("🟦 [AVA] Validation contrat n°", adhesionNumber);
 
   const token = await getAvaToken();
-  if (!token) throw new Error("Token manquant lors de la validation AVA");
+  if (!token) throw new Error("Token manquant");
 
   const endpoint = `${process.env.AVA_API_URL}/assurance/adhesion/validationAdhesion.php`;
 
@@ -219,14 +180,12 @@ export async function validateAvaAdhesion(adhesionNumber: string) {
 
     const raw = await res.text();
     
-    // Tenter de parser, mais AVA renvoie parfois du HTML ou du texte sur validation
     try {
         const data = JSON.parse(raw);
         console.log("🟩 [AVA] Contrat validé :", data);
         return data;
     } catch {
-        console.log("🟧 [AVA] Validation brute (non JSON):", raw);
-        // Si ce n'est pas du JSON mais que le statut est 200, c'est souvent bon
+        console.log("🟧 [AVA] Validation brute :", raw);
         return { success: true, raw };
     }
 

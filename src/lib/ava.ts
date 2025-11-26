@@ -1,5 +1,4 @@
-// src/lib/ava.ts — Version CORRIGÉE pour l'API AVA
-//-------------------------------------------------------
+// src/lib/ava.ts
 
 /**
  * Format une date ISO (2025-01-02) → 02/01/2025
@@ -17,11 +16,11 @@ function formatDateFR(date: string) {
 //  1. AUTHENTIFICATION AVA
 //-------------------------------------------------------
 export async function getAvaToken() {
-  // Utilisation des variables définies dans .env.local
+  // ✅ UTILISATION DE LA BONNE VARIABLE VERCEL : AVA_API_URL
   const endpoint = `${process.env.AVA_API_URL}/authentification/connexion.php`;
 
   const formData = new URLSearchParams();
-  // ⚠️ CORRECTION ICI : partnerId et password (selon la doc AVA)
+  // ✅ Correction des noms de paramètres (selon doc AVA)
   formData.append("partnerId", process.env.AVA_PARTNER_ID || "");
   formData.append("password", process.env.AVA_PASSWORD || "");
 
@@ -35,7 +34,7 @@ export async function getAvaToken() {
     });
 
     const raw = await res.text();
-    console.log("🟧 [AVA] Auth → RAW:", raw);
+    // console.log("🟧 [AVA] Auth → RAW:", raw); // Décommentez pour debug
 
     let data: any;
     try {
@@ -69,13 +68,12 @@ export async function createAvaAdhesion(quoteData: any) {
 
   // Détection automatique de l'URL (Incoming vs Standard)
   const isIncoming = quoteData.productType.includes('incoming');
+  // ✅ UTILISATION DE LA BONNE VARIABLE VERCEL : AVA_API_URL
   const endpoint = `${process.env.AVA_API_URL}/assurance/${isIncoming ? 'tarification' : 'adhesion'}/creationAdhesion.php`;
 
   const formData = new URLSearchParams();
 
-  //---------------------------------------------------
-  // Champs obligatoires AVA (Noms corrigés selon la doc)
-  //---------------------------------------------------
+  // Champs obligatoires AVA
   formData.append("productType", quoteData.productType);
   formData.append("journeyStartDate", formatDateFR(quoteData.startDate));
   formData.append("journeyEndDate", formatDateFR(quoteData.endDate));
@@ -89,14 +87,12 @@ export async function createAvaAdhesion(quoteData: any) {
   formData.append("numberChildrenCompanions", "0");
   formData.append("numberCompanions", nbCompanions.toString());
 
-  //---------------------------------------------------
-  // Souscripteur (subscriberInfos JSON)
-  //---------------------------------------------------
+  // Souscripteur (Correction des clés JSON : firstName/lastName)
   formData.append(
     "subscriberInfos",
     JSON.stringify({
-      firstName: quoteData.subscriber.firstName, // ⚠️ firstName pas prenom
-      lastName: quoteData.subscriber.lastName,   // ⚠️ lastName pas nom
+      firstName: quoteData.subscriber.firstName, 
+      lastName: quoteData.subscriber.lastName,   
       birthdate: formatDateFR(quoteData.subscriber.birthDate),
       subscriberEmail: quoteData.subscriber.email,
       subscriberCountry: quoteData.subscriber.countryCode || "PF",
@@ -108,9 +104,7 @@ export async function createAvaAdhesion(quoteData: any) {
     })
   );
 
-  //---------------------------------------------------
-  // Voyageurs supplémentaires (companionsInfos JSON Array)
-  //---------------------------------------------------
+  // Voyageurs supplémentaires
   const companionsFormatted = (quoteData.companions || []).map((c: any) => ({
     firstName: c.firstName,
     lastName: c.lastName,
@@ -119,16 +113,12 @@ export async function createAvaAdhesion(quoteData: any) {
   }));
   formData.append("companionsInfos", JSON.stringify(companionsFormatted));
 
-  //---------------------------------------------------
   // Options AVA
-  //---------------------------------------------------
   formData.append("option", JSON.stringify(quoteData.options || {}));
   
   formData.append("prod", "false"); // Mode Test
 
-  //---------------------------------------------------
   // Requête AVA
-  //---------------------------------------------------
   const res = await fetch(endpoint, {
     method: "POST",
     headers: {
@@ -160,6 +150,7 @@ export async function validateAvaAdhesion(adhesionNumber: string) {
   const token = await getAvaToken();
   if (!token) throw new Error("Token manquant lors de la validation AVA");
 
+  // ✅ UTILISATION DE LA BONNE VARIABLE VERCEL : AVA_API_URL
   const endpoint = `${process.env.AVA_API_URL}/assurance/adhesion/validationAdhesion.php`;
 
   const body = new URLSearchParams();

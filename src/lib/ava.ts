@@ -5,18 +5,33 @@
  */
 function formatDateFR(dateStr: string) {
   if (!dateStr) return "";
+  // Si déjà formaté, on renvoie tel quel
   if (dateStr.includes('/')) return dateStr;
+  
   const parts = dateStr.split('-');
-  if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  // Sécurité : on s'assure qu'on a bien Année-Mois-Jour
+  if (parts.length === 3) {
+    const [year, month, day] = parts;
+    return `${day}/${month}/${year}`;
+  }
   return "";
 }
 
 // 1. AUTHENTIFICATION
 export async function getAvaToken() {
-  const endpoint = `${process.env.AVA_API_URL}/authentification/connexion.php`;
+  const apiUrl = process.env.AVA_API_URL;
+  const partnerId = process.env.AVA_PARTNER_ID;
+  const password = process.env.AVA_PASSWORD;
+
+  if (!apiUrl || !partnerId || !password) {
+    console.error("❌ ERREUR CONFIG : Variables AVA manquantes.");
+    throw new Error("Configuration serveur incomplète");
+  }
+
+  const endpoint = `${apiUrl}/authentification/connexion.php`;
   const formData = new URLSearchParams();
-  formData.append("partnerId", process.env.AVA_PARTNER_ID || "");
-  formData.append("password", process.env.AVA_PASSWORD || "");
+  formData.append("partnerId", partnerId);
+  formData.append("password", password);
 
   try {
     const res = await fetch(endpoint, {
@@ -25,7 +40,6 @@ export async function getAvaToken() {
       body: formData.toString(),
     });
     const data = await res.json();
-    // Gère Token (maj) ou token (min)
     const token = data.Token || data.token;
     if (!token) throw new Error("Pas de token reçu");
     return token;
@@ -35,8 +49,8 @@ export async function getAvaToken() {
   }
 }
 
-// 2. ESTIMATION DU PRIX (Le Devis)
-// Appelle demandeTarif.php -> Ne crée PAS de dossier chez AVA
+// 2. OBTENIR LE TARIF (DEVIS)
+// Utilise "demandeTarif.php" -> Ne crée PAS de dossier
 export async function getAvaPrice(quoteData: any) {
   const token = await getAvaToken();
   if (!token) throw new Error("Auth AVA échouée");
@@ -45,27 +59,40 @@ export async function getAvaPrice(quoteData: any) {
   const endpoint = `${process.env.AVA_API_URL}/assurance/${isIncoming ? 'tarification' : 'tarification'}/demandeTarif.php`;
 
   const formData = new URLSearchParams();
+  
+  // --- CORRECTION PRIX (Par personne) ---
+  // Le front envoie le total (tripCost) et le nombre de voyageurs.
+  // AVA veut le prix PAR PERSONNE.
+  const travelers = 1 + (quoteData.companions?.length || 0);
+  let pricePerPerson = 0;
+
+  if (quoteData.tripCost) {
+    // Si on a le total, on divise
+    pricePerPerson = Math.round(quoteData.tripCost / travelers);
+  } else {
+    // Valeur par défaut
+    pricePerPerson = 2000;
+  }
+  formData.append("journeyAmount", pricePerPerson.toString());
+
+  // Dates
   formData.append("productType", quoteData.productType);
   formData.append("journeyStartDate", formatDateFR(quoteData.startDate));
   formData.append("journeyEndDate", formatDateFR(quoteData.endDate));
-  formData.append("journeyRegion", "102"); // Monde
-  
-  // Prix estimé pour le calcul
-  const travelers = 1 + (quoteData.companions?.length || 0);
-  const price = quoteData.tripCost || (quoteData.tripCostPerPerson ? quoteData.tripCostPerPerson * travelers : 2000);
-  formData.append("journeyAmount", price.toString());
+  formData.append("journeyRegion", "102");
 
+  // Compteurs
   formData.append("numberAdultCompanions", (quoteData.companions?.length || 0).toString());
   formData.append("numberChildrenCompanions", "0");
   formData.append("numberCompanions", (quoteData.companions?.length || 0).toString());
 
-  // Info minimale requise pour le tarif
+  // Infos Assuré (Date Naissance est cruciale pour le tarif)
   formData.append("subscriberInfos", JSON.stringify({
     birthdate: formatDateFR(quoteData.subscriber.birthDate),
     subscriberCountry: quoteData.subscriber.countryCode || "PF"
   }));
 
-  // Dates de naissance des accompagnateurs (impacte le prix)
+  // Infos Accompagnateurs (Dates Naissance)
   const companionsList = (quoteData.companions || []).map((c: any) => ({
     birthdate: formatDateFR(c.birthDate),
     parental_link: "13"
@@ -75,6 +102,8 @@ export async function getAvaPrice(quoteData: any) {
   formData.append("option", JSON.stringify(quoteData.options || {}));
   formData.append("prod", "false");
 
+  console.log("💰 [AVA] Demande Tarif - Prix/Pers:", pricePerPerson, "Dates:", formatDateFR(quoteData.startDate));
+
   const res = await fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded", "Authorization": `Bearer ${token}` },
@@ -82,11 +111,11 @@ export async function getAvaPrice(quoteData: any) {
   });
 
   const raw = await res.text();
-  try { return JSON.parse(raw); } catch { return { error: "Erreur format prix", raw }; }
+  try { return JSON.parse(raw); } catch { return { error: "Format réponse invalide", raw }; }
 }
 
-// 3. CRÉATION ADHÉSION (Le Contrat)
-// Appelle creationAdhesion.php -> Crée le dossier "Brouillon"
+// 3. CRÉATION ADHÉSION (CONTRAT)
+// Utilise "creationAdhesion.php" -> Crée le dossier "Brouillon"
 export async function createAvaAdhesion(quoteData: any) {
   const token = await getAvaToken();
   if (!token) throw new Error("Token manquant");
@@ -96,29 +125,26 @@ export async function createAvaAdhesion(quoteData: any) {
 
   const formData = new URLSearchParams();
 
-  // Prix final (arrondi pour éviter les erreurs)
-  let rawPrice = quoteData.tripCost;
-  if (!rawPrice && quoteData.tripCostPerPerson) {
-     const travelers = 1 + (quoteData.companions?.length || 0);
-     rawPrice = quoteData.tripCostPerPerson * travelers;
+  // --- CORRECTION PRIX (Par personne) ---
+  const travelers = 1 + (quoteData.companions?.length || 0);
+  let pricePerPerson = 2000;
+  if (quoteData.tripCost) {
+    pricePerPerson = Math.round(quoteData.tripCost / travelers);
   }
-  const finalPrice = rawPrice ? Math.round(Number(rawPrice)).toString() : "2000";
+  formData.append("journeyAmount", pricePerPerson.toString());
 
   // Champs obligatoires
   formData.append("productType", quoteData.productType);
   formData.append("journeyStartDate", formatDateFR(quoteData.startDate));
   formData.append("journeyEndDate", formatDateFR(quoteData.endDate));
   formData.append("journeyRegion", "102");
-  formData.append("journeyAmount", finalPrice);
   formData.append("internalReference", quoteData.internalReference || "");
 
-  // Compteurs
-  const nbCompanions = quoteData.companions ? quoteData.companions.length : 0;
-  formData.append("numberAdultCompanions", nbCompanions.toString());
+  formData.append("numberAdultCompanions", (quoteData.companions?.length || 0).toString());
   formData.append("numberChildrenCompanions", "0");
-  formData.append("numberCompanions", nbCompanions.toString());
+  formData.append("numberCompanions", (quoteData.companions?.length || 0).toString());
 
-  // Souscripteur Complet
+  // Assuré Complet
   formData.append("subscriberInfos", JSON.stringify({
     firstName: quoteData.subscriber.firstName, 
     lastName: quoteData.subscriber.lastName,   
@@ -140,6 +166,8 @@ export async function createAvaAdhesion(quoteData: any) {
   formData.append("option", JSON.stringify(quoteData.options || {}));
   formData.append("prod", "false"); 
 
+  console.log("📝 [AVA] Création Dossier...");
+
   const res = await fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded", "Authorization": `Bearer ${token}` },
@@ -149,7 +177,6 @@ export async function createAvaAdhesion(quoteData: any) {
   const raw = await res.text();
   try {
     const data = JSON.parse(raw);
-    // Gestion des erreurs métier AVA (200 OK mais message d'erreur)
     if (data.code && data.message && !data.id_adhesion && !data.id_contrat) {
         if (Object.keys(data).length === 1 && data["200 OK"]) return { error: data["200 OK"], raw: data };
         return { error: data.message, raw: data };
@@ -160,7 +187,7 @@ export async function createAvaAdhesion(quoteData: any) {
   }
 }
 
-// 4. VALIDATION (Le Webhook)
+// 4. VALIDATION
 export async function validateAvaAdhesion(adhesionNumber: string) {
   const token = await getAvaToken();
   const res = await fetch(`${process.env.AVA_API_URL}/assurance/adhesion/validationAdhesion.php`, {

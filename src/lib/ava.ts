@@ -6,10 +6,11 @@
  */
 function formatDateFR(date: string) {
   if (!date) return "";
+  // Si la date est déjà au format français, on la retourne telle quelle
   if (date.includes('/')) return date;
   
   const d = new Date(date);
-  if (isNaN(d.getTime())) return date;
+  if (isNaN(d.getTime())) return date; // Sécurité si date invalide
 
   const day = String(d.getUTCDate()).padStart(2, "0");
   const month = String(d.getUTCMonth() + 1).padStart(2, "0");
@@ -49,18 +50,20 @@ export async function getAvaToken() {
     try {
       data = JSON.parse(raw);
     } catch {
-      console.error("❌ [AVA] Réponse non-JSON:", raw);
+      console.error("❌ [AVA] Réponse Auth non-JSON:", raw);
       return null;
     }
 
-    // ⚠️ CORRECTION ICI : "Token" avec majuscule
-    if (!data.Token) {
+    // Vérification Token (Majuscule T ou minuscule t selon l'API)
+    const token = data.Token || data.token;
+
+    if (!token) {
       console.error("❌ [AVA] Auth refusée :", data);
       throw new Error("Authentification AVA échouée");
     }
 
     console.log("✅ [AVA] Token récupéré !");
-    return data.Token; // ⚠️ CORRECTION ICI AUSSI
+    return token;
 
   } catch (err) {
     console.error("💥 [AVA] Exception Auth:", err);
@@ -70,7 +73,7 @@ export async function getAvaToken() {
 
 
 //-------------------------------------------------------
-//  2. CRÉATION D’ADHÉSION
+//  2. CRÉATION D’ADHÉSION (AVEC LOGS DE DEBUG)
 //-------------------------------------------------------
 export async function createAvaAdhesion(quoteData: any) {
   console.log("🟦 [AVA] Création adhésion → Produit:", quoteData.productType);
@@ -126,6 +129,7 @@ export async function createAvaAdhesion(quoteData: any) {
   formData.append("option", JSON.stringify(quoteData.options || {}));
   formData.append("prod", "false"); 
 
+  // APPEL API
   const res = await fetch(endpoint, {
     method: "POST",
     headers: {
@@ -136,6 +140,9 @@ export async function createAvaAdhesion(quoteData: any) {
   });
 
   const raw = await res.text();
+  
+  // 👇 LOGS CRITIQUES POUR LE DÉBOGAGE 👇
+  console.log("🔍 [DEBUG] Réponse Brute AVA Adhésion :", raw);
 
   try {
     const data = JSON.parse(raw);
@@ -145,7 +152,9 @@ export async function createAvaAdhesion(quoteData: any) {
         return { error: data.message, raw: data };
     }
 
-    console.log("🟩 [AVA] Adhésion réussie !");
+    console.log("🟩 [AVA] Succès API !");
+    console.log("📦 [DEBUG] Objet reçu :", JSON.stringify(data, null, 2)); // Pour voir la structure exacte
+
     return data;
   } catch {
     console.error("❌ [AVA] Erreur parsing réponse:", raw);
@@ -179,13 +188,14 @@ export async function validateAvaAdhesion(adhesionNumber: string) {
     });
 
     const raw = await res.text();
+    console.log("🔍 [DEBUG] Réponse Brute AVA Validation :", raw);
     
     try {
         const data = JSON.parse(raw);
         console.log("🟩 [AVA] Contrat validé :", data);
         return data;
     } catch {
-        console.log("🟧 [AVA] Validation brute :", raw);
+        console.log("🟧 [AVA] Validation non-JSON (OK si 200):", raw);
         return { success: true, raw };
     }
 

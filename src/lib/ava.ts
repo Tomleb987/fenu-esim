@@ -1,4 +1,5 @@
 // lib/ava.ts
+
 const AVA_BASE_URL = "https://api-ava.fr/api";
 
 if (!process.env.AVA_PARTNER_ID || !process.env.AVA_PASSWORD) {
@@ -22,8 +23,8 @@ export type AvaProductType =
   | "avantages_360";
 
 export interface AvaSubscriberInfos {
-  subscriberCountry: string; // code ISO, ex: FR, PF
-  birthdate: string;         // "jj/mm/AAAA"
+  subscriberCountry: string;
+  birthdate: string; // "jj/mm/AAAA"
   firstName?: string;
   lastName?: string;
   subscriberEmail?: string;
@@ -43,17 +44,17 @@ export interface AvaCompanionInfo {
 
 export interface AvaTarifInput {
   productType: AvaProductType;
-  journeyStartDate: string; // "jj/mm/AAAA"
-  journeyEndDate: string;   // "jj/mm/AAAA"
-  journeyAmount: number;    // sans devise
-  journeyRegion?: string;   // 102 / 58 / 53… selon doc
+  journeyStartDate: string;
+  journeyEndDate: string;
+  journeyAmount: number;
+  journeyRegion?: string;
   numberAdultCompanions: number;
   numberChildrenCompanions: number;
   numberCompanions?: number;
   subscriberInfos: AvaSubscriberInfos;
   companionsInfos?: AvaCompanionInfo[];
-  option?: Record<string, any>; // structure JSON des options AVA
-  prod: boolean; // false = TEST, true = PROD
+  option?: Record<string, any>;
+  prod: boolean;
   internalReference?: string;
 }
 
@@ -73,7 +74,6 @@ async function getAvaToken(): Promise<string> {
     throw new Error("Échec de l'authentification AVA");
   }
 
-  // La doc ne précise pas clairement le format; on part sur un JSON générique.
   const data: any = await res.json().catch(async () => ({ raw: await res.text() }));
   const token = data.token ?? data.access_token ?? data.raw;
 
@@ -136,7 +136,7 @@ export async function demandeTarifComplexe(input: AvaTarifInput): Promise<any> {
   return data;
 }
 
-export async function creationAdhesion(input: AvaTarifInput): Promise<any> {
+export async function createAvaAdhesion(input: AvaTarifInput): Promise<any> {
   const token = await getAvaToken();
 
   const body = new URLSearchParams();

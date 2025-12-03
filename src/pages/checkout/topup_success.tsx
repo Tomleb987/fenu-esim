@@ -108,7 +108,7 @@ export default function SuccessPage() {
         customerName:
           orderDetails.nom || orderDetails.prenom || "Client",
         packageName: orderDetails.package_name,
-        destinationName: packageData.region,
+        destinationName: packageData?.region_fr || packageData?.region || "Destination",
         dataUnit: orderDetails.data_unit || "GB",
         validityDays: orderDetails.validity,
       };

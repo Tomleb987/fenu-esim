@@ -155,7 +155,7 @@ export default function SuccessPage() {
         customerName:
           orderDetails.esim?.nom || orderDetails.esim?.prenom || "Client",
         packageName: orderDetails.package_name,
-        destinationName: packageData.region,
+        destinationName: packageData?.region_fr || packageData?.region || "Destination",
         dataUnit: orderDetails.data_unit || "GB",
         validityDays: orderDetails.validity,
         qrCodeUrl: orderDetails.esim.qr_code_url,

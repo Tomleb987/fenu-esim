@@ -186,3 +186,27 @@ export async function creationAdhesion(input: AvaTarifInput): Promise<any> {
   const data = await res.json().catch(async () => ({ raw: await res.text() }));
   return data;
 }
+
+export async function validateAvaAdhesion(adhesionNumber: string): Promise<any> {
+  const token = await getAvaToken();
+
+  const body = new URLSearchParams();
+  body.append("id_adhesion", adhesionNumber);
+
+  const res = await fetch(`${AVA_BASE_URL}/assurance/adhesion/validationAdhesion.php`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body,
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    console.error("Erreur AVA validation adhésion:", text);
+    throw new Error("Échec de la validation d'adhésion AVA");
+  }
+
+  const data = await res.json().catch(async () => ({ raw: await res.text() }));
+  return data;
+}

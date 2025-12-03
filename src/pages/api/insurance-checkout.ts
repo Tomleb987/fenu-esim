@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import { createAvaAdhesion } from '@/lib/ava';
+import { creationAdhesion } from '@/lib/ava';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-04-30.basil' as any,
@@ -20,7 +20,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // 1️⃣ Création du contrat AVA
     const internalRef = `CMD-${Date.now()}`;
-    const avaResult = await createAvaAdhesion({
+    const avaResult = await creationAdhesion({
       ...quoteData,
       internalReference: internalRef
     });

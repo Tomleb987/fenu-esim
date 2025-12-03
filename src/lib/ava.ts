@@ -1,8 +1,11 @@
 // lib/ava.ts
+
 const AVA_BASE_URL = "https://api-ava.fr/api";
 
 if (!process.env.AVA_PARTNER_ID || !process.env.AVA_PASSWORD) {
-  throw new Error("AVA_PARTNER_ID et AVA_PASSWORD doivent être définis dans les variables d'environnement");
+  throw new Error(
+    "AVA_PARTNER_ID et AVA_PASSWORD doivent être définis dans les variables d'environnement"
+  );
 }
 
 export type AvaProductType =
@@ -22,8 +25,8 @@ export type AvaProductType =
   | "avantages_360";
 
 export interface AvaSubscriberInfos {
-  subscriberCountry: string; // code ISO, ex: FR, PF
-  birthdate: string;         // "jj/mm/AAAA"
+  subscriberCountry: string;
+  birthdate: string;
   firstName?: string;
   lastName?: string;
   subscriberEmail?: string;
@@ -37,25 +40,29 @@ export interface AvaSubscriberInfos {
 export interface AvaCompanionInfo {
   firstName: string;
   lastName: string;
-  birthdate: string;     // "jj/mm/AAAA"
-  parental_link: string; // "1","3","4","6","13","17","21"
+  birthdate: string;
+  parental_link: string;
 }
 
 export interface AvaTarifInput {
   productType: AvaProductType;
-  journeyStartDate: string; // "jj/mm/AAAA"
-  journeyEndDate: string;   // "jj/mm/AAAA"
-  journeyAmount: number;    // sans devise
-  journeyRegion?: string;   // 102 / 58 / 53… selon doc
+  journeyStartDate: string;
+  journeyEndDate: string;
+  journeyAmount: number;
+  journeyRegion?: string;
   numberAdultCompanions: number;
   numberChildrenCompanions: number;
   numberCompanions?: number;
   subscriberInfos: AvaSubscriberInfos;
   companionsInfos?: AvaCompanionInfo[];
-  option?: Record<string, any>; // structure JSON des options AVA
-  prod: boolean; // false = TEST, true = PROD
+  option?: Record<string, any>;
+  prod: boolean;
   internalReference?: string;
 }
+
+/* -------------------------------------------------------------------------- */
+/*                           AUTHENTIFICATION TOKEN                            */
+/* -------------------------------------------------------------------------- */
 
 async function getAvaToken(): Promise<string> {
   const body = new URLSearchParams();
@@ -73,10 +80,11 @@ async function getAvaToken(): Promise<string> {
     throw new Error("Échec de l'authentification AVA");
   }
 
-  // La doc ne précise pas clairement le format; on part sur un JSON générique.
-  const data: any = await res.json().catch(async () => ({ raw: await res.text() }));
-  const token = data.token ?? data.access_token ?? data.raw;
+  const data: any = await res.json().catch(async () => ({
+    raw: await res.text(),
+  }));
 
+  const token = data.token ?? data.access_token ?? data.raw;
   if (!token) {
     console.error("Réponse inattendue AVA auth:", data);
     throw new Error("Token AVA introuvable dans la réponse");
@@ -85,7 +93,13 @@ async function getAvaToken(): Promise<string> {
   return token;
 }
 
-export async function demandeTarifComplexe(input: AvaTarifInput): Promise<any> {
+/* -------------------------------------------------------------------------- */
+/*                           DEMANDE TARIF COMPLEXE                           */
+/* -------------------------------------------------------------------------- */
+
+export async function demandeTarifComplexe(
+  input: AvaTarifInput
+): Promise<any> {
   const token = await getAvaToken();
 
   const body = new URLSearchParams();
@@ -94,7 +108,10 @@ export async function demandeTarifComplexe(input: AvaTarifInput): Promise<any> {
   body.append("journeyEndDate", input.journeyEndDate);
   body.append("journeyAmount", String(input.journeyAmount));
   body.append("numberAdultCompanions", String(input.numberAdultCompanions));
-  body.append("numberChildrenCompanions", String(input.numberChildrenCompanions));
+  body.append(
+    "numberChildrenCompanions",
+    String(input.numberChildrenCompanions)
+  );
 
   if (typeof input.numberCompanions === "number") {
     body.append("numberCompanions", String(input.numberCompanions));
@@ -114,17 +131,19 @@ export async function demandeTarifComplexe(input: AvaTarifInput): Promise<any> {
   }
 
   body.append("prod", input.prod ? "true" : "false");
+
   if (input.internalReference) {
     body.append("internalReference", input.internalReference);
   }
 
-  const res = await fetch(`${AVA_BASE_URL}/assurance/tarification/demandeTarif.php`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    body,
-  });
+  const res = await fetch(
+    `${AVA_BASE_URL}/assurance/tarification/demandeTarif.php`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body,
+    }
+  );
 
   if (!res.ok) {
     const text = await res.text();
@@ -132,11 +151,16 @@ export async function demandeTarifComplexe(input: AvaTarifInput): Promise<any> {
     throw new Error("Échec de la demande de tarification AVA");
   }
 
-  const data = await res.json().catch(async () => ({ raw: await res.text() }));
-  return data;
+  return await res.json().catch(async () => ({ raw: await res.text() }));
 }
 
-export async function creationAdhesion(input: AvaTarifInput): Promise<any> {
+/* -------------------------------------------------------------------------- */
+/*                          CRÉATION D’ADHÉSION AVA                           */
+/* -------------------------------------------------------------------------- */
+
+export async function createAvaAdhesion(
+  input: AvaTarifInput
+): Promise<any> {
   const token = await getAvaToken();
 
   const body = new URLSearchParams();
@@ -145,7 +169,10 @@ export async function creationAdhesion(input: AvaTarifInput): Promise<any> {
   body.append("journeyEndDate", input.journeyEndDate);
   body.append("journeyAmount", String(input.journeyAmount));
   body.append("numberAdultCompanions", String(input.numberAdultCompanions));
-  body.append("numberChildrenCompanions", String(input.numberChildrenCompanions));
+  body.append(
+    "numberChildrenCompanions",
+    String(input.numberChildrenCompanions)
+  );
 
   if (typeof input.numberCompanions === "number") {
     body.append("numberCompanions", String(input.numberCompanions));
@@ -165,17 +192,19 @@ export async function creationAdhesion(input: AvaTarifInput): Promise<any> {
   }
 
   body.append("prod", input.prod ? "true" : "false");
+
   if (input.internalReference) {
     body.append("internalReference", input.internalReference);
   }
 
-  const res = await fetch(`${AVA_BASE_URL}/assurance/adhesion/creationAdhesion.php`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    body,
-  });
+  const res = await fetch(
+    `${AVA_BASE_URL}/assurance/adhesion/creationAdhesion.php`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body,
+    }
+  );
 
   if (!res.ok) {
     const text = await res.text();
@@ -183,8 +212,39 @@ export async function creationAdhesion(input: AvaTarifInput): Promise<any> {
     throw new Error("Échec de la création d'adhésion AVA");
   }
 
-  const data = await res.json().catch(async () => ({ raw: await res.text() }));
-  return data;
+  return await res.json().catch(async () => ({ raw: await res.text() }));
+}
+
+/* -------------------------------------------------------------------------- */
+/*                         VALIDATION DE L’ADHÉSION AVA                       */
+/* -------------------------------------------------------------------------- */
+
+export async function validateAvaAdhesion(
+  internalReference: string,
+  prod: boolean
+): Promise<any> {
+  const token = await getAvaToken();
+
+  const body = new URLSearchParams();
+  body.append("internalReference", internalReference);
+  body.append("prod", prod ? "true" : "false");
+
+  const res = await fetch(
+    `${AVA_BASE_URL}/assurance/adhesion/validationAdhesion.php`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body,
+    }
+  );
+
+  if (!res.ok) {
+    const text = await res.text();
+    console.error("Erreur AVA validation adhésion:", text);
+    throw new Error("Échec de la validation d'adhésion AVA");
+  }
+
+  return await res.json().catch(async () => ({ raw: await res.text() }));
 }
 
 export async function validateAvaAdhesion(adhesionNumber: string): Promise<any> {

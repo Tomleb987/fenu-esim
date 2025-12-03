@@ -1,15 +1,16 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import { creationAdhesion } from '@/lib/ava';
+import { createAvaAdhesion } from '@/lib/ava';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-04-30.basil' as any,
 });
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST')
+  if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
+  }
 
   try {
     const { quoteData, userEmail } = req.body;
@@ -18,46 +19,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: "Missing quoteData or userEmail" });
     }
 
-    // 1️⃣ Création du contrat AVA
+    // 🔐 Référence unique pour l'adhésion
     const internalRef = `CMD-${Date.now()}`;
-    const avaResult = await creationAdhesion({
+    const avaResult = await createAvaAdhesion({
       ...quoteData,
-      internalReference: internalRef
+      internalReference: internalRef,
     });
 
     if (!avaResult) {
-      return res.status(400).json({ error: "Réponse AVA invalide" });
+      return res.status(400).json({ error: "Réponse AVA invalide ou vide" });
     }
 
-    const adhesionNumber =
-      avaResult.id_adhesion ||
-      avaResult.id_contrat;
+    const adhesionNumber = avaResult.id_adhesion || avaResult.id_contrat;
 
     if (!adhesionNumber) {
       return res.status(400).json({
-        error: "Numéro d'adhésion manquant dans AVA",
-        detail: avaResult
+        error: "Numéro d'adhésion manquant dans la réponse AVA",
+        detail: avaResult,
       });
     }
 
-    // Convertir le prix (gérer virgule éventuelle)
+    // 💶 Conversion montant AVA
     let price = avaResult.montant_total;
     if (typeof price === "string") {
-      price = price.replace(',', '.');
-      price = parseFloat(price);
+      price = parseFloat(price.replace(',', '.'));
     }
 
     if (isNaN(price)) {
-      return res.status(400).json({ error: "Montant AVA invalide" });
+      return res.status(400).json({ error: "Montant AVA invalide", raw: avaResult.montant_total });
     }
 
-    // 2️⃣ Enregistrement Supabase
+    // 2️⃣ Enregistrement dans Supabase
     const { data: insertData, error: supaError } = await supabaseAdmin
       .from('insurances')
       .insert({
         user_email: userEmail,
-        subscriber_first_name: quoteData.subscriber?.firstName,
-        subscriber_last_name: quoteData.subscriber?.lastName,
+        subscriber_first_name: quoteData.subscriber?.firstName ?? null,
+        subscriber_last_name: quoteData.subscriber?.lastName ?? null,
         product_type: quoteData.productType,
         adhesion_number: adhesionNumber,
         total_amount: price,
@@ -68,19 +66,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (supaError) {
       console.error("Supabase insert error:", supaError);
-      return res.status(500).json({ error: "Supabase insert error" });
+      return res.status(500).json({ error: "Erreur enregistrement Supabase" });
     }
 
-    // 3️⃣ Création session Stripe Checkout
+    // 3️⃣ Création de la session Stripe Checkout
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
-      payment_method_types: ['card'], // compatibilité ok
+      payment_method_types: ['card'],
       line_items: [
         {
           price_data: {
             currency: 'eur',
             product_data: {
-              name: `Assurance AVA (${adhesionNumber})`
+              name: `Assurance AVA – ${adhesionNumber}`,
             },
             unit_amount: Math.round(price * 100),
           },
@@ -101,6 +99,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   } catch (error: any) {
     console.error("❌ API insurance error:", error);
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message ?? "Erreur serveur" });
   }
 }

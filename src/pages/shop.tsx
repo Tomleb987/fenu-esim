@@ -16,10 +16,12 @@ interface RegionStats {
   packageCount: number;
   operatorName: string;
   countryCode: string;
+  originalRegion: string; // Store original English region name for slug generation
 }
 
 interface DestinationCardProps {
-  region: string;
+  region: string; // French display name
+  originalRegion: string; // Original English region name for slug
   stats: RegionStats;
   currency: "EUR" | "USD" | "XPF";
   isTop?: boolean;
@@ -28,10 +30,177 @@ interface DestinationCardProps {
 const TOP_DESTINATIONS = [
   "France",
   "Canada",
-  "United States",
-  "Australia",
-  "New Zealand",
+  "États-Unis",
+  "Australie",
+  "Nouvelle-Zélande",
 ];
+
+// Translation mapping for English to French destination names
+const REGION_TRANSLATIONS: Record<string, string> = {
+  "Discover Global": "Découvrir Global",
+  "Asia": "Asie",
+  "Europe": "Europe",
+  "Japan": "Japon",
+  "Japon": "Japon", // Handle if already in French
+  "Canary Islands": "Îles Canaries",
+  "South Korea": "Corée du Sud",
+  "Hong Kong": "Hong Kong",
+  "United States": "États-Unis",
+  "Australia": "Australie",
+  "New Zealand": "Nouvelle-Zélande",
+  "Mexico": "Mexique",
+  "Fiji": "Fidji",
+  "Thailand": "Thaïlande",
+  "Singapore": "Singapour",
+  "Malaysia": "Malaisie",
+  "Indonesia": "Indonésie",
+  "Philippines": "Philippines",
+  "Vietnam": "Viêt Nam",
+  "India": "Inde",
+  "China": "Chine",
+  "Taiwan": "Taïwan",
+  "United Kingdom": "Royaume-Uni",
+  "Germany": "Allemagne",
+  "Spain": "Espagne",
+  "Italy": "Italie",
+  "Greece": "Grèce",
+  "Portugal": "Portugal",
+  "Netherlands": "Pays-Bas",
+  "Belgium": "Belgique",
+  "Switzerland": "Suisse",
+  "Austria": "Autriche",
+  "Poland": "Pologne",
+  "Czech Republic": "République tchèque",
+  "Turkey": "Turquie",
+  "Egypt": "Égypte",
+  "Morocco": "Maroc",
+  "South Africa": "Afrique du Sud",
+  "Brazil": "Brésil",
+  "Argentina": "Argentine",
+  "Chile": "Chili",
+  "Colombia": "Colombie",
+  "Peru": "Pérou",
+  "UAE": "Émirats arabes unis",
+  "United Arab Emirates": "Émirats arabes unis",
+  "Saudi Arabia": "Arabie saoudite",
+  "Israel": "Israël",
+  "Jordan": "Jordanie",
+  "Lebanon": "Liban",
+  "Qatar": "Qatar",
+  "Kuwait": "Koweït",
+  "Bahrain": "Bahreïn",
+  "Oman": "Oman",
+  "Azerbaijan": "Azerbaïdjan",
+  "Jamaica": "Jamaïque",
+  "Albania": "Albanie",
+  "Algeria": "Algérie",
+  "Angola": "Angola",
+  "Armenia": "Arménie",
+  "Bangladesh": "Bangladesh",
+  "Belarus": "Biélorussie",
+  "Bolivia": "Bolivie",
+  "Bosnia and Herzegovina": "Bosnie-Herzégovine",
+  "Botswana": "Botswana",
+  "Bulgaria": "Bulgarie",
+  "Cambodia": "Cambodge",
+  "Cameroon": "Cameroun",
+  "Chad": "Tchad",
+  "Croatia": "Croatie",
+  "Cuba": "Cuba",
+  "Cyprus": "Chypre",
+  "Denmark": "Danemark",
+  "Dominican Republic": "République dominicaine",
+  "Ecuador": "Équateur",
+  "Estonia": "Estonie",
+  "Ethiopia": "Éthiopie",
+  "Finland": "Finlande",
+  "France": "France",
+  "Georgia": "Géorgie",
+  "Ghana": "Ghana",
+  "Guatemala": "Guatemala",
+  "Honduras": "Honduras",
+  "Hungary": "Hongrie",
+  "Iceland": "Islande",
+  "Ireland": "Irlande",
+  "Ivory Coast": "Côte d'Ivoire",
+  "Kazakhstan": "Kazakhstan",
+  "Kenya": "Kenya",
+  "Kyrgyzstan": "Kirghizistan",
+  "Laos": "Laos",
+  "Latvia": "Lettonie",
+  "Lithuania": "Lituanie",
+  "Luxembourg": "Luxembourg",
+  "Madagascar": "Madagascar",
+  "Malawi": "Malawi",
+  "Maldives": "Maldives",
+  "Mali": "Mali",
+  "Malta": "Malte",
+  "Mauritius": "Maurice",
+  "Moldova": "Moldavie",
+  "Mongolia": "Mongolie",
+  "Montenegro": "Monténégro",
+  "Myanmar": "Myanmar",
+  "Namibia": "Namibie",
+  "Nepal": "Népal",
+  "Nicaragua": "Nicaragua",
+  "Nigeria": "Nigeria",
+  "North Macedonia": "Macédoine du Nord",
+  "Norway": "Norvège",
+  "Pakistan": "Pakistan",
+  "Panama": "Panama",
+  "Paraguay": "Paraguay",
+  "Romania": "Roumanie",
+  "Russia": "Russie",
+  "Rwanda": "Rwanda",
+  "Senegal": "Sénégal",
+  "Serbia": "Serbie",
+  "Slovakia": "Slovaquie",
+  "Slovenia": "Slovénie",
+  "Sri Lanka": "Sri Lanka",
+  "Sweden": "Suède",
+  "Tanzania": "Tanzanie",
+  "Tunisia": "Tunisie",
+  "Ukraine": "Ukraine",
+  "Uruguay": "Uruguay",
+  "Uzbekistan": "Ouzbékistan",
+  "Venezuela": "Venezuela",
+  "Zambia": "Zambie",
+  "Zimbabwe": "Zimbabwe",
+};
+
+// Function to get French name with fallback to translation
+function getFrenchRegionName(regionFr: string | null, region: string | null): string {
+  // First priority: Use region_fr from database if available and it's actually French
+  if (regionFr && regionFr.trim()) {
+    const trimmedFr = regionFr.trim();
+    // Check if region_fr is actually in English (needs translation)
+    if (REGION_TRANSLATIONS[trimmedFr]) {
+      // region_fr contains English name, translate it
+      return REGION_TRANSLATIONS[trimmedFr];
+    }
+    // region_fr is already in French, use it
+    return trimmedFr;
+  }
+  
+  // Second priority: Translate English region name to French
+  if (region && region.trim()) {
+    const trimmedRegion = region.trim();
+    // Try exact match first
+    if (REGION_TRANSLATIONS[trimmedRegion]) {
+      return REGION_TRANSLATIONS[trimmedRegion];
+    }
+    // Try case-insensitive match
+    const lowerRegion = trimmedRegion.toLowerCase();
+    for (const [key, value] of Object.entries(REGION_TRANSLATIONS)) {
+      if (key.toLowerCase() === lowerRegion) {
+        return value;
+      }
+    }
+  }
+  
+  // Fallback: return original region or "Autres"
+  return region?.trim() || "Autres";
+}
 
 function generateSlug(name: string): string {
   return name
@@ -46,6 +215,7 @@ function generateSlug(name: string): string {
 
 function DestinationCard({
   region,
+  originalRegion,
   stats,
   currency,
   isTop = false,
@@ -53,7 +223,8 @@ function DestinationCard({
   const router = useRouter();
 
   const handleCardClick = () => {
-    const slug = generateSlug(region);
+    // Use original English region name to generate slug (DB uses English slugs)
+    const slug = generateSlug(originalRegion);
     router.push(`/shop/${slug}`);
   };
 
@@ -270,8 +441,8 @@ export default function Shop() {
       return acc;
     }
     
-    // Use region_fr if available, otherwise fallback to region
-    const region = pkg.region_fr || pkg.region || "Autres";
+    // Use region_fr if available, otherwise use translation mapping, then fallback to region
+    const region = getFrenchRegionName(pkg.region_fr, pkg.region);
     if (!acc[region]) {
       acc[region] = [];
     }
@@ -286,6 +457,9 @@ export default function Shop() {
       const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
       const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
 
+      // Get original English region name from first package
+      const originalRegion = pkgs[0]?.region || pkgs[0]?.region_fr || region;
+
       // Apply margin here
       acc[region] = {
         minPrice: minPrice * (1 + margin),
@@ -296,6 +470,7 @@ export default function Shop() {
         maxDays: Math.max(
           ...pkgs.map((p) => parseInt(p.validity?.toString().split(' ')[0] || "0"))
         ),
+        originalRegion: originalRegion, // Store original English name for slug
       };
       return acc;
     },
@@ -438,6 +613,7 @@ export default function Shop() {
                 <DestinationCard
                   key={region}
                   region={region}
+                  originalRegion={regionStats[region].originalRegion}
                   stats={regionStats[region]}
                   currency={currency}
                   isTop={true}
@@ -474,6 +650,7 @@ export default function Shop() {
                 <DestinationCard
                   key={region}
                   region={region}
+                  originalRegion={regionStats[region].originalRegion}
                   stats={regionStats[region]}
                   currency={currency}
                   isTop={false}

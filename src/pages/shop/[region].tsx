@@ -56,11 +56,60 @@ function getCountryCode(region: string | null): string {
   }
 }
 
-const REGION_SLUGS = {
-  fr: "France",
-  us: "États-Unis",
-  jp: "Japon",
-  // etc.
+// Reverse translation mapping: French slug → English region name (for DB lookup)
+const FRENCH_TO_ENGLISH_REGION: Record<string, string> = {
+  "japon": "Japan",
+  "etats-unis": "United States",
+  "australie": "Australia",
+  "nouvelle-zelande": "New Zealand",
+  "mexique": "Mexico",
+  "fidji": "Fiji",
+  "thailande": "Thailand",
+  "singapour": "Singapore",
+  "malaisie": "Malaysia",
+  "indonesie": "Indonesia",
+  "philippines": "Philippines",
+  "viet-nam": "Vietnam",
+  "inde": "India",
+  "chine": "China",
+  "taiwan": "Taiwan",
+  "royaume-uni": "United Kingdom",
+  "allemagne": "Germany",
+  "espagne": "Spain",
+  "italie": "Italy",
+  "grece": "Greece",
+  "portugal": "Portugal",
+  "pays-bas": "Netherlands",
+  "belgique": "Belgium",
+  "suisse": "Switzerland",
+  "autriche": "Austria",
+  "pologne": "Poland",
+  "republique-tcheque": "Czech Republic",
+  "turquie": "Turkey",
+  "egypte": "Egypt",
+  "maroc": "Morocco",
+  "afrique-du-sud": "South Africa",
+  "bresil": "Brazil",
+  "argentine": "Argentina",
+  "chili": "Chile",
+  "colombie": "Colombia",
+  "perou": "Peru",
+  "emirats-arabes-unis": "United Arab Emirates",
+  "arabie-saoudite": "Saudi Arabia",
+  "israel": "Israel",
+  "jordanie": "Jordan",
+  "liban": "Lebanon",
+  "qatar": "Qatar",
+  "koweit": "Kuwait",
+  "bahrein": "Bahrain",
+  "oman": "Oman",
+  "azerbaidjan": "Azerbaijan",
+  "jamaique": "Jamaica",
+  "asie": "Asia",
+  "europe": "Europe",
+  "decouvrir-global": "Discover Global",
+  "iles-canaries": "Canary Islands",
+  "coree-du-sud": "South Korea",
 };
 
 function slugToRegionFr(slug: string): string {
@@ -69,6 +118,17 @@ function slugToRegionFr(slug: string): string {
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(" ")
     .toLowerCase();
+}
+
+// Convert French slug to English region name for database lookup
+function getEnglishRegionFromSlug(slug: string): string {
+  const normalizedSlug = slug.toLowerCase().trim();
+  // Try direct mapping first
+  if (FRENCH_TO_ENGLISH_REGION[normalizedSlug]) {
+    return FRENCH_TO_ENGLISH_REGION[normalizedSlug];
+  }
+  // If not found, assume slug is already in English
+  return slug;
 }
 
 async function validateAndApplyPromoCode(
@@ -218,11 +278,17 @@ export default function RegionPage() {
           ? params.region[0]
           : params.region;
         const regionFr = slugToRegionFr(regionParam.toLowerCase());
-        console.log(regionParam)
+        
+        // Convert French slug to English region name for DB lookup if needed
+        // Database uses English slugs, so we need to convert if slug is in French
+        const englishRegion = getEnglishRegionFromSlug(regionParam);
+        const dbSlug = englishRegion.toLowerCase();
+        
+        // Lookup packages by slug (DB uses English slugs like "japan", not "japon")
         const { data: pkgs, error: pkgError } = await supabase
           .from("airalo_packages")
           .select("*")
-          .eq("slug", regionParam);
+          .eq("slug", dbSlug);
         const { data: dest, error: destError } = await supabase
           .from("destination_info")
           .select("*")
@@ -298,8 +364,8 @@ export default function RegionPage() {
   const regionParam = Array.isArray(params.region)
     ? params.region[0]
     : params.region;
-  const regionName =
-    REGION_SLUGS[regionParam as keyof typeof REGION_SLUGS] || regionParam;
+  // Use region_fr from database for display (French name)
+  const regionName = packages[0]?.region_fr || regionParam;
   const regionDescription = packages[0]?.region_description || "";
 
   // Fonction d'ajout au panier

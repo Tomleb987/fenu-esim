@@ -9,16 +9,106 @@ import ChatWidget from "@/components/ChatWidget";
 
 const TOP_DESTINATIONS = [
   "Europe",
-  "Japan",
-  "Australia",
-  "United States",
-  "Fiji",
-  "New Zealand",
-  "Mexico",
+  "Japon",
+  "Australie",
+  "États-Unis",
+  "Fidji",
+  "Nouvelle-Zélande",
+  "Mexique",
   "France",
-  "Asia",
-  "Discover Global",
+  "Asie",
+  "Découvrir Global",
 ];
+
+// Translation mapping for English to French destination names
+const REGION_TRANSLATIONS: Record<string, string> = {
+  "Discover Global": "Découvrir Global",
+  "Asia": "Asie",
+  "Europe": "Europe",
+  "Japan": "Japon",
+  "Canary Islands": "Îles Canaries",
+  "South Korea": "Corée du Sud",
+  "Hong Kong": "Hong Kong",
+  "United States": "États-Unis",
+  "Australia": "Australie",
+  "New Zealand": "Nouvelle-Zélande",
+  "Mexico": "Mexique",
+  "Fiji": "Fidji",
+  "Thailand": "Thaïlande",
+  "Singapore": "Singapour",
+  "Malaysia": "Malaisie",
+  "Indonesia": "Indonésie",
+  "Philippines": "Philippines",
+  "Vietnam": "Viêt Nam",
+  "India": "Inde",
+  "China": "Chine",
+  "Taiwan": "Taïwan",
+  "United Kingdom": "Royaume-Uni",
+  "Germany": "Allemagne",
+  "Spain": "Espagne",
+  "Italy": "Italie",
+  "Greece": "Grèce",
+  "Portugal": "Portugal",
+  "Netherlands": "Pays-Bas",
+  "Belgium": "Belgique",
+  "Switzerland": "Suisse",
+  "Austria": "Autriche",
+  "Poland": "Pologne",
+  "Czech Republic": "République tchèque",
+  "Turkey": "Turquie",
+  "Egypt": "Égypte",
+  "Morocco": "Maroc",
+  "South Africa": "Afrique du Sud",
+  "Brazil": "Brésil",
+  "Argentina": "Argentine",
+  "Chile": "Chili",
+  "Colombia": "Colombie",
+  "Peru": "Pérou",
+  "UAE": "Émirats arabes unis",
+  "United Arab Emirates": "Émirats arabes unis",
+  "Saudi Arabia": "Arabie saoudite",
+  "Israel": "Israël",
+  "Jordan": "Jordanie",
+  "Lebanon": "Liban",
+  "Qatar": "Qatar",
+  "Kuwait": "Koweït",
+  "Bahrain": "Bahreïn",
+  "Oman": "Oman",
+};
+
+// Function to get French name with fallback to translation
+function getFrenchRegionName(regionFr: string | null, region: string | null): string {
+  // First priority: Use region_fr from database if available and it's actually French
+  if (regionFr && regionFr.trim()) {
+    const trimmedFr = regionFr.trim();
+    // Check if region_fr is actually in English (needs translation)
+    if (REGION_TRANSLATIONS[trimmedFr]) {
+      // region_fr contains English name, translate it
+      return REGION_TRANSLATIONS[trimmedFr];
+    }
+    // region_fr is already in French, use it
+    return trimmedFr;
+  }
+  
+  // Second priority: Translate English region name to French
+  if (region && region.trim()) {
+    const trimmedRegion = region.trim();
+    // Try exact match first
+    if (REGION_TRANSLATIONS[trimmedRegion]) {
+      return REGION_TRANSLATIONS[trimmedRegion];
+    }
+    // Try case-insensitive match
+    const lowerRegion = trimmedRegion.toLowerCase();
+    for (const [key, value] of Object.entries(REGION_TRANSLATIONS)) {
+      if (key.toLowerCase() === lowerRegion) {
+        return value;
+      }
+    }
+  }
+  
+  // Fallback: return original region or "Autres"
+  return region?.trim() || "Autres";
+}
 
 type Package = Database["public"]["Tables"]["airalo_packages"]["Row"];
 
@@ -67,7 +157,7 @@ export default function Home() {
   // Group forfaits by region
   const packagesByRegion = packages.reduce(
     (acc, pkg) => {
-      const region = pkg.region_fr || "";
+      const region = getFrenchRegionName(pkg.region_fr, pkg.region);
       if (!acc[region]) acc[region] = [];
       acc[region].push(pkg);
       return acc;

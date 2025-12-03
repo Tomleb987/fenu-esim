@@ -9,6 +9,7 @@ import { Camera, Globe, Video, MessageSquare } from "lucide-react";
 import React from "react";
 import OrderSummary from "@/components/checkout/OrderSummary";
 import { stripePromise } from "@/lib/stripe/config";
+import { getFrenchRegionName } from "@/lib/regionTranslations";
 
 // Types
 
@@ -364,8 +365,10 @@ export default function RegionPage() {
   const regionParam = Array.isArray(params.region)
     ? params.region[0]
     : params.region;
-  // Use region_fr from database for display (French name)
-  const regionName = packages[0]?.region_fr || regionParam;
+  // Use translated French name for display
+  const regionName = packages[0] 
+    ? getFrenchRegionName(packages[0].region_fr, packages[0].region)
+    : regionParam;
   const regionDescription = packages[0]?.region_description || "";
 
   // Fonction d'ajout au panier
@@ -510,7 +513,7 @@ export default function RegionPage() {
               <div className="pt-4 h-30 mr-4 overflow-hidden relative">
                 <img
                   src={packages[0]?.flag_url ?? ""}
-                  alt={packages[0]?.region_fr || ""}
+                  alt={regionName || ""}
                   width={70}
                   height={20}
                   className="rounded object-cover"
@@ -519,7 +522,7 @@ export default function RegionPage() {
               {/* Titre + description à droite */}
               <div className="flex flex-col justify-start md:text-left">
                 <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 md:mb-0 text-purple-800">
-                  {packages[0]?.region_fr}
+                  {regionName}
                 </h1>
                 <p className="text-purple-700 text-base sm:text-lg leading-relaxed">
                   {packages[0]?.region_description ||

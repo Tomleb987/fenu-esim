@@ -1,6 +1,6 @@
 // Comprehensive translation mapping for English to French destination names
 export const REGION_TRANSLATIONS: Record<string, string> = {
-  "Discover Global": "Découvrir Global",
+  "Discover Global": "Monde",
   "Asia": "Asie",
   "Europe": "Europe",
   "Japan": "Japon",
@@ -170,4 +170,5 @@ export function getFrenchRegionName(regionFr: string | null, region: string | nu
   // Fallback: return original region or "Autres"
   return region?.trim() || "Autres";
 }
+
 

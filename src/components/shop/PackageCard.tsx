@@ -10,7 +10,7 @@ type Package = Database["public"]["Tables"]["airalo_packages"]["Row"];
 
 // Translation mapping for English to French destination names
 const REGION_TRANSLATIONS: Record<string, string> = {
-  "Discover Global": "Découvrir Global",
+  "Discover Global": "Monde",
   "Asia": "Asie",
   "Europe": "Europe",
   "Japan": "Japon",

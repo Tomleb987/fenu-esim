@@ -17,12 +17,14 @@ import {
   Edit3
 } from "lucide-react";
 
+// Types
 type Companion = {
   firstName: string;
   lastName: string;
   birthDate: string;
 };
 
+// Liens vers les documents IPID
 const IPID_BY_PRODUCT: Record<string, { label: string; href: string }> = {
   ava_tourist_card: { label: "IPID – Tourist Card", href: "/docs/ava/FP-AVA-TOURIST-CARD.pdf" },
   ava_carte_sante: { label: "IPID – Carte Santé", href: "/docs/ava/FP-AVA-CARTE-SANTE.pdf" },
@@ -31,44 +33,45 @@ const IPID_BY_PRODUCT: Record<string, { label: string; href: string }> = {
 };
 
 export default function AssurancePage() {
+  // --- ÉTATS (STATE) ---
   const [loading, setLoading] = useState(false);
   const [offerModalOpen, setOfferModalOpen] = useState(true);
-  
-  // --- NOUVEAU STATE : Est-ce que le devis est affiché ? ---
-  const [isQuoteReady, setIsQuoteReady] = useState(false);
+  const [isQuoteReady, setIsQuoteReady] = useState(false); // Est-ce que le devis est calculé ?
+  const [apiPrice, setApiPrice] = useState<string | null>(null); // Le prix renvoyé par AVA
 
+  // Données Formulaire
   const [productType, setProductType] = useState("ava_tourist_card");
   const [dates, setDates] = useState({ start: "", end: "" });
   const [subscriber, setSubscriber] = useState({
     firstName: "", lastName: "", email: "", birthDate: "",
     countryCode: "PF", address: { street: "", zip: "", city: "" },
   });
-
   const [companions, setCompanions] = useState<Companion[]>([]);
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
   const [tripCostPerPerson, setTripCostPerPerson] = useState<number | "">("");
 
-  // Calculs
+  // Calculs locaux (pour info seulement)
   const totalTravelers = 1 + companions.length;
   const totalTripCost = tripCostPerPerson === "" ? 0 : tripCostPerPerson * totalTravelers;
-  
-  // Estimation du prix de l'assurance (Simulation simple pour l'affichage)
-  // Note: Le VRAI prix sera calculé par AVA lors du paiement, mais ici on affiche une estimation ou le montant assuré
-  // Si vous avez une grille tarifaire, vous pouvez l'implémenter ici.
-  // Pour l'instant, on affiche le "Montant Assuré" comme référence principale.
 
+  // Données dynamiques
   const currentOptionsList = getOptionsForProduct(productType);
   const currentProductInfo = AVA_PRODUCTS.find((p) => p.id === productType);
   const currentIpid = IPID_BY_PRODUCT[productType];
 
-  useEffect(() => { setSelectedOptions({}); setIsQuoteReady(false); }, [productType]);
+  // Reset quand on change de produit
+  useEffect(() => { 
+    setSelectedOptions({}); 
+    setIsQuoteReady(false); 
+    setApiPrice(null);
+  }, [productType]);
 
+  // --- UTILITAIRES ---
   const formatDateFR = (val: string) => {
     if (!val) return "--";
     try { return new Date(val).toLocaleDateString("fr-FR"); } catch { return val; }
   };
 
-  // Gestionnaires (Identiques)
   const handleOptionChange = (optionId: string, subOptionId: string | null) => {
     const newOptions = { ...selectedOptions };
     if (subOptionId === null) delete newOptions[optionId];
@@ -82,29 +85,70 @@ export default function AssurancePage() {
   };
   const removeCompanion = (index: number) => setCompanions(prev => prev.filter((_, i) => i !== index));
 
-  // --- ACTION 1 : CALCULER LE DEVIS ---
-  const handleCalculateQuote = (e: React.FormEvent) => {
-    e.preventDefault();
+  // --- ACTION 1 : CALCULER LE DEVIS (Appel API) ---
+  const handleCalculateQuote = async () => {
+    // Validation manuelle
+    if (!dates.start || !dates.end) { alert("Veuillez sélectionner les dates de voyage."); return; }
+    if (!subscriber.lastName || !subscriber.firstName) { alert("Veuillez renseigner le nom et prénom."); return; }
+    if (!subscriber.email) { alert("L'email est obligatoire."); return; }
+    if (!subscriber.birthDate) { alert("La date de naissance est obligatoire."); return; }
     
-    // Validation basique
-    if (!dates.start || !dates.end) { alert("Veuillez sélectionner les dates."); return; }
-    if (!subscriber.lastName || !subscriber.email) { alert("Veuillez remplir les informations de l'assuré."); return; }
-    if (tripCostPerPerson === "") { alert("Merci de renseigner le coût du voyage."); return; }
+    setLoading(true);
 
-    // Si tout est bon, on affiche le mode "Prêt à payer"
-    setIsQuoteReady(true);
-    // Scroll vers le résumé
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    try {
+      // On prépare les options pour l'API
+      const formattedOptions: Record<string, Record<string, string>> = {};
+      Object.entries(selectedOptions).forEach(([optId, subOptId]) => {
+        const map: Record<string, string> = {};
+        // On applique l'option à tous les voyageurs (0 = Assuré, 1 = Compagnon 1, etc.)
+        for (let i = 0; i < totalTravelers; i++) map[i.toString()] = subOptId;
+        formattedOptions[optId] = map;
+      });
+
+      // Appel à l'API de devis
+      const res = await fetch('/api/get-quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          quoteData: {
+            productType,
+            startDate: dates.start,
+            endDate: dates.end,
+            destinationRegion: 102,
+            tripCost: tripCostPerPerson ? tripCostPerPerson * totalTravelers : 2000,
+            subscriber,
+            companions,
+            options: formattedOptions
+          }
+        })
+      });
+
+      const data = await res.json();
+
+      if (data.price) {
+        setApiPrice(data.price); // On sauvegarde le prix reçu
+        setIsQuoteReady(true);   // On passe à l'étape suivante
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        alert("Erreur AVA : " + (data.error || "Impossible de calculer le tarif"));
+      }
+
+    } catch (err) {
+      console.error(err);
+      alert("Erreur de connexion au serveur");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // --- ACTION 2 : PAYER ---
+  // --- ACTION 2 : PAYER (Redirection Stripe) ---
   const handlePayment = async () => {
     setLoading(true);
     try {
       const formattedOptions: Record<string, Record<string, string>> = {};
       Object.entries(selectedOptions).forEach(([optId, subOptId]) => {
         const map: Record<string, string> = {};
-        map["0"] = subOptId;
+        for (let i = 0; i < totalTravelers; i++) map[i.toString()] = subOptId;
         formattedOptions[optId] = map;
       });
 
@@ -117,7 +161,7 @@ export default function AssurancePage() {
             startDate: dates.start,
             endDate: dates.end,
             destinationRegion: 102,
-            tripCost: totalTripCost,
+            tripCost: tripCostPerPerson ? tripCostPerPerson * totalTravelers : 2000,
             subscriber,
             companions,
             options: formattedOptions,
@@ -129,7 +173,7 @@ export default function AssurancePage() {
       const data = await res.json();
 
       if (data.url) {
-        window.location.href = data.url;
+        window.location.href = data.url; // Départ vers Stripe
       } else {
         alert("Erreur : " + (data.error || "Impossible de lancer le paiement"));
       }
@@ -141,14 +185,14 @@ export default function AssurancePage() {
     }
   };
 
-  // Modale de sélection (Identique)
+  // --- MODALE DE SÉLECTION INITIALE ---
   const OfferSelectionModal = () => {
     if (!offerModalOpen) return null;
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-        <div className="bg-white w-full max-w-4xl p-6 rounded-3xl shadow-2xl animate-in fade-in zoom-in duration-300">
-          <h2 className="text-2xl font-bold text-center text-purple-900 mb-2">Quel est votre type de voyage ?</h2>
-          <p className="text-gray-500 text-center mb-8">Sélectionnez l'offre adaptée pour commencer</p>
+        <div className="bg-white w-full max-w-4xl p-6 rounded-3xl shadow-2xl animate-in fade-in zoom-in duration-300 border border-gray-200">
+          <h2 className="text-2xl font-bold text-center text-purple-900 mb-2">Quel est votre projet ?</h2>
+          <p className="text-gray-500 text-center mb-8">Sélectionnez l&apos;offre adaptée pour commencer</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {AVA_PRODUCTS.map((product) => (
               <button key={product.id} onClick={() => { setProductType(product.id); setOfferModalOpen(false); }}
@@ -163,7 +207,7 @@ export default function AssurancePage() {
             ))}
           </div>
           <button onClick={() => setOfferModalOpen(false)} className="block mt-6 mx-auto text-sm text-gray-400 hover:text-gray-600 underline">
-            Passer cette étape
+            Fermer
           </button>
         </div>
       </div>
@@ -178,7 +222,7 @@ export default function AssurancePage() {
       <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8 font-sans">
         <div className="max-w-7xl mx-auto">
           
-          {/* En-tête */}
+          {/* HEADER */}
           <div className="text-center mb-8">
             <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Voyagez l&apos;esprit tranquille 🛡️</h1>
             <p className="text-gray-500 mt-2">Assurance médicale, rapatriement et bagages.</p>
@@ -187,10 +231,9 @@ export default function AssurancePage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
             
             {/* --- COLONNE GAUCHE : FORMULAIRE --- */}
-            <div className={`lg:col-span-2 space-y-6 ${isQuoteReady ? 'opacity-50 pointer-events-none grayscale-[0.5]' : ''} transition-all duration-500`}>
+            <div className={`lg:col-span-2 space-y-6 transition-all duration-500 ${isQuoteReady ? 'opacity-60 pointer-events-none grayscale-[0.5]' : ''}`}>
               
-              {/* Formulaire (Désactivé visuellement si devis prêt) */}
-              <form id="insurance-form" onSubmit={handleCalculateQuote}>
+              <div id="quote-form">
                 
                 {/* 1. Choix Produit */}
                 <section className="mb-8">
@@ -220,15 +263,15 @@ export default function AssurancePage() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <div>
                       <label className="text-xs font-semibold text-gray-500 uppercase">Départ</label>
-                      <input type="date" required className="w-full p-3 border rounded-lg bg-gray-50" onChange={(e) => setDates({...dates, start: e.target.value})} disabled={isQuoteReady}/>
+                      <input type="date" required className="w-full p-3 border rounded-lg bg-gray-50 text-gray-900" onChange={(e) => setDates({...dates, start: e.target.value})} disabled={isQuoteReady}/>
                     </div>
                     <div>
                       <label className="text-xs font-semibold text-gray-500 uppercase">Retour</label>
-                      <input type="date" required className="w-full p-3 border rounded-lg bg-gray-50" onChange={(e) => setDates({...dates, end: e.target.value})} disabled={isQuoteReady}/>
+                      <input type="date" required className="w-full p-3 border rounded-lg bg-gray-50 text-gray-900" onChange={(e) => setDates({...dates, end: e.target.value})} disabled={isQuoteReady}/>
                     </div>
                     <div>
                       <label className="text-xs font-semibold text-gray-500 uppercase">Coût / Pers. (€)</label>
-                      <input type="number" required min="0" step="100" className="w-full p-3 border rounded-lg bg-gray-50" 
+                      <input type="number" required min="0" step="100" className="w-full p-3 border rounded-lg bg-gray-50 text-gray-900" 
                         value={tripCostPerPerson} 
                         onChange={(e) => setTripCostPerPerson(e.target.value === "" ? "" : Number(e.target.value))} 
                         disabled={isQuoteReady}
@@ -244,19 +287,19 @@ export default function AssurancePage() {
                     Vos informations
                   </h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <input placeholder="Prénom" required className="p-3 border rounded-lg" onChange={(e) => setSubscriber({...subscriber, firstName: e.target.value})} disabled={isQuoteReady}/>
-                    <input placeholder="Nom" required className="p-3 border rounded-lg" onChange={(e) => setSubscriber({...subscriber, lastName: e.target.value})} disabled={isQuoteReady}/>
-                    <input type="date" required className="p-3 border rounded-lg" onChange={(e) => setSubscriber({...subscriber, birthDate: e.target.value})} disabled={isQuoteReady}/>
-                    <input type="email" placeholder="Email" required className="p-3 border rounded-lg" onChange={(e) => setSubscriber({...subscriber, email: e.target.value})} disabled={isQuoteReady}/>
+                    <input placeholder="Prénom" required className="p-3 border rounded-lg text-gray-900" onChange={(e) => setSubscriber({...subscriber, firstName: e.target.value})} disabled={isQuoteReady}/>
+                    <input placeholder="Nom" required className="p-3 border rounded-lg text-gray-900" onChange={(e) => setSubscriber({...subscriber, lastName: e.target.value})} disabled={isQuoteReady}/>
+                    <input type="date" required className="p-3 border rounded-lg text-gray-900" onChange={(e) => setSubscriber({...subscriber, birthDate: e.target.value})} disabled={isQuoteReady}/>
+                    <input type="email" placeholder="Email" required className="p-3 border rounded-lg text-gray-900" onChange={(e) => setSubscriber({...subscriber, email: e.target.value})} disabled={isQuoteReady}/>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <select className="p-3 border rounded-lg bg-white" value={subscriber.countryCode} onChange={(e) => setSubscriber({...subscriber, countryCode: e.target.value})} disabled={isQuoteReady}>
+                    <select className="p-3 border rounded-lg bg-white text-gray-900" value={subscriber.countryCode} onChange={(e) => setSubscriber({...subscriber, countryCode: e.target.value})} disabled={isQuoteReady}>
                       {COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
                     </select>
-                    <input placeholder="Adresse complète" required className="p-3 border rounded-lg" onChange={(e) => setSubscriber({...subscriber, address: {...subscriber.address, street: e.target.value}})} disabled={isQuoteReady}/>
+                    <input placeholder="Adresse complète" required className="p-3 border rounded-lg text-gray-900" onChange={(e) => setSubscriber({...subscriber, address: {...subscriber.address, street: e.target.value}})} disabled={isQuoteReady}/>
                     <div className="grid grid-cols-2 gap-2">
-                        <input placeholder="Code Postal" required className="p-3 border rounded-lg" onChange={(e) => setSubscriber({...subscriber, address: {...subscriber.address, zip: e.target.value}})} disabled={isQuoteReady}/>
-                        <input placeholder="Ville" required className="p-3 border rounded-lg" onChange={(e) => setSubscriber({...subscriber, address: {...subscriber.address, city: e.target.value}})} disabled={isQuoteReady}/>
+                        <input placeholder="Code Postal" required className="p-3 border rounded-lg text-gray-900" onChange={(e) => setSubscriber({...subscriber, address: {...subscriber.address, zip: e.target.value}})} disabled={isQuoteReady}/>
+                        <input placeholder="Ville" required className="p-3 border rounded-lg text-gray-900" onChange={(e) => setSubscriber({...subscriber, address: {...subscriber.address, city: e.target.value}})} disabled={isQuoteReady}/>
                     </div>
                   </div>
                 </section>
@@ -275,8 +318,8 @@ export default function AssurancePage() {
                             <div className="space-y-2">
                                 {companions.map((c, i) => (
                                     <div key={i} className="flex gap-2">
-                                        <input placeholder="Prénom" className="w-full p-2 border rounded text-sm" onChange={(e) => updateCompanion(i, "firstName", e.target.value)} disabled={isQuoteReady}/>
-                                        <input placeholder="Nom" className="w-full p-2 border rounded text-sm" onChange={(e) => updateCompanion(i, "lastName", e.target.value)} disabled={isQuoteReady}/>
+                                        <input placeholder="Prénom" className="w-full p-2 border rounded text-sm text-gray-900" onChange={(e) => updateCompanion(i, "firstName", e.target.value)} disabled={isQuoteReady}/>
+                                        <input placeholder="Nom" className="w-full p-2 border rounded text-sm text-gray-900" onChange={(e) => updateCompanion(i, "lastName", e.target.value)} disabled={isQuoteReady}/>
                                         <button type="button" onClick={() => removeCompanion(i)} disabled={isQuoteReady}><Trash2 className="w-4 h-4 text-red-400"/></button>
                                     </div>
                                 ))}
@@ -291,12 +334,12 @@ export default function AssurancePage() {
                             <div className="space-y-3">
                                 {currentOptionsList.map((opt) => (
                                     <div key={opt.id} className="flex items-center justify-between bg-white p-2 rounded border border-indigo-50">
-                                        <label className="text-sm text-gray-700 flex-1 cursor-pointer">
+                                        <label className="text-sm text-gray-700 flex-1 cursor-pointer select-none">
                                             {opt.type === 'boolean' && <input type="checkbox" className="mr-2" checked={!!selectedOptions[opt.id]} onChange={(e) => handleOptionChange(opt.id, e.target.checked ? opt.defaultSubOptionId || opt.id : null)} disabled={isQuoteReady}/>}
                                             {opt.label}
                                         </label>
                                         {opt.type === 'select' && (
-                                            <select className="text-xs border rounded p-1 max-w-[120px]" value={selectedOptions[opt.id] || ""} onChange={(e) => handleOptionChange(opt.id, e.target.value || null)} disabled={isQuoteReady}>
+                                            <select className="text-xs border rounded p-1 max-w-[120px] text-gray-900" value={selectedOptions[opt.id] || ""} onChange={(e) => handleOptionChange(opt.id, e.target.value || null)} disabled={isQuoteReady}>
                                                 <option value="">--</option>
                                                 {opt.subOptions?.map(sub => <option key={sub.id} value={sub.id}>{sub.label}</option>)}
                                             </select>
@@ -308,12 +351,12 @@ export default function AssurancePage() {
                     )}
                 </div>
 
-              </form>
+              </div>
             </div>
 
-            {/* --- COLONNE DROITE : RÉSUMÉ & ACTIONS --- */}
+            {/* --- COLONNE DROITE : RÉSUMÉ & ACTIONS (Sticky) --- */}
             <div className="lg:col-span-1">
-              <div className={`bg-white p-6 rounded-2xl shadow-xl border transition-all duration-500 sticky top-6 ${isQuoteReady ? 'border-green-500 ring-2 ring-green-100 transform scale-105' : 'border-gray-100'}`}>
+              <div className={`bg-white p-6 rounded-2xl shadow-xl border transition-all duration-500 sticky top-6 ${isQuoteReady ? 'border-green-500 ring-2 ring-green-100 transform scale-105 z-10' : 'border-gray-100'}`}>
                 
                 {/* En-tête carte */}
                 <div className="flex items-center gap-4 mb-6 pb-6 border-b border-gray-100">
@@ -331,45 +374,46 @@ export default function AssurancePage() {
                 {/* Détails */}
                 <div className="space-y-3 text-sm mb-8">
                   <div className="flex justify-between py-2 border-b border-dashed border-gray-100">
-                    <span className="text-gray-500">Voyageurs</span>
+                    <span className="text-gray-500 flex items-center"><User className="w-4 h-4 mr-2"/> Voyageur</span>
                     <span className="font-medium text-gray-900">{totalTravelers} pers.</span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-dashed border-gray-100">
-                    <span className="text-gray-500">Dates</span>
-                    <span className="font-medium text-gray-900 text-right">
-                      {dates.start ? formatDateFR(dates.start) : "--"} <br/> au {dates.end ? formatDateFR(dates.end) : "--"}
+                    <span className="text-gray-500 flex items-center"><Calendar className="w-4 h-4 mr-2"/> Durée</span>
+                    <span className="font-medium text-gray-900">
+                      {dates.start && dates.end ? "Sélectionnée" : "--"}
                     </span>
                   </div>
-                  {totalTripCost > 0 && (
-                    <div className="flex justify-between py-2 border-b border-dashed border-gray-100">
-                        <span className="text-gray-500">Valeur assurée</span>
-                        <span className="font-medium text-gray-900">{totalTripCost} €</span>
-                    </div>
-                  )}
+                  <div className="flex justify-between py-2">
+                    <span className="text-gray-500 flex items-center"><ShieldCheck className="w-4 h-4 mr-2"/> Options</span>
+                    <span className="font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
+                      {Object.keys(selectedOptions).length} ajoutées
+                    </span>
+                  </div>
                 </div>
 
-                {/* ZONE D'ACTION */}
-                <div className="space-y-3">
-                    {/* SI PAS ENCORE PRÊT -> BOUTON CALCULER */}
+                {/* ZONE PRIX & BOUTONS */}
+                <div className="space-y-4">
+                    
+                    {/* ETAT 1 : CALCUL DU DEVIS */}
                     {!isQuoteReady ? (
                         <button
-                            type="submit"
-                            form="insurance-form" // Lie ce bouton au formulaire à gauche
+                            type="button" // IMPORTANT: Type Button pour ne pas dépendre du form
+                            onClick={handleCalculateQuote}
+                            disabled={loading}
                             className="w-full py-4 rounded-xl bg-purple-600 text-white font-bold text-lg shadow-lg hover:bg-purple-700 transition-all flex items-center justify-center"
                         >
-                            <Calculator className="mr-2 h-5 w-5" />
+                            {loading ? <Loader2 className="animate-spin mr-2"/> : <Calculator className="mr-2 h-5 w-5" />}
                             Obtenir mon tarif
                         </button>
                     ) : (
-                        /* SI PRÊT -> BOUTON PAYER + MODIFIER */
+                        /* ETAT 2 : PAIEMENT */
                         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                            <div className="mb-4 text-center">
-                                <span className="text-sm text-gray-500">Tarif estimé à valider</span>
-                                <div className="text-3xl font-extrabold text-green-600 my-1">
-                                    {/* Ici vous pourrez mettre le vrai prix retourné par l'API plus tard */}
-                                    --,-- €
+                            <div className="mb-4 text-center bg-green-50 p-4 rounded-xl border border-green-100">
+                                <span className="text-sm text-gray-500 block mb-1">Tarif total à payer</span>
+                                <div className="text-4xl font-extrabold text-green-600">
+                                    {apiPrice ? `${apiPrice} €` : "--"}
                                 </div>
-                                <p className="text-xs text-gray-400">Prix calculé à l'étape suivante</p>
+                                <p className="text-xs text-gray-400 mt-1">Toutes taxes comprises</p>
                             </div>
 
                             <button
@@ -394,8 +438,8 @@ export default function AssurancePage() {
                 {/* Lien légal */}
                 {currentIpid && (
                     <div className="mt-6 pt-4 border-t border-gray-100 text-center">
-                        <a href={currentIpid.href} target="_blank" rel="noreferrer" className="text-xs text-purple-400 hover:text-purple-600 underline">
-                            Voir les conditions (IPID)
+                        <a href={currentIpid.href} target="_blank" rel="noreferrer" className="text-xs text-purple-400 hover:text-purple-600 underline flex items-center justify-center">
+                            <FileText className="w-3 h-3 mr-1"/> Conditions Générales (IPID)
                         </a>
                     </div>
                 )}

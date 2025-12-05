@@ -1,5 +1,5 @@
 /**
- * Format une date ISO (2025-01-02) → 02/01/2025 pour AVA
+ * Format une date ISO (2025-01-02) → 02/01/2025
  */
 function formatDateFR(dateStr: string) {
   if (!dateStr) return "";
@@ -10,7 +10,7 @@ function formatDateFR(dateStr: string) {
 }
 
 /* ---------------------------------------------------------
-   1️⃣ AUTHENTIFICATION
+   1️⃣ AUTHENTIFICATION AVA
 --------------------------------------------------------- */
 export async function getAvaToken() {
   const apiUrl = process.env.AVA_API_URL;
@@ -45,21 +45,15 @@ export async function getAvaToken() {
 }
 
 /* ---------------------------------------------------------
-   2️⃣ OBTENTION DU TARIF (Devis sans création de contrat)
+   2️⃣ CALCUL DEVIS (getAvaPrice)
 --------------------------------------------------------- */
 export async function getAvaPrice(quoteData: any) {
   const token = await getAvaToken();
   if (!token) throw new Error("Auth AVA échouée");
 
-  // Validation minimum
   if (!quoteData?.startDate || !quoteData?.endDate || !quoteData?.subscriber?.birthDate) {
     return { error: "Champs manquants (startDate, endDate ou birthDate)" };
   }
-
-  const isIncoming = quoteData.productType?.includes("incoming");
-  const endpoint = `${process.env.AVA_API_URL}/assurance/${
-    isIncoming ? "tarification" : "tarification"
-  }/demandeTarif.php`;
 
   const travelers = 1 + (quoteData.companions?.length || 0);
 
@@ -69,42 +63,49 @@ export async function getAvaPrice(quoteData: any) {
   }
 
   const formData = new URLSearchParams();
-  formData.append("journeyAmount", pricePerPerson.toString());
   formData.append("productType", quoteData.productType);
   formData.append("journeyStartDate", formatDateFR(quoteData.startDate));
   formData.append("journeyEndDate", formatDateFR(quoteData.endDate));
-  formData.append("journeyRegion", "102"); // Monde
+  formData.append("journeyAmount", pricePerPerson.toString());
+  formData.append("journeyRegion", "102"); // Monde par défaut
 
-  formData.append("numberAdultCompanions", (quoteData.companions?.length || 0).toString());
-  formData.append("numberChildrenCompanions", "0");
+  formData.append("numberAdultCompanions", (quoteData.companions?.filter((c: any) => c.type === 'adult')?.length || "0").toString());
+  formData.append("numberChildrenCompanions", (quoteData.companions?.filter((c: any) => c.type === 'child')?.length || "0").toString());
   formData.append("numberCompanions", (quoteData.companions?.length || 0).toString());
 
-  // Assuré principal
-  formData.append(
-    "subscriberInfos",
-    JSON.stringify({
-      birthdate: formatDateFR(quoteData.subscriber.birthDate),
-      subscriberCountry: quoteData.subscriber.countryCode || "PF",
-    })
-  );
+  // ✅ Infos Assuré – requis même pour un devis
+  formData.append("subscriberInfos", JSON.stringify({
+    firstName: quoteData.subscriber.firstName || "John",
+    lastName: quoteData.subscriber.lastName || "Doe",
+    birthdate: formatDateFR(quoteData.subscriber.birthDate),
+    subscriberEmail: quoteData.subscriber.email || "test@email.com",
+    subscriberCountry: quoteData.subscriber.countryCode || "PF",
+    address: {
+      street: quoteData.subscriber.address?.street || "Rue de test",
+      zip: quoteData.subscriber.address?.zip || "98700",
+      city: quoteData.subscriber.address?.city || "Papeete"
+    }
+  }));
 
-  // Accompagnateurs
+  // ✅ Accompagnateurs
   const companionsList = (quoteData.companions || []).map((c: any) => ({
+    firstName: c.firstName || "Ami",
+    lastName: c.lastName || "Test",
     birthdate: formatDateFR(c.birthDate),
-    parental_link: "13",
+    parental_link: c.parental_link || "13" // 13 = autre, 4 = conjoint, 6 = enfant
   }));
   formData.append("companionsInfos", JSON.stringify(companionsList));
 
-  // Options
+  // ✅ Options (doit être un objet même vide)
   formData.append("option", JSON.stringify(quoteData.options || {}));
 
-  // Mode développement
+  // ✅ Mode test
   formData.append("prod", "false");
 
   console.log(`💰 [AVA] Demande Tarif (Prix/pers: ${pricePerPerson})...`);
   console.log("[DEBUG] Données envoyées à AVA:", Object.fromEntries(formData.entries()));
 
-  const res = await fetch(endpoint, {
+  const res = await fetch(`${process.env.AVA_API_URL}/assurance/tarification/demandeTarif.php`, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -124,16 +125,13 @@ export async function getAvaPrice(quoteData: any) {
 }
 
 /* ---------------------------------------------------------
-   3️⃣ CRÉATION ADHÉSION AVA (contrat)
+   3️⃣ CRÉATION D'ADHÉSION (Contrat AVA)
 --------------------------------------------------------- */
 export async function createAvaAdhesion(quoteData: any) {
   const token = await getAvaToken();
   if (!token) throw new Error("Token manquant");
 
-  const isIncoming = quoteData.productType?.toLowerCase().includes("incoming");
-  const endpoint = `${process.env.AVA_API_URL}/assurance/${
-    isIncoming ? "tarification" : "adhesion"
-  }/creationAdhesion.php`;
+  const endpoint = `${process.env.AVA_API_URL}/assurance/adhesion/creationAdhesion.php`;
 
   const travelers = 1 + (quoteData.companions?.length || 0);
 
@@ -150,29 +148,28 @@ export async function createAvaAdhesion(quoteData: any) {
   formData.append("journeyRegion", "102");
   formData.append("internalReference", quoteData.internalReference || "");
 
-  formData.append("numberAdultCompanions", (quoteData.companions?.length || 0).toString());
-  formData.append("numberChildrenCompanions", "0");
+  formData.append("numberAdultCompanions", (quoteData.companions?.filter((c: any) => c.type === 'adult')?.length || "0").toString());
+  formData.append("numberChildrenCompanions", (quoteData.companions?.filter((c: any) => c.type === 'child')?.length || "0").toString());
   formData.append("numberCompanions", (quoteData.companions?.length || 0).toString());
 
-  // Assuré principal complet
-  formData.append(
-    "subscriberInfos",
-    JSON.stringify({
-      firstName: quoteData.subscriber.firstName,
-      lastName: quoteData.subscriber.lastName,
-      birthdate: formatDateFR(quoteData.subscriber.birthDate),
-      subscriberEmail: quoteData.subscriber.email,
-      subscriberCountry: quoteData.subscriber.countryCode || "PF",
-      address: quoteData.subscriber.address,
-    })
-  );
+  formData.append("subscriberInfos", JSON.stringify({
+    firstName: quoteData.subscriber.firstName,
+    lastName: quoteData.subscriber.lastName,
+    birthdate: formatDateFR(quoteData.subscriber.birthDate),
+    subscriberEmail: quoteData.subscriber.email,
+    subscriberCountry: quoteData.subscriber.countryCode || "PF",
+    address: {
+      street: quoteData.subscriber.address?.street,
+      zip: quoteData.subscriber.address?.zip,
+      city: quoteData.subscriber.address?.city
+    }
+  }));
 
-  // Accompagnateurs complets
   const companionsList = (quoteData.companions || []).map((c: any) => ({
     firstName: c.firstName,
     lastName: c.lastName,
     birthdate: formatDateFR(c.birthDate),
-    parental_link: "13",
+    parental_link: c.parental_link
   }));
   formData.append("companionsInfos", JSON.stringify(companionsList));
 

@@ -1,9 +1,10 @@
-// src/pages/api/stripe-session.ts
+// src/pages/api/assurance/stripe-session.ts
 import { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
 
+// ⚠️ IMPORTANT : garder la même version que dans insurance-checkout.ts
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2023-10-16',
+  apiVersion: '2025-04-30.basil' as any,
 });
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -15,8 +16,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const session = await stripe.checkout.sessions.retrieve(session_id);
-    res.status(200).json({ session });
+    return res.status(200).json({ session });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    console.error("❌ Erreur Stripe session:", err.message);
+    return res.status(500).json({ error: err.message });
   }
 }

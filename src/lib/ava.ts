@@ -1,248 +1,224 @@
-// lib/ava.ts
+// src/lib/ava.ts
 
-const AVA_BASE_URL = "https://api-ava.fr/api";
-
-if (!process.env.AVA_PARTNER_ID || !process.env.AVA_PASSWORD) {
-  throw new Error(
-    "AVA_PARTNER_ID et AVA_PASSWORD doivent être définis dans les variables d'environnement"
-  );
+/**
+ * Format une date ISO (2025-01-02) → 02/01/2025
+ * Format requis par l'API AVA.
+ */
+function formatDateFR(dateStr: string) {
+  if (!dateStr) return "";
+  if (dateStr.includes('/')) return dateStr;
+  
+  // Découpage manuel pour éviter les problèmes de fuseau horaire
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    const [year, month, day] = parts;
+    return `${day}/${month}/${year}`;
+  }
+  return "";
 }
 
-export type AvaProductType =
-  | "ava_pass"
-  | "ava_carte_sante"
-  | "ava_zap_voyages"
-  | "ava_tourist_card"
-  | "ava_incoming_classic"
-  | "ava_incoming_studies"
-  | "ava_incoming_safehealth"
-  | "ava_incoming_safehealth_studies"
-  | "plan_sante_studies"
-  | "plan_sante_campus"
-  | "plan_sante_working_holiday_pvt"
-  | "plan_sante_avanture"
-  | "plan_sante_diginomad"
-  | "avantages_360";
+//-------------------------------------------------------
+//  1. AUTHENTIFICATION AVA
+//-------------------------------------------------------
+export async function getAvaToken() {
+  const apiUrl = process.env.AVA_API_URL;
+  const partnerId = process.env.AVA_PARTNER_ID;
+  const password = process.env.AVA_PASSWORD;
 
-export interface AvaSubscriberInfos {
-  subscriberCountry: string;
-  birthdate: string;
-  firstName?: string;
-  lastName?: string;
-  subscriberEmail?: string;
-  address?: {
-    street: string;
-    zip: string;
-    city: string;
-  };
-}
-
-export interface AvaCompanionInfo {
-  firstName: string;
-  lastName: string;
-  birthdate: string;
-  parental_link: string;
-}
-
-export interface AvaTarifInput {
-  productType: AvaProductType;
-  journeyStartDate: string;
-  journeyEndDate: string;
-  journeyAmount: number;
-  journeyRegion?: string;
-  numberAdultCompanions: number;
-  numberChildrenCompanions: number;
-  numberCompanions?: number;
-  subscriberInfos: AvaSubscriberInfos;
-  companionsInfos?: AvaCompanionInfo[];
-  option?: Record<string, any>;
-  prod: boolean;
-  internalReference?: string;
-}
-
-/* -------------------------------------------------------------------------- */
-/*                           AUTHENTIFICATION TOKEN                            */
-/* -------------------------------------------------------------------------- */
-
-async function getAvaToken(): Promise<string> {
-  const body = new URLSearchParams();
-  body.append("partnerId", process.env.AVA_PARTNER_ID!);
-  body.append("password", process.env.AVA_PASSWORD!);
-
-  const res = await fetch(`${AVA_BASE_URL}/authentification/connexion.php`, {
-    method: "POST",
-    body,
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    console.error("Erreur AVA auth:", text);
-    throw new Error("Échec de l'authentification AVA");
+  if (!apiUrl || !partnerId || !password) {
+    console.error("❌ ERREUR CRITIQUE : Variables AVA manquantes.");
+    throw new Error("Configuration serveur incomplète");
   }
 
-  const data: any = await res.json().catch(async () => ({
-    raw: await res.text(),
+  const endpoint = `${apiUrl}/authentification/connexion.php`;
+  
+  const formData = new URLSearchParams();
+  formData.append("partnerId", partnerId);
+  formData.append("password", password);
+
+  try {
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: formData.toString(),
+    });
+
+    const raw = await res.text();
+    let data: any;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      console.error("❌ [AVA] Réponse non-JSON:", raw);
+      return null;
+    }
+
+    // Gestion Token (Majuscule ou minuscule)
+    const token = data.Token || data.token;
+
+    if (!token) {
+      console.error("❌ [AVA] Auth refusée :", data);
+      throw new Error("Authentification AVA échouée");
+    }
+
+    return token;
+
+  } catch (err) {
+    console.error("💥 [AVA] Exception Auth:", err);
+    return null;
+  }
+}
+
+//-------------------------------------------------------
+//  2. ESTIMATION DU PRIX (DEVIS)
+//  Appelle demandeTarif.php -> Ne crée PAS de dossier
+//-------------------------------------------------------
+export async function getAvaPrice(quoteData: any) {
+  const token = await getAvaToken();
+  if (!token) throw new Error("Auth AVA échouée");
+
+  const isIncoming = quoteData.productType.includes('incoming');
+  // Endpoint de TARIFICATION
+  const endpoint = `${process.env.AVA_API_URL}/assurance/${isIncoming ? 'tarification' : 'tarification'}/demandeTarif.php`;
+
+  const formData = new URLSearchParams();
+  
+  // Calcul du prix par personne (AVA attend le prix par tête, pas le total)
+  const travelers = 1 + (quoteData.companions?.length || 0);
+  let pricePerPerson = 2000; // Valeur par défaut
+  if (quoteData.tripCost) {
+    pricePerPerson = Math.round(quoteData.tripCost / travelers);
+  }
+  
+  formData.append("journeyAmount", pricePerPerson.toString());
+  formData.append("productType", quoteData.productType);
+  formData.append("journeyStartDate", formatDateFR(quoteData.startDate));
+  formData.append("journeyEndDate", formatDateFR(quoteData.endDate));
+  formData.append("journeyRegion", "102"); // 102 = Monde
+
+  // Compteurs
+  formData.append("numberAdultCompanions", (quoteData.companions?.length || 0).toString());
+  formData.append("numberChildrenCompanions", "0");
+  formData.append("numberCompanions", (quoteData.companions?.length || 0).toString());
+
+  // Infos minimales assuré pour le tarif (Date naissance requise)
+  formData.append("subscriberInfos", JSON.stringify({
+    birthdate: formatDateFR(quoteData.subscriber.birthDate),
+    subscriberCountry: quoteData.subscriber.countryCode || "PF"
   }));
 
-  const token = data.token ?? data.access_token ?? data.raw;
-  if (!token) {
-    console.error("Réponse inattendue AVA auth:", data);
-    throw new Error("Token AVA introuvable dans la réponse");
-  }
+  // Infos Accompagnateurs (Dates naissance requises)
+  const companionsList = (quoteData.companions || []).map((c: any) => ({
+    birthdate: formatDateFR(c.birthDate),
+    parental_link: "13"
+  }));
+  formData.append("companionsInfos", JSON.stringify(companionsList));
+  
+  formData.append("option", JSON.stringify(quoteData.options || {}));
+  formData.append("prod", "false");
 
-  return token;
+  console.log(`💰 [AVA] Demande Tarif...`);
+
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded", "Authorization": `Bearer ${token}` },
+    body: formData.toString(),
+  });
+
+  const raw = await res.text();
+  try { return JSON.parse(raw); } catch { return { error: "Erreur format prix", raw }; }
 }
 
-/* -------------------------------------------------------------------------- */
-/*                           DEMANDE TARIF COMPLEXE                           */
-/* -------------------------------------------------------------------------- */
-
-export async function demandeTarifComplexe(
-  input: AvaTarifInput
-): Promise<any> {
+//-------------------------------------------------------
+//  3. CRÉATION ADHÉSION (CONTRAT)
+//  Appelle creationAdhesion.php -> Crée le dossier "Brouillon"
+//-------------------------------------------------------
+export async function createAvaAdhesion(quoteData: any) {
   const token = await getAvaToken();
+  if (!token) throw new Error("Token manquant");
 
-  const body = new URLSearchParams();
-  body.append("productType", input.productType);
-  body.append("journeyStartDate", input.journeyStartDate);
-  body.append("journeyEndDate", input.journeyEndDate);
-  body.append("journeyAmount", String(input.journeyAmount));
-  body.append("numberAdultCompanions", String(input.numberAdultCompanions));
-  body.append(
-    "numberChildrenCompanions",
-    String(input.numberChildrenCompanions)
-  );
+  const isIncoming = quoteData.productType.toLowerCase().includes('incoming');
+  const endpoint = `${process.env.AVA_API_URL}/assurance/${isIncoming ? 'tarification' : 'adhesion'}/creationAdhesion.php`;
 
-  if (typeof input.numberCompanions === "number") {
-    body.append("numberCompanions", String(input.numberCompanions));
+  const formData = new URLSearchParams();
+
+  // Prix par personne
+  const travelers = 1 + (quoteData.companions?.length || 0);
+  let pricePerPerson = 2000;
+  if (quoteData.tripCost) {
+    pricePerPerson = Math.round(quoteData.tripCost / travelers);
   }
-  if (input.journeyRegion) {
-    body.append("journeyRegion", input.journeyRegion);
-  }
+  formData.append("journeyAmount", pricePerPerson.toString());
 
-  body.append("subscriberInfos", JSON.stringify(input.subscriberInfos));
+  // Champs obligatoires
+  formData.append("productType", quoteData.productType);
+  formData.append("journeyStartDate", formatDateFR(quoteData.startDate));
+  formData.append("journeyEndDate", formatDateFR(quoteData.endDate));
+  formData.append("journeyRegion", "102");
+  formData.append("internalReference", quoteData.internalReference || "");
 
-  if (input.companionsInfos && input.companionsInfos.length > 0) {
-    body.append("companionsInfos", JSON.stringify(input.companionsInfos));
-  }
+  formData.append("numberAdultCompanions", (quoteData.companions?.length || 0).toString());
+  formData.append("numberChildrenCompanions", "0");
+  formData.append("numberCompanions", (quoteData.companions?.length || 0).toString());
 
-  if (input.option) {
-    body.append("option", JSON.stringify(input.option));
-  }
+  // Assuré Complet (Attention aux clés firstName/lastName)
+  formData.append("subscriberInfos", JSON.stringify({
+    firstName: quoteData.subscriber.firstName, 
+    lastName: quoteData.subscriber.lastName,   
+    birthdate: formatDateFR(quoteData.subscriber.birthDate),
+    subscriberEmail: quoteData.subscriber.email,
+    subscriberCountry: quoteData.subscriber.countryCode || "PF",
+    address: quoteData.subscriber.address, // { street, zip, city }
+  }));
 
-  body.append("prod", input.prod ? "true" : "false");
+  // Accompagnateurs Complets
+  const companionsList = (quoteData.companions || []).map((c: any) => ({
+    firstName: c.firstName,
+    lastName: c.lastName,
+    birthdate: formatDateFR(c.birthDate),
+    parental_link: "13"
+  }));
+  formData.append("companionsInfos", JSON.stringify(companionsList));
 
-  if (input.internalReference) {
-    body.append("internalReference", input.internalReference);
-  }
+  formData.append("option", JSON.stringify(quoteData.options || {}));
+  formData.append("prod", "false"); 
 
-  const res = await fetch(
-    `${AVA_BASE_URL}/assurance/tarification/demandeTarif.php`,
-    {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body,
+  console.log("📝 [AVA] Création Dossier...");
+
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded", "Authorization": `Bearer ${token}` },
+    body: formData.toString(),
+  });
+
+  const raw = await res.text();
+  try {
+    const data = JSON.parse(raw);
+    
+    // Détection erreur métier AVA (Format {"200 OK": "Erreur..."})
+    if (data["200 OK"] && typeof data["200 OK"] === "string") {
+        console.error("❌ [AVA] Refus Métier :", data["200 OK"]);
+        return { error: data["200 OK"], raw: data };
     }
-  );
 
-  if (!res.ok) {
-    const text = await res.text();
-    console.error("Erreur AVA tarif:", text);
-    throw new Error("Échec de la demande de tarification AVA");
+    if (data.code && data.message && !data.id_adhesion && !data.id_contrat) {
+        return { error: data.message, raw: data };
+    }
+    
+    return data;
+  } catch {
+    return { error: "Format invalide", raw };
   }
-
-  return await res.json().catch(async () => ({ raw: await res.text() }));
 }
 
-/* -------------------------------------------------------------------------- */
-/*                          CRÉATION D’ADHÉSION AVA                           */
-/* -------------------------------------------------------------------------- */
-
-export async function createAvaAdhesion(
-  input: AvaTarifInput
-): Promise<any> {
+//-------------------------------------------------------
+//  4. VALIDATION (WEBHOOK)
+//-------------------------------------------------------
+export async function validateAvaAdhesion(adhesionNumber: string) {
   const token = await getAvaToken();
-
-  const body = new URLSearchParams();
-  body.append("productType", input.productType);
-  body.append("journeyStartDate", input.journeyStartDate);
-  body.append("journeyEndDate", input.journeyEndDate);
-  body.append("journeyAmount", String(input.journeyAmount));
-  body.append("numberAdultCompanions", String(input.numberAdultCompanions));
-  body.append(
-    "numberChildrenCompanions",
-    String(input.numberChildrenCompanions)
-  );
-
-  if (typeof input.numberCompanions === "number") {
-    body.append("numberCompanions", String(input.numberCompanions));
-  }
-  if (input.journeyRegion) {
-    body.append("journeyRegion", input.journeyRegion);
-  }
-
-  body.append("subscriberInfos", JSON.stringify(input.subscriberInfos));
-
-  if (input.companionsInfos && input.companionsInfos.length > 0) {
-    body.append("companionsInfos", JSON.stringify(input.companionsInfos));
-  }
-
-  if (input.option) {
-    body.append("option", JSON.stringify(input.option));
-  }
-
-  body.append("prod", input.prod ? "true" : "false");
-
-  if (input.internalReference) {
-    body.append("internalReference", input.internalReference);
-  }
-
-  const res = await fetch(
-    `${AVA_BASE_URL}/assurance/adhesion/creationAdhesion.php`,
-    {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body,
-    }
-  );
-
-  if (!res.ok) {
-    const text = await res.text();
-    console.error("Erreur AVA création adhésion:", text);
-    throw new Error("Échec de la création d'adhésion AVA");
-  }
-
-  return await res.json().catch(async () => ({ raw: await res.text() }));
-}
-
-/* -------------------------------------------------------------------------- */
-/*                         VALIDATION DE L’ADHÉSION AVA                       */
-/* -------------------------------------------------------------------------- */
-
-export async function validateAvaAdhesion(
-  internalReference: string,
-  prod: boolean
-): Promise<any> {
-  const token = await getAvaToken();
-
-  const body = new URLSearchParams();
-  body.append("internalReference", internalReference);
-  body.append("prod", prod ? "true" : "false");
-
-  const res = await fetch(
-    `${AVA_BASE_URL}/assurance/adhesion/validationAdhesion.php`,
-    {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body,
-    }
-  );
-
-  if (!res.ok) {
-    const text = await res.text();
-    console.error("Erreur AVA validation adhésion:", text);
-    throw new Error("Échec de la validation d'adhésion AVA");
-  }
-
-  return await res.json().catch(async () => ({ raw: await res.text() }));
+  const res = await fetch(`${process.env.AVA_API_URL}/assurance/adhesion/validationAdhesion.php`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded", "Authorization": `Bearer ${token}` },
+    body: new URLSearchParams({ numeroAdhesion: adhesionNumber }).toString(),
+  });
+  return res.json();
 }

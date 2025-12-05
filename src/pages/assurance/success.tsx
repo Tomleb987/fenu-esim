@@ -1,65 +1,62 @@
 // src/pages/assurance/success.tsx
-import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
 
 export default function AssuranceSuccessPage() {
   const router = useRouter();
   const { session_id } = router.query;
 
-  const [loading, setLoading] = useState(true);
-  const [contract, setContract] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [adhesionNumber, setAdhesionNumber] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!session_id) return;
+    if (!session_id || typeof session_id !== 'string') return;
 
-    const validatePayment = async () => {
+    async function handleSession() {
       try {
         // 1️⃣ Récupère la session Stripe
-        const res = await fetch(`/api/stripe-session?session_id=${session_id}`);
-        const data = await res.json();
+        const res = await fetch(`/api/assurance/stripe-session?session_id=${session_id}`);
+        const { session } = await res.json();
 
-        if (!data.session || data.session.payment_status !== "paid") {
-          throw new Error("Paiement non validé.");
+        if (!session || session.payment_status !== 'paid') {
+          setStatus('error');
+          return;
         }
 
-        const adhesionNumber = data.session.metadata.adhesion_number;
-        const insuranceId = data.session.metadata.insurance_id;
-
-        // 2️⃣ Mise à jour du statut dans Supabase
-        const updateRes = await fetch('/api/insurance/mark-paid', {
+        // 2️⃣ Marque comme payé dans Supabase
+        const resMark = await fetch(`/api/assurance/mark-paid`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ insuranceId }),
+          body: JSON.stringify({
+            insurance_id: session.metadata.insurance_id,
+            adhesion_number: session.metadata.adhesion_number,
+          }),
         });
 
-        if (!updateRes.ok) {
-          throw new Error("Erreur lors de la mise à jour de Supabase.");
+        const markResult = await resMark.json();
+        if (markResult.success) {
+          setAdhesionNumber(session.metadata.adhesion_number);
+          setStatus('success');
+        } else {
+          setStatus('error');
         }
-
-        setContract({ adhesionNumber });
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
+      } catch (err) {
+        console.error("💥 Erreur success:", err);
+        setStatus('error');
       }
-    };
+    }
 
-    validatePayment();
+    handleSession();
   }, [session_id]);
 
-  if (loading) return <p className="text-center">⏳ Validation du paiement...</p>;
-  if (error) return <p className="text-center text-red-600">❌ {error}</p>;
+  if (status === 'loading') return <p>⏳ Vérification du paiement...</p>;
+  if (status === 'error') return <p>❌ Une erreur est survenue. Merci de nous contacter.</p>;
 
   return (
-    <div className="max-w-lg mx-auto text-center p-6">
-      <h1 className="text-2xl font-bold mb-4 text-green-600">✅ Assurance souscrite avec succès !</h1>
-      <p>Merci pour votre confiance.</p>
-      <p className="mt-2">
-        Numéro d’adhésion AVA : <strong>{contract.adhesionNumber}</strong>
-      </p>
-      <p className="mt-4 text-sm text-gray-500">
-        Vous recevrez votre contrat AVA par email.
+    <div className="max-w-xl mx-auto text-center py-12">
+      <h1 className="text-2xl font-bold text-green-600">✅ Paiement confirmé !</h1>
+      <p className="mt-4">
+        Votre contrat d’assurance AVA est validé. Référence : <strong>{adhesionNumber}</strong>
       </p>
     </div>
   );

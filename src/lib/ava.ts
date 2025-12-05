@@ -1,6 +1,9 @@
 // src/lib/ava.ts
 
-// --- UTILITAIRE : Format Date (YYYY-MM-DD -> JJ/MM/AAAA) ---
+/**
+ * Format une date ISO (2025-01-02) → 02/01/2025
+ * Format requis par l'API AVA.
+ */
 function formatDateFR(dateStr: string) {
   if (!dateStr) return "";
   if (dateStr.includes('/')) return dateStr;
@@ -16,7 +19,7 @@ export async function getAvaToken() {
   const password = process.env.AVA_PASSWORD;
 
   if (!apiUrl || !partnerId || !password) {
-    throw new Error("Configuration AVA manquante (Vérifiez les variables d'environnement)");
+    throw new Error("Configuration AVA manquante (.env)");
   }
 
   const endpoint = `${apiUrl}/authentification/connexion.php`;
@@ -31,7 +34,6 @@ export async function getAvaToken() {
       body: formData.toString(),
     });
     const data = await res.json();
-    // Gère Token (maj) ou token (min) selon la réponse
     const token = data.Token || data.token;
     if (!token) throw new Error("Pas de token reçu");
     return token;
@@ -41,8 +43,7 @@ export async function getAvaToken() {
   }
 }
 
-// 2. ESTIMATION DU PRIX (DEVIS)
-// Remplace votre fonction 'demandeTarifComplexe'
+// 2. OBTENIR LE TARIF (Simule un devis sans créer de dossier)
 export async function getAvaPrice(quoteData: any) {
   const token = await getAvaToken();
   if (!token) throw new Error("Auth AVA échouée");
@@ -52,18 +53,19 @@ export async function getAvaPrice(quoteData: any) {
 
   const formData = new URLSearchParams();
   
-  // Calcul du prix par personne
+  // --- Calcul du prix par personne (Requis par AVA) ---
   const travelers = 1 + (quoteData.companions?.length || 0);
-  let pricePerPerson = 2000; 
+  let pricePerPerson = 2000;
   if (quoteData.tripCost) {
     pricePerPerson = Math.round(quoteData.tripCost / travelers);
   }
-  
   formData.append("journeyAmount", pricePerPerson.toString());
+
+  // --- Mapping des champs (Traduction Front -> AVA) ---
   formData.append("productType", quoteData.productType);
-  formData.append("journeyStartDate", formatDateFR(quoteData.startDate)); // ✅ Date corrigée
-  formData.append("journeyEndDate", formatDateFR(quoteData.endDate));     // ✅ Date corrigée
-  formData.append("journeyRegion", "102");
+  formData.append("journeyStartDate", formatDateFR(quoteData.startDate)); // Conversion date
+  formData.append("journeyEndDate", formatDateFR(quoteData.endDate));     // Conversion date
+  formData.append("journeyRegion", "102"); // Monde par défaut
 
   formData.append("numberAdultCompanions", (quoteData.companions?.length || 0).toString());
   formData.append("numberChildrenCompanions", "0");
@@ -71,19 +73,21 @@ export async function getAvaPrice(quoteData: any) {
 
   // Infos Assuré
   formData.append("subscriberInfos", JSON.stringify({
-    birthdate: formatDateFR(quoteData.subscriber.birthDate), // ✅ Date corrigée
+    birthdate: formatDateFR(quoteData.subscriber.birthDate), // Conversion date
     subscriberCountry: quoteData.subscriber.countryCode || "PF"
   }));
 
   // Infos Accompagnateurs
   const companionsList = (quoteData.companions || []).map((c: any) => ({
-    birthdate: formatDateFR(c.birthDate), // ✅ Date corrigée
+    birthdate: formatDateFR(c.birthDate), // Conversion date
     parental_link: "13"
   }));
   formData.append("companionsInfos", JSON.stringify(companionsList));
   
   formData.append("option", JSON.stringify(quoteData.options || {}));
   formData.append("prod", "false");
+
+  console.log(`💰 [AVA] Demande Tarif (Prix/pers: ${pricePerPerson})...`);
 
   const res = await fetch(endpoint, {
     method: "POST",
@@ -92,10 +96,10 @@ export async function getAvaPrice(quoteData: any) {
   });
 
   const raw = await res.text();
-  try { return JSON.parse(raw); } catch { return { error: "Erreur format prix", raw }; }
+  try { return JSON.parse(raw); } catch { return { error: "Format réponse invalide", raw }; }
 }
 
-// 3. CRÉATION ADHÉSION (CONTRAT)
+// 3. CRÉATION ADHÉSION (Contrat)
 export async function createAvaAdhesion(quoteData: any) {
   const token = await getAvaToken();
   if (!token) throw new Error("Token manquant");
@@ -105,7 +109,7 @@ export async function createAvaAdhesion(quoteData: any) {
 
   const formData = new URLSearchParams();
 
-  // Prix
+  // Mêmes calculs que pour le tarif
   const travelers = 1 + (quoteData.companions?.length || 0);
   let pricePerPerson = 2000;
   if (quoteData.tripCost) {
@@ -113,7 +117,6 @@ export async function createAvaAdhesion(quoteData: any) {
   }
   formData.append("journeyAmount", pricePerPerson.toString());
 
-  // Champs obligatoires
   formData.append("productType", quoteData.productType);
   formData.append("journeyStartDate", formatDateFR(quoteData.startDate));
   formData.append("journeyEndDate", formatDateFR(quoteData.endDate));
@@ -124,7 +127,7 @@ export async function createAvaAdhesion(quoteData: any) {
   formData.append("numberChildrenCompanions", "0");
   formData.append("numberCompanions", (quoteData.companions?.length || 0).toString());
 
-  // Assuré Complet
+  // Assuré COMPLET
   formData.append("subscriberInfos", JSON.stringify({
     firstName: quoteData.subscriber.firstName, 
     lastName: quoteData.subscriber.lastName,   
@@ -134,7 +137,7 @@ export async function createAvaAdhesion(quoteData: any) {
     address: quoteData.subscriber.address,
   }));
 
-  // Accompagnateurs
+  // Accompagnateurs COMPLETS
   const companionsList = (quoteData.companions || []).map((c: any) => ({
     firstName: c.firstName,
     lastName: c.lastName,
@@ -155,12 +158,10 @@ export async function createAvaAdhesion(quoteData: any) {
   const raw = await res.text();
   try {
     const data = JSON.parse(raw);
-    
-    // Gestion erreur "200 OK" spécifique AVA
+    // Gestion erreur métier
     if (data["200 OK"] && typeof data["200 OK"] === "string") {
         return { error: data["200 OK"], raw: data };
     }
-    // Gestion erreur standard
     if (data.code && data.message && !data.id_adhesion && !data.id_contrat) {
         return { error: data.message, raw: data };
     }

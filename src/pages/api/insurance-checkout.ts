@@ -1,10 +1,11 @@
+// src/pages/api/insurance-checkout.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { createAvaAdhesion } from '@/lib/ava';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-04-30.basil' as any,
+  apiVersion: '2023-10-16',
 });
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -16,11 +17,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { quoteData, userEmail } = req.body;
 
     if (!quoteData || !userEmail) {
-      return res.status(400).json({ error: "Missing quoteData or userEmail" });
+      return res.status(400).json({ error: "quoteData ou userEmail manquant" });
     }
 
-    // 🔐 Référence unique pour l'adhésion
+    // 🔐 Générer une référence unique
     const internalRef = `CMD-${Date.now()}`;
+
+    // 1️⃣ Création du contrat AVA (sans validation)
     const avaResult = await createAvaAdhesion({
       ...quoteData,
       internalReference: internalRef,
@@ -39,7 +42,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // 💶 Conversion montant AVA
+    // 2️⃣ Récupération du tarif
     let price = avaResult.montant_total;
     if (typeof price === "string") {
       price = parseFloat(price.replace(',', '.'));
@@ -49,7 +52,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: "Montant AVA invalide", raw: avaResult.montant_total });
     }
 
-    // 2️⃣ Enregistrement dans Supabase
+    // 3️⃣ Sauvegarde temporaire dans Supabase
     const { data: insertData, error: supaError } = await supabaseAdmin
       .from('insurances')
       .insert({
@@ -65,11 +68,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .single();
 
     if (supaError) {
-      console.error("Supabase insert error:", supaError);
+      console.error("❌ Supabase insert error:", supaError);
       return res.status(500).json({ error: "Erreur enregistrement Supabase" });
     }
 
-    // 3️⃣ Création de la session Stripe Checkout
+    // 4️⃣ Création session Stripe Checkout
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       payment_method_types: ['card'],
@@ -85,7 +88,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           quantity: 1,
         },
       ],
-      success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/checkout/success`,
+      success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/assurance`,
       customer_email: userEmail,
       metadata: {
@@ -95,10 +98,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
     });
 
+    // ✅ Redirection vers Stripe
     return res.status(200).json({ url: session.url });
 
   } catch (error: any) {
-    console.error("❌ API insurance error:", error);
+    console.error("❌ API insurance-checkout error:", error);
     return res.status(500).json({ error: error.message ?? "Erreur serveur" });
   }
 }

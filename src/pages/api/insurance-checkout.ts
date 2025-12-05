@@ -1,11 +1,11 @@
-// src/pages/api/insurance-checkout.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
-import Stripe from 'stripe';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { createAvaAdhesion } from '@/lib/ava';
+import Stripe from 'stripe';
 
+// ✅ Correction API Stripe version (évite l'erreur de build)
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2023-10-16',
+  apiVersion: '2025-04-30.basil' as any,
 });
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -20,10 +20,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: "quoteData ou userEmail manquant" });
     }
 
-    // 🔐 Générer une référence unique
+    // 🔐 Référence unique pour le contrat AVA
     const internalRef = `CMD-${Date.now()}`;
 
-    // 1️⃣ Création du contrat AVA (sans validation)
+    // 1️⃣ Création temporaire du contrat AVA (non validé)
     const avaResult = await createAvaAdhesion({
       ...quoteData,
       internalReference: internalRef,
@@ -42,7 +42,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // 2️⃣ Récupération du tarif
+    // 2️⃣ Conversion du tarif AVA
     let price = avaResult.montant_total;
     if (typeof price === "string") {
       price = parseFloat(price.replace(',', '.'));
@@ -72,7 +72,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(500).json({ error: "Erreur enregistrement Supabase" });
     }
 
-    // 4️⃣ Création session Stripe Checkout
+    // 4️⃣ Création de la session Stripe Checkout
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       payment_method_types: ['card'],
@@ -98,7 +98,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
     });
 
-    // ✅ Redirection vers Stripe
+    // ✅ Retourner l’URL Stripe au frontend
     return res.status(200).json({ url: session.url });
 
   } catch (error: any) {

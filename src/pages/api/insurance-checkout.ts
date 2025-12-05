@@ -1,9 +1,10 @@
+// src/pages/api/insurance-checkout.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
+import Stripe from 'stripe';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { createAvaAdhesion } from '@/lib/ava';
-import Stripe from 'stripe';
 
-// ✅ Correction API Stripe version (évite l'erreur de build)
+// Stripe - avec version imposée (Next.js 15)
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-04-30.basil' as any,
 });
@@ -20,10 +21,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: "quoteData ou userEmail manquant" });
     }
 
-    // 🔐 Référence unique pour le contrat AVA
+    // 🔐 Référence unique
     const internalRef = `CMD-${Date.now()}`;
 
-    // 1️⃣ Création temporaire du contrat AVA (non validé)
+    // 1️⃣ Création contrat AVA
     const avaResult = await createAvaAdhesion({
       ...quoteData,
       internalReference: internalRef,
@@ -34,6 +35,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const adhesionNumber = avaResult.id_adhesion || avaResult.id_contrat;
+    const contractLink = avaResult.contract_link || null;
 
     if (!adhesionNumber) {
       return res.status(400).json({
@@ -42,7 +44,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // 2️⃣ Conversion du tarif AVA
+    // 2️⃣ Conversion montant AVA
     let price = avaResult.montant_total;
     if (typeof price === "string") {
       price = parseFloat(price.replace(',', '.'));
@@ -52,7 +54,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: "Montant AVA invalide", raw: avaResult.montant_total });
     }
 
-    // 3️⃣ Sauvegarde temporaire dans Supabase
+    // 3️⃣ Enregistrement dans Supabase
     const { data: insertData, error: supaError } = await supabaseAdmin
       .from('insurances')
       .insert({
@@ -62,7 +64,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         product_type: quoteData.productType,
         adhesion_number: adhesionNumber,
         total_amount: price,
+        contract_link: contractLink, // ✅ ajouté
         status: 'pending_payment',
+        start_date: quoteData.startDate ?? null,
+        end_date: quoteData.endDate ?? null,
       })
       .select()
       .single();
@@ -72,7 +77,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(500).json({ error: "Erreur enregistrement Supabase" });
     }
 
-    // 4️⃣ Création de la session Stripe Checkout
+    // 4️⃣ Création session Stripe Checkout
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       payment_method_types: ['card'],
@@ -88,7 +93,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           quantity: 1,
         },
       ],
-      success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/assurance/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/assurance`,
       customer_email: userEmail,
       metadata: {
@@ -98,7 +103,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
     });
 
-    // ✅ Retourner l’URL Stripe au frontend
+    // ✅ Redirection vers Stripe
     return res.status(200).json({ url: session.url });
 
   } catch (error: any) {

@@ -1,4 +1,3 @@
-// src/pages/api/get-quote.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAvaPrice } from '@/lib/ava';
 
@@ -9,12 +8,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const { quoteData } = req.body;
+
     console.log("💰 [API] Calcul Tarif AVA...");
 
-    // Appel à AVA (sans création de dossier)
     const avaResult = await getAvaPrice(quoteData);
 
-    console.log("[DEBUG] Réponse AVA brute :", avaResult); // LOG COMPLET
+    console.log("[DEBUG] Réponse AVA brute :", avaResult);
 
     if (!avaResult || avaResult.error) {
       console.error("❌ Erreur Devis:", avaResult);
@@ -24,8 +23,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Récupération du prix dans plusieurs champs possibles
-    const price = avaResult.montant_total || avaResult.prime_totale || avaResult.tarif || 0;
+    // ✅ Extraction du tarif : clé principale + fallback
+    const price =
+      avaResult["Prix total avec options (en €)"] ??
+      avaResult.montant_total ??
+      avaResult.prime_totale ??
+      avaResult.tarif ??
+      0;
 
     console.log("[DEBUG] Prix extrait :", price);
 
@@ -33,6 +37,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       price,
       currency: "EUR",
     });
+
   } catch (error: any) {
     console.error("💥 Erreur Serveur:", error);
     return res.status(500).json({ error: error.message });

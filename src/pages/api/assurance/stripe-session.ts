@@ -4,7 +4,7 @@ import Stripe from 'stripe';
 
 // ⚠️ IMPORTANT : garder la même version que dans insurance-checkout.ts
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-04-30.basil' as any,
+  apiVersion: '2025-04-30.basil' as any, // ✅ Corrigé ici
 });
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

@@ -1,87 +1,68 @@
-// src/pages/api/stripe-insurance-webhook.ts
-
 import type { NextApiRequest, NextApiResponse } from "next";
 import Stripe from "stripe";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { validateAvaAdhesion } from "@/lib/ava";
 
-// Stripe v2025-04-30.basil (imposé par ton compte)
+// Stripe avec version imposée
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-04-30.basil",
+  apiVersion: "2025-04-30.basil" as any,
 });
 
-// ⚠️ Stripe requiert le body brut → désactiver le parsing automatique
 export const config = { api: { bodyParser: false } };
 
-// 🔄 Convertir le body en Buffer
-async function buffer(stream: any) {
-  const chunks: any[] = [];
-  for await (const chunk of stream) {
+async function buffer(readable: any) {
+  const chunks = [];
+  for await (const chunk of readable) {
     chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
   }
   return Buffer.concat(chunks);
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ message: "Method not allowed" });
-  }
+  if (req.method !== "POST") return res.status(405).json({ message: "Method not allowed" });
 
-  // 🔐 Lecture & validation de l’événement Stripe
-  const rawBody = await buffer(req);
-  const signature = req.headers["stripe-signature"] as string;
-
+  const buf = await buffer(req);
+  const sig = req.headers["stripe-signature"];
   let event: Stripe.Event;
 
   try {
     event = stripe.webhooks.constructEvent(
-      rawBody,
-      signature,
-      process.env.STRIPE_INSURANCE_WEBHOOK_SECRET! // ➕ Clé secrète du webhook AVA
+      buf, 
+      sig!, 
+      process.env.STRIPE_INSURANCE_WEBHOOK_SECRET! 
     );
   } catch (err: any) {
-    console.error("❌ Erreur de signature Stripe:", err.message);
+    console.error(`❌ Stripe signature error: ${err.message}`);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  // ▶️ On traite uniquement les paiements réussis
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
     const metadata = session.metadata || {};
 
     if (metadata.type === "insurance_ava" && metadata.adhesion_number) {
-      const adhesionNumber = metadata.adhesion_number;
-
-      console.log(`🟦 Stripe webhook → Validation AVA pour #${adhesionNumber}`);
-
+      console.log(`🚑 Webhook Assurance : Validation contrat ${metadata.adhesion_number}`);
+      
       try {
-        // 1️⃣ Appel AVA → Validation du contrat
-        await validateAvaAdhesion(adhesionNumber, true); // true = prod
-
-        // 2️⃣ Mise à jour Supabase
-        const { error: supaError } = await supabaseAdmin
-          .from("insurances")
-          .update({
-            status: "validated",
-            stripe_session_id: session.id,
+        // 1. Valider chez AVA (Correction ici : 1 seul argument)
+        await validateAvaAdhesion(metadata.adhesion_number);
+        
+        // 2. Mettre à jour Supabase
+        await supabaseAdmin
+          .from('insurances')
+          .update({ 
+            status: 'validated', 
+            stripe_session_id: session.id 
           })
-          .eq("adhesion_number", adhesionNumber);
-
-        if (supaError) {
-          console.error("❌ Supabase update error:", supaError);
-          return res.status(500).json({ error: "Supabase update error" });
-        }
-
-        console.log(`✅ AVA validée pour ${adhesionNumber}`);
+          .eq('adhesion_number', metadata.adhesion_number);
+          
         return res.status(200).json({ received: true, processed: true });
-
-      } catch (err) {
-        console.error("❌ Erreur lors de la validation AVA:", err);
-        return res.status(500).json({ error: "AVA validation error" });
+      } catch (error) {
+        console.error("Erreur validation Assurance:", error);
+        return res.status(500).json({ error: "Erreur validation" });
       }
     }
   }
 
-  // Tous les autres événements Stripe sont ignorés
   return res.status(200).json({ received: true, ignored: true });
 }

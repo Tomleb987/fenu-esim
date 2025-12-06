@@ -73,7 +73,7 @@ export async function getAvaPrice(quoteData: any) {
   formData.append("numberChildrenCompanions", (quoteData.companions?.filter((c: any) => c.type === 'child')?.length || "0").toString());
   formData.append("numberCompanions", (quoteData.companions?.length || 0).toString());
 
-  // ✅ Infos Assuré – requis même pour un devis
+  // Infos Assuré – requis même pour un devis
   formData.append("subscriberInfos", JSON.stringify({
     firstName: quoteData.subscriber.firstName || "John",
     lastName: quoteData.subscriber.lastName || "Doe",
@@ -87,19 +87,19 @@ export async function getAvaPrice(quoteData: any) {
     }
   }));
 
-  // ✅ Accompagnateurs
+  // Accompagnateurs
   const companionsList = (quoteData.companions || []).map((c: any) => ({
     firstName: c.firstName || "Ami",
     lastName: c.lastName || "Test",
     birthdate: formatDateFR(c.birthDate),
-    parental_link: c.parental_link || "13" // 13 = autre, 4 = conjoint, 6 = enfant
+    parental_link: c.parental_link || "13"
   }));
   formData.append("companionsInfos", JSON.stringify(companionsList));
 
-  // ✅ Options (doit être un objet même vide)
+  // Options
   formData.append("option", JSON.stringify(quoteData.options || {}));
 
-  // ✅ Mode test
+  // Test mode
   formData.append("prod", "false");
 
   console.log(`💰 [AVA] Demande Tarif (Prix/pers: ${pricePerPerson})...`);

@@ -209,16 +209,28 @@ export async function createAvaAdhesion(quoteData: any) {
 --------------------------------------------------------- */
 export async function validateAvaAdhesion(adhesionNumber: string) {
   const token = await getAvaToken();
-  const res = await fetch(
-    `${process.env.AVA_API_URL}/assurance/adhesion/validationAdhesion.php`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Authorization: `Bearer ${token}`,
-      },
-      body: new URLSearchParams({ numeroAdhesion: adhesionNumber }).toString(),
-    }
-  );
-  return res.json();
+  if (!token) throw new Error("Token AVA manquant pour la validation");
+
+  const endpoint = `${process.env.AVA_API_URL}/assurance/adhesion/validationAdhesion.php`;
+
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: { 
+      "Content-Type": "application/x-www-form-urlencoded",
+      "Authorization": `Bearer ${token}` 
+    },
+    body: new URLSearchParams({ numeroAdhesion: adhesionNumber }).toString(),
+  });
+
+  const raw = await res.text();
+  console.log("📄 [AVA] Validation réponse brute :", raw);
+
+  try {
+    const data = JSON.parse(raw);
+    console.log("📄 [AVA] Validation réponse JSON :", data);
+    return data;
+  } catch {
+    console.warn("⚠️ [AVA] Réponse validation non-JSON, raw conservé.");
+    return { raw };
+  }
 }

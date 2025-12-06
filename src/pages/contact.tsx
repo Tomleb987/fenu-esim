@@ -5,8 +5,7 @@ import {
   Facebook, 
   Instagram, 
   ArrowRight, 
-  Clock, 
-  MapPin 
+  Clock 
 } from "lucide-react";
 
 /* ------------------------------------------------- 
@@ -44,22 +43,17 @@ export default function Contact() {
             <Mail className="w-8 h-8" />
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Service Client & Support</h2>
-          <p className="text-gray-600 mb-6 flex-grow">
+          <p className="text-gray-600 mb-8 flex-grow">
             Pour toute question technique, remboursement ou suivi de commande. Nous créons un ticket et vous répondons sous 24h max.
           </p>
           
-          <div className="w-full space-y-3">
-             <a 
-              href={`mailto:${ODOO_EMAIL}?subject=${encodeURIComponent(EMAIL_SUBJECT)}&body=${encodeURIComponent(EMAIL_BODY)}`}
-              className="w-full flex items-center justify-center gap-2 bg-purple-600 text-white px-6 py-4 rounded-xl font-bold hover:bg-purple-700 transition-all transform hover:scale-[1.02]"
-            >
-              Envoyer un email
-              <ArrowRight className="w-5 h-5" />
-            </a>
-            <p className="text-center text-sm text-gray-400">
-              via {ODOO_EMAIL}
-            </p>
-          </div>
+          <a 
+            href={`mailto:${ODOO_EMAIL}?subject=${encodeURIComponent(EMAIL_SUBJECT)}&body=${encodeURIComponent(EMAIL_BODY)}`}
+            className="w-full flex items-center justify-center gap-2 bg-purple-600 text-white px-6 py-4 rounded-xl font-bold hover:bg-purple-700 transition-all transform hover:scale-[1.02]"
+          >
+            Envoyer un email
+            <ArrowRight className="w-5 h-5" />
+          </a>
         </div>
 
         {/* --- CARTE 2 : WHATSAPP (INSTANTANÉ) --- */}
@@ -71,24 +65,19 @@ export default function Contact() {
             <MessageCircle className="w-8 h-8" />
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2 relative z-10">WhatsApp Direct</h2>
-          <p className="text-gray-600 mb-6 flex-grow relative z-10">
+          <p className="text-gray-600 mb-8 flex-grow relative z-10">
             Besoin d'une réponse rapide ? Discutez directement avec nous. Idéal pour les questions avant achat ou les urgences.
           </p>
           
-          <div className="w-full space-y-3 relative z-10">
-            <a 
-              href={`https://wa.me/${WHATSAPP_NUMBER}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full flex items-center justify-center gap-2 bg-[#25D366] text-white px-6 py-4 rounded-xl font-bold hover:bg-[#20bd5a] transition-all transform hover:scale-[1.02]"
-            >
-              <MessageCircle className="w-5 h-5" />
-              Discuter sur WhatsApp
-            </a>
-            <p className="text-center text-sm text-gray-400">
-              +33 7 49 78 21 01
-            </p>
-          </div>
+          <a 
+            href={`https://wa.me/${WHATSAPP_NUMBER}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full flex items-center justify-center gap-2 bg-[#25D366] text-white px-6 py-4 rounded-xl font-bold hover:bg-[#20bd5a] transition-all transform hover:scale-[1.02] relative z-10"
+          >
+            <MessageCircle className="w-5 h-5" />
+            Discuter sur WhatsApp
+          </a>
         </div>
 
       </div>

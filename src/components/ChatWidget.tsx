@@ -1,88 +1,113 @@
-import { useState, useRef } from 'react'
-import { useRouter } from 'next/navigation'
-import Image from 'next/image'
+"use client";
+
+import { useChat } from "ai/react";
+import { useState, useRef, useEffect } from "react";
+import { MessageCircle, X, Send, Bot } from "lucide-react";
 
 export default function ChatWidget() {
-  const [open, setOpen] = useState(false)
-  const [messages, setMessages] = useState<any[]>([{
-    role: 'assistant',
-    content: 'Bonjour ! Je suis votre assistant eSIM. Pour quelle destination souhaitez-vous une eSIM ?'
-  }])
-  const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
-  const router = useRouter()
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const [isOpen, setIsOpen] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  async function sendMessage(e?: React.FormEvent) {
-    if (e) e.preventDefault()
-    if (!input.trim()) return
-    setLoading(true)
-    const newMessages = [...messages, { role: 'user', content: input }]
-    setMessages(newMessages)
-    setInput('')
-    try {
-      const res = await fetch('/api/assistant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newMessages }),
-      })
-      const data = await res.json()
-      const reply = data.reply && data.reply.trim() ? data.reply : "Je n'ai pas compris votre demande.";
-      setMessages([...newMessages, { role: 'assistant', content: reply }])
-    } catch (err) {
-      setMessages([...newMessages, { role: 'assistant', content: "Désolé, une erreur est survenue." }])
-    } finally {
-      setLoading(false)
-      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
+  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
+    api: "/api/assistant",
+    onError: (err) => console.error("Erreur Chat:", err),
+  });
+
+  // Scroll automatique vers le bas
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }
+  }, [messages]);
 
   return (
-    <>
-      {/* Bouton flottant logo Fenua SIM */}
-      {!open && (
-        <button
-          onClick={() => setOpen(true)}
-          className="fixed bottom-4 right-4 z-50 bg-white rounded-full shadow-lg p-2 border border-gray-200 flex items-center justify-center w-16 h-16 sm:w-14 sm:h-14"
-          aria-label="Ouvrir le chat Fenua SIM"
-        >
-          <Image src="/images/ai_assist.jpg" alt="Fenua SIM" width={48} height={48} />
-        </button>
-      )}
+    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end font-sans">
+      
       {/* Fenêtre de chat */}
-      {open && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 w-full max-w-md mx-auto bg-white rounded-t-xl shadow-2xl border border-gray-200 flex flex-col h-[60vh] sm:bottom-4 sm:right-4 sm:left-auto sm:w-full sm:max-w-sm sm:rounded-xl animate-fade-in">
-          <div className="flex items-center justify-between p-2 border-b bg-fenua-coral rounded-t-xl">
-            <span className="ml-3 text-gray-400 font-bold text-lg">Assistant eSIM</span>
-            <button onClick={() => setOpen(false)} className="text-gray-600 text-2xl px-2" aria-label="Fermer le chat">×</button>
+      {isOpen && (
+        <div className="bg-white w-[350px] h-[500px] rounded-2xl shadow-2xl border border-gray-200 flex flex-col mb-4 overflow-hidden animate-in slide-in-from-bottom-5 duration-300">
+          
+          {/* Header */}
+          <div className="bg-gradient-to-r from-purple-600 to-orange-500 p-4 flex justify-between items-center text-white">
+            <div className="flex items-center gap-2">
+              <div className="bg-white/20 p-1.5 rounded-full">
+                <Bot className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-sm">Assistant FenuaSIM</h3>
+                <p className="text-xs text-white/80">En ligne</p>
+              </div>
+            </div>
+            <button onClick={() => setIsOpen(false)} className="hover:bg-white/20 p-1 rounded transition">
+              <X className="w-5 h-5" />
+            </button>
           </div>
-          <div className="flex-1 overflow-y-auto p-4">
-            {messages.map((msg, i) => (
-              <div key={i} className={`mb-2 ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
-                <span className={`inline-block px-3 py-2 rounded-lg ${msg.role === 'user' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-900'}`}>{msg.content}</span>
+
+          {/* Messages */}
+          <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+            {messages.length === 0 && (
+              <div className="text-center text-gray-500 text-sm mt-10">
+                <p>👋 Bonjour !</p>
+                <p>Posez-moi vos questions sur l'eSIM.</p>
+              </div>
+            )}
+            
+            {messages.map((m) => (
+              <div
+                key={m.id}
+                className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
+              >
+                <div
+                  className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm shadow-sm ${
+                    m.role === "user"
+                      ? "bg-purple-600 text-white rounded-br-none"
+                      : "bg-white text-gray-800 border border-gray-100 rounded-bl-none"
+                  }`}
+                >
+                  <div dangerouslySetInnerHTML={{ __html: m.content }} />
+                </div>
               </div>
             ))}
-            <div ref={bottomRef} />
+            
+            {isLoading && (
+              <div className="flex justify-start">
+                <div className="bg-white p-3 rounded-2xl rounded-bl-none shadow-sm border border-gray-100">
+                  <div className="flex gap-1">
+                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></span>
+                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-75"></span>
+                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-150"></span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-          <form onSubmit={sendMessage} className="p-4 border-t flex gap-2 bg-white">
+
+          {/* Input */}
+          <form onSubmit={handleSubmit} className="p-3 bg-white border-t border-gray-100 flex gap-2">
             <input
-              type="text"
-              className="flex-1 border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-fenua-coral"
-              placeholder="Votre message..."
+              className="flex-1 bg-gray-100 text-gray-900 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
               value={input}
-              onChange={e => setInput(e.target.value)}
-              disabled={loading}
+              onChange={handleInputChange}
+              placeholder="Écrivez votre message..."
             />
             <button
               type="submit"
-              className="bg-fenua-coral bg-gray-600 text-white active:bg-slate-800 px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
-              disabled={loading || !input.trim()}
+              disabled={isLoading || !input.trim()}
+              className="bg-purple-600 text-white p-2 rounded-full hover:bg-purple-700 disabled:opacity-50 transition-colors"
             >
-              Envoyer
+              <Send className="w-5 h-5" />
             </button>
           </form>
         </div>
       )}
-    </>
-  )
-} 
+
+      {/* Bouton d'ouverture */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="group flex items-center justify-center w-14 h-14 bg-purple-600 text-white rounded-full shadow-lg hover:bg-purple-700 hover:scale-110 transition-all duration-300"
+      >
+        {isOpen ? <X className="w-6 h-6" /> : <MessageCircle className="w-7 h-7" />}
+      </button>
+    </div>
+  );
+}

@@ -1,3 +1,4 @@
+import type { NextApiRequest, NextApiResponse } from "next";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
 export const systemPrompt: ChatCompletionMessageParam = {
@@ -17,3 +18,14 @@ Comportement :
 - Utilise du HTML avec des balises <p>, <a>, <strong>, etc. pour formater tes réponses proprement.
 - Sois direct, clair, et utile.`
 };
+
+/**
+ * 🔥 Handler API obligatoire pour Next.js
+ * Sans cela → erreur Vercel : “Property 'default' is missing”
+ */
+export default function handler(req: NextApiRequest, res: NextApiResponse) {
+  return res.status(200).json({
+    status: "ok",
+    systemPrompt
+  });
+}

@@ -1,11 +1,15 @@
 import Link from "next/link";
 import Image from "next/image";
 import Head from "next/head";
+import { useRouter } from "next/router"; // ⚠️ Import nécessaire pour la recherche
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import PackageCard from "@/components/shop/PackageCard";
 import type { Database } from "@/lib/supabase/config";
 import ChatWidget from "@/components/ChatWidget";
+import { 
+  MapPin, ArrowRight, Wifi, CheckCircle, ShieldCheck 
+} from "lucide-react"; // ⚠️ Import des nouvelles icônes
 
 const TOP_DESTINATIONS = [
   "Europe",
@@ -154,43 +158,29 @@ const REGION_TRANSLATIONS: Record<string, string> = {
 
 // Function to get French name with fallback to translation
 function getFrenchRegionName(regionFr: string | null, region: string | null): string {
-  // First priority: Use region_fr from database if available and it's actually French
   if (regionFr && regionFr.trim()) {
     const trimmedFr = regionFr.trim();
-    // Check if region_fr is actually in English (needs translation)
-    if (REGION_TRANSLATIONS[trimmedFr]) {
-      // region_fr contains English name, translate it
-      return REGION_TRANSLATIONS[trimmedFr];
-    }
-    // region_fr is already in French, use it
+    if (REGION_TRANSLATIONS[trimmedFr]) return REGION_TRANSLATIONS[trimmedFr];
     return trimmedFr;
   }
-  
-  // Second priority: Translate English region name to French
   if (region && region.trim()) {
     const trimmedRegion = region.trim();
-    // Try exact match first
-    if (REGION_TRANSLATIONS[trimmedRegion]) {
-      return REGION_TRANSLATIONS[trimmedRegion];
-    }
-    // Try case-insensitive match
+    if (REGION_TRANSLATIONS[trimmedRegion]) return REGION_TRANSLATIONS[trimmedRegion];
     const lowerRegion = trimmedRegion.toLowerCase();
     for (const [key, value] of Object.entries(REGION_TRANSLATIONS)) {
-      if (key.toLowerCase() === lowerRegion) {
-        return value;
-      }
+      if (key.toLowerCase() === lowerRegion) return value;
     }
   }
-  
-  // Fallback: return original region or "Autres"
   return region?.trim() || "Autres";
 }
 
 type Package = Database["public"]["Tables"]["airalo_packages"]["Row"];
 
 export default function Home() {
+  const router = useRouter(); // <--- Initialisation du routeur
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState(""); // <--- État pour la recherche
 
   // Plausible analytics helper
   const plausible = useCallback((event: string, props?: Record<string, any>) => {
@@ -198,6 +188,14 @@ export default function Home() {
       (window as any).plausible(event, { props });
     }
   }, []);
+
+  // --- FONCTION DE RECHERCHE ---
+  const handleSearch = () => {
+    if (search.trim()) {
+      plausible("Recherche Hero", { query: search });
+      router.push(`/shop/${encodeURIComponent(search.trim())}`);
+    }
+  };
 
   // Fetch forfaits
   useEffect(() => {
@@ -312,70 +310,116 @@ export default function Home() {
         />
       </Head>
 
-      {/* Hero */}
-      <div className="relative bg-gradient-to-br from-purple-600 via-purple-500 to-orange-500">
-        <div className="absolute inset-0 overflow-hidden">
-          <svg
-            className="absolute bottom-0 left-0 w-full h-16 sm:h-20 lg:h-24 text-white/10"
-            viewBox="0 0 1200 120"
-            preserveAspectRatio="none"
-            aria-hidden="true"
-          >
-            <path
-              d="M0,0V46.29c47.79,22.2,103.59,32.17,158,28,70.36-5.37,136.33-33.31,206.8-37.5C438.64,32.43,512.34,53.67,583,72.05c69.27,18,138.3,24.88,209.4,13.08,36.15-6,69.85-17.84,104.45-29.34C989.49,25,1113-14.29,1200,52.47V0Z"
-              fill="currentColor"
-            />
-          </svg>
-        </div>
+      {/* ----------------------------------------------------------------------------------
+          NOUVEAU HERO SECTION (LIGHT & SPLIT SCREEN)
+         ---------------------------------------------------------------------------------- */}
+      <section className="relative w-full min-h-[700px] flex items-center bg-gradient-to-br from-white via-purple-50/30 to-orange-50/30 overflow-hidden">
+        
+        {/* Éléments de fond abstraits */}
+        <div className="absolute top-[-10%] right-[-5%] w-96 h-96 bg-purple-200/40 rounded-full blur-3xl opacity-50 animate-pulse"></div>
+        <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-orange-200/40 rounded-full blur-3xl opacity-40"></div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 lg:py-24 relative">
-          <div className="flex flex-col-reverse md:flex-row items-center justify-between gap-10">
-            {/* Texte */}
-            <div className="md:w-1/2 text-center md:text-left">
-              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold text-white leading-tight">
-                Votre eSIM{" "}
-                <span className="text-orange-200">partout dans le Monde</span>
-              </h1>
-              <p className="mt-4 sm:mt-6 max-w-2xl mx-auto md:mx-0 text-lg sm:text-xl text-white/95">
-                Activez votre forfait instantanément dans plus de 180 pays. Plus
-                besoin de carte physique, activez votre forfait en quelques clics.
-              </p>
-              <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row justify-center md:justify-start gap-3 sm:gap-4">
-                <Link
-                  href="/shop"
-                  onClick={() => plausible("CTA: Voir les forfaits")}
-                  aria-label="Voir tous les forfaits eSIM"
-                  className="inline-flex items-center justify-center px-6 sm:px-8 py-3 rounded-full font-semibold text-purple-700 bg-white shadow hover:bg-orange-50 transition"
-                >
-                  Voir les forfaits
-                </Link>
-                <Link
-                  href="/compatibilite"
-                  onClick={() => plausible("CTA: Vérifier compatibilité")}
-                  aria-label="Vérifier la compatibilité eSIM"
-                  className="inline-flex items-center justify-center px-6 sm:px-8 py-3 rounded-full font-semibold border border-white text-white hover:bg-white/10 transition"
-                >
-                  Vérifier la compatibilité
-                </Link>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 z-10 w-full">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            
+            {/* --- COLONNE GAUCHE : TEXTE & RECHERCHE --- */}
+            <div className="text-left space-y-8">
+              
+              {/* Badge */}
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-100 text-purple-700 text-sm font-bold">
+                <Wifi className="w-4 h-4" />
+                <span>La connexion de voyage simplifiée</span>
               </div>
+
+              {/* Titre */}
+              <h1 className="text-4xl md:text-6xl font-extrabold text-gray-900 leading-tight">
+                Explorez le monde, <br />
+                restez <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-orange-500">connecté.</span>
+              </h1>
+
+              {/* Sous-titre */}
+              <p className="text-xl text-gray-600 max-w-lg">
+                Activez votre eSIM en 2 minutes. Profitez de la data locale dans +180 pays, sans frais cachés, dès l'atterrissage.
+              </p>
+
+              {/* Widget de Recherche Style "Carte" */}
+              <div className="bg-white p-2 rounded-2xl shadow-xl border border-gray-100 flex flex-col sm:flex-row gap-2 max-w-lg">
+                <div className="relative flex-grow flex items-center">
+                   <MapPin className="absolute left-4 w-6 h-6 text-purple-500" />
+                   <input 
+                    type="text" 
+                    placeholder="Où partez-vous ? (ex: Japon)" 
+                    className="w-full bg-transparent rounded-xl py-4 pl-12 pr-4 text-gray-900 placeholder-gray-400 focus:outline-none text-lg font-medium"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleSearch();
+                    }}
+                  />
+                </div>
+                <button 
+                  onClick={handleSearch}
+                  className="sm:w-auto w-full bg-purple-600 hover:bg-purple-700 text-white px-8 py-4 rounded-xl font-bold transition-all flex items-center justify-center gap-2 shrink-0 shadow-lg shadow-purple-200"
+                >
+                  Rechercher <ArrowRight className="w-5 h-5" />
+                </button>
+              </div>
+
+               {/* Arguments */}
+               <div className="flex flex-wrap gap-6 text-gray-600 font-medium text-sm sm:text-base">
+                  <div className="flex items-center gap-2">
+                    <div className="bg-green-100 p-1 rounded-full text-green-600"><CheckCircle className="w-4 h-4" /></div>
+                    Installation immédiate
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="bg-blue-100 p-1 rounded-full text-blue-600"><ShieldCheck className="w-4 h-4" /></div>
+                    Paiement sécurisé
+                  </div>
+               </div>
             </div>
 
-            {/* Visuel 3D */}
-            <div className="md:w-1/2 flex justify-center">
-              <Image
-                src="/images/hero-esim.png"
-                alt="Voyageurs FenuaSIM sélectionnant une destination eSIM"
-                width={520}
-                height={520}
-                priority
-                className="w-full h-auto max-w-xs sm:max-w-md"
-              />
+            {/* --- COLONNE DROITE : VISUEL COMPOSITE --- */}
+            <div className="relative hidden lg:block h-[600px]">
+              
+              {/* Image principale (Mockup Téléphone) */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] z-20 hover:scale-105 transition-transform duration-500">
+                 {/* Image statique, remplacez src par votre propre image si besoin */}
+                 <img 
+                   src="https://images.unsplash.com/photo-1592434134753-a70baf7979d5?q=80&w=1000&auto=format&fit=crop" 
+                   alt="App FenuaSIM" 
+                   className="w-full rounded-[2.5rem] shadow-2xl border-[8px] border-white"
+                 />
+              </div>
+
+              {/* Cartes flottantes */}
+              <div className="absolute top-24 right-4 bg-white p-4 rounded-2xl shadow-xl flex items-center gap-4 z-30 animate-bounce">
+                 <img src="https://flagcdn.com/w80/jp.png" alt="Japon" className="w-10 h-10 rounded-full object-cover shadow-sm border border-gray-100" />
+                 <div>
+                    <p className="font-bold text-gray-900 text-sm">Japon 5G</p>
+                    <p className="text-xs text-purple-600 font-semibold">Activé ✔</p>
+                 </div>
+              </div>
+
+              <div className="absolute bottom-32 left-8 bg-white p-4 rounded-2xl shadow-xl flex items-center gap-4 z-10 animate-bounce" style={{ animationDelay: "1s" }}>
+                 <img src="https://flagcdn.com/w80/us.png" alt="USA" className="w-10 h-10 rounded-full object-cover shadow-sm border border-gray-100" />
+                 <div>
+                    <p className="font-bold text-gray-900 text-sm">USA Data</p>
+                    <p className="text-xs text-orange-500 font-semibold">4.00€ / Go</p>
+                 </div>
+              </div>
+
+              {/* Data stat */}
+              <div className="absolute bottom-12 right-24 bg-purple-600 text-white p-4 rounded-2xl shadow-xl z-30 transform rotate-3">
+                 <p className="text-xs opacity-80 mb-1">Data restante</p>
+                 <p className="font-bold text-xl flex items-center gap-2"><Wifi className="w-5 h-5" /> 18.5 GB</p>
+              </div>
+
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Destinations */}
+      {/* Destinations (Suite du code existant) */}
       <div className="py-12 sm:py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 text-center mb-8 sm:mb-12">

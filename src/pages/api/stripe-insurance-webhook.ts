@@ -1,4 +1,5 @@
-import type { NextApiRequest, NextApiResponse } from "next";
+// src/pages/api/stripe-insurance-webhook.ts
+import type { NextApiRequest, NextApiResponse } from "next"; 
 import Stripe from "stripe";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { validateAvaAdhesion } from "@/lib/ava";
@@ -36,6 +37,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
+  // 🎯 Paiement Stripe validé
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
     const metadata = session.metadata || {};
@@ -44,19 +46,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.log(`🚑 Webhook Assurance : Validation contrat ${metadata.adhesion_number}`);
       
       try {
-        // 1. Valider chez AVA (Correction ici : 1 seul argument)
-        await validateAvaAdhesion(metadata.adhesion_number);
-        
-        // 2. Mettre à jour Supabase
+        // 1️⃣ Appel AVA et récupération PDF
+        const ava = await validateAvaAdhesion(metadata.adhesion_number);
+        console.log("📄 Réponse AVA validation :", ava);
+
+        // 2️⃣ Extraction PDF AVA
+        const certificateUrl =
+          ava?.certificat_de_garantie ||
+          ava?.certificat_garantie ||
+          ava?.certificate ||
+          null;
+
+        const attestationUrl =
+          ava?.attestation_assurance ||
+          ava?.attestation ||
+          null;
+
+        console.log("📎 URLs extraites :", { certificateUrl, attestationUrl });
+
+        // 3️⃣ Mise à jour Supabase
         await supabaseAdmin
-          .from('insurances')
-          .update({ 
-            status: 'validated', 
-            stripe_session_id: session.id 
+          .from("insurances")
+          .update({
+            status: "validated",
+            stripe_session_id: session.id,
+            certificate_url: certificateUrl,
+            attestation_url: attestationUrl,
           })
-          .eq('adhesion_number', metadata.adhesion_number);
+          .eq("adhesion_number", metadata.adhesion_number);
           
         return res.status(200).json({ received: true, processed: true });
+
       } catch (error) {
         console.error("Erreur validation Assurance:", error);
         return res.status(500).json({ error: "Erreur validation" });

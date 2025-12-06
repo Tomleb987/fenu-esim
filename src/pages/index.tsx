@@ -191,21 +191,6 @@ export default function Home() {
   const [currency, setCurrency] = useState("EUR"); 
   const [showCurrencyMenu, setShowCurrencyMenu] = useState(false);
 
-  // Fonction de conversion
-  const convertPrice = (priceInEur: number) => {
-    // @ts-ignore
-    const rate = EXCHANGE_RATES[currency] || 1;
-    const converted = priceInEur * rate;
-    
-    if (currency === "XPF") {
-      return Math.round(converted).toLocaleString('fr-FR') + " F";
-    } else if (currency === "USD") {
-      return "$" + converted.toFixed(2);
-    } else {
-      return converted.toFixed(2) + " €";
-    }
-  };
-
   const plausible = useCallback((event: string, props?: Record<string, any>) => {
     if (typeof window !== "undefined" && (window as any).plausible) {
       (window as any).plausible(event, { props });
@@ -254,11 +239,16 @@ export default function Home() {
     {} as Record<string, Package[]>
   );
 
-  // Stats per region (On garde le minPriceEur brut pour le calcul)
+  // Stats per region
+  // On calcule ici les valeurs, mais on ne fait pas de formatage texte pour ne pas casser le composant enfant
   const regionStats = Object.entries(packagesByRegion).reduce(
     (acc, [region, pkgs]) => {
+      // 1. Calcul du prix MINIMUM en EUR (Brut)
       const minPriceEur = Math.min(...pkgs.map((p) => p.final_price_eur ?? 0));
       
+      // 2. Gestion si aucune donnée (évite -Infinity ou NaN)
+      const safeMinPriceEur = minPriceEur === Infinity ? 0 : minPriceEur;
+
       acc[region] = {
         minData: Math.min(...pkgs.map((p) => p.data_amount ?? 0)),
         maxData: Math.max(...pkgs.map((p) => p.data_amount ?? 0)),
@@ -271,7 +261,7 @@ export default function Home() {
             parseInt(p.validity?.toString().split(" ")[0] || "0")
           )
         ),
-        minPriceEur: minPriceEur, 
+        minPriceEur: safeMinPriceEur, // On stocke la valeur EUR de base
         packageCount: pkgs.length,
       };
       return acc;
@@ -310,15 +300,14 @@ export default function Home() {
       </Head>
 
       {/* ----------------------------------------------------------------------------------
-          HERO SECTION (COMPATIBLE MOBILE & DESKTOP + DEVISE)
+          HERO SECTION
          ---------------------------------------------------------------------------------- */}
       <section className="relative w-full min-h-[600px] flex items-center bg-gradient-to-br from-purple-100 via-purple-50/30 to-orange-100 overflow-hidden">
         
-        {/* Cercles décoratifs */}
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-purple-300/30 rounded-full blur-3xl opacity-70 pointer-events-none"></div>
         <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-orange-300/30 rounded-full blur-3xl opacity-70 pointer-events-none"></div>
 
-        {/* --- SELECTEUR DE DEVISE (FLOTTANT) --- */}
+        {/* --- SELECTEUR DE DEVISE --- */}
         <div className="absolute top-6 right-6 md:right-12 z-50">
           <div className="relative">
             <button 
@@ -343,7 +332,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 z-10 w-full py-12 md:py-20">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
             
-            {/* --- COLONNE GAUCHE : CONTENU --- */}
+            {/* COLONNE GAUCHE */}
             <div className="text-left space-y-8 pt-8 lg:pt-0">
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-purple-100 shadow-sm text-purple-700 text-sm font-bold">
                 <Wifi className="w-4 h-4" />
@@ -373,7 +362,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* --- VERSION MOBILE (VISIBLE UNIQUEMENT SUR PETITS ÉCRANS) --- */}
+            {/* VERSION MOBILE */}
             <div className="block lg:hidden mt-4">
               <div className="grid grid-cols-2 gap-4 h-40">
                  <div className="relative rounded-2xl overflow-hidden shadow-lg border-2 border-white transform translate-y-3">
@@ -387,7 +376,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* --- VERSION DESKTOP (MOSAÏQUE COMPLÈTE) --- */}
+            {/* VERSION DESKTOP */}
             <div className="relative hidden lg:grid grid-cols-2 gap-4 h-[500px] items-center">
               <div className="space-y-4 pt-12">
                  <div className="relative h-48 rounded-2xl overflow-hidden shadow-lg border-4 border-white transform hover:-translate-y-1 transition-transform duration-300 group">
@@ -419,7 +408,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Destinations (PRIX DYNAMIQUES) */}
+      {/* Destinations (PRIX DYNAMIQUES CORRIGÉS) */}
       <div className="py-12 sm:py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 text-center mb-8 sm:mb-12">
@@ -435,19 +424,35 @@ export default function Home() {
                 const pkg = packagesByRegion[region]?.[0];
                 if (!pkg) return null;
                 
-                // 1. On récupère les stats
+                // 1. Récupération des stats (le minPriceEur calculé dans regionStats)
                 const stats = regionStats[region];
                 
-                // 2. On convertit le prix min
-                const displayPrice = convertPrice(stats.minPriceEur);
+                // 2. Conversion du prix
+                // @ts-ignore
+                const rate = EXCHANGE_RATES[currency] || 1;
+                // Calcul de la valeur numérique
+                const convertedValue = (stats.minPriceEur || 0) * rate;
+                
+                // 3. Choix du symbole
+                let symbol = "€";
+                if (currency === "USD") symbol = "$";
+                if (currency === "XPF") symbol = "F";
 
                 return (
                   <PackageCard
                     key={region}
                     pkg={pkg}
                     {...stats}
-                    // 3. On passe le prix converti en string à la carte
-                    minPrice={displayPrice} 
+                    
+                    // CORRECTION ICI : On passe la valeur convertie (NOMBRE) à minPrice
+                    // pour que le composant puisse faire ses calculs s'il en a besoin
+                    // Si PackageCard affiche juste la valeur, il affichera "4.32" (pour USD).
+                    minPrice={convertedValue} 
+                    
+                    // On passe aussi la devise pour information (si PackageCard le supporte)
+                    currency={currency}
+                    currencySymbol={symbol}
+                    
                     isPopular={true}
                   />
                 );
@@ -468,46 +473,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Avantages */}
-      <div className="py-12 sm:py-16 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-12">
-            {[{title: "Configuration rapide", desc: "Installez votre eSIM en quelques minutes.", icon: <Smartphone className="w-8 h-8 text-purple-600"/>},
-              {title: "Service clientèle 7/7", desc: "Notre équipe est disponible pour vous accompagner.", icon: <ShieldCheck className="w-8 h-8 text-purple-600"/>},
-              {title: "Pour tous les budgets", desc: "Des forfaits adaptés à tous les besoins.", icon: <Star className="w-8 h-8 text-purple-600"/>}
-            ].map((item, i) => (
-              <div key={i} className="text-center">
-                <div className="flex justify-center mb-4">
-                  <div className="h-16 w-16 rounded-full bg-purple-100 flex items-center justify-center">{item.icon}</div>
-                </div>
-                <h3 className="text-xl font-bold text-gray-900">{item.title}</h3>
-                <p className="mt-2 text-gray-500">{item.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Comment ça marche */}
-      <div className="py-12 sm:py-16 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-extrabold text-gray-900 text-center mb-12">Comment ça marche ?</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-            {[{step: 1, title: "Choisissez", desc: "Sélectionnez votre destination et forfait."},
-              {step: 2, title: "Recevez", desc: "QR code reçu instantanément par email."},
-              {step: 3, title: "Connectez", desc: "Scannez et profitez d'internet."}
-            ].map((item, i) => (
-              <div key={i} className="text-center">
-                <div className="inline-flex h-16 w-16 rounded-full bg-gradient-to-br from-purple-600 to-orange-500 text-white items-center justify-center text-2xl font-bold mb-6">{item.step}</div>
-                <h3 className="text-xl font-bold text-gray-900">{item.title}</h3>
-                <p className="mt-2 text-gray-500">{item.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* FAQ */}
+      {/* Avantages & FAQ */}
       <div className="py-12 sm:py-16 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 text-center mb-8">Questions fréquentes</h2>

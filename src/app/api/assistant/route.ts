@@ -1,6 +1,6 @@
 import { OpenAI } from 'openai';
 import { OpenAIStream, StreamingTextResponse } from 'ai';
-import { systemPrompt } from '@/app/api/assistant/systemPrompt'; // Adaptez le chemin selon où vous avez mis le prompt
+import { systemPrompt } from './systemPrompt';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,

@@ -6,6 +6,7 @@ import { MessageCircle, X, Send, Bot } from "lucide-react";
 
 export default function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
+  const [showPrompt, setShowPrompt] = useState(false); // État pour la bulle
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
@@ -13,19 +14,73 @@ export default function ChatWidget() {
     onError: (err) => console.error("Erreur Chat:", err),
   });
 
-  // Scroll automatique vers le bas
+  // 1. DÉCLENCHEMENT AUTOMATIQUE DE LA BULLE
+  useEffect(() => {
+    // Attend 3 secondes après le chargement de la page
+    const timer = setTimeout(() => {
+      // Si le chat n'est pas déjà ouvert, on montre la bulle
+      if (!isOpen) {
+        setShowPrompt(true);
+      }
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [isOpen]);
+
+  // Scroll automatique
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
 
+  // Fonction pour ouvrir le chat (et cacher la bulle)
+  const toggleChat = () => {
+    setIsOpen(!isOpen);
+    if (!isOpen) {
+      setShowPrompt(false); // On cache la bulle dès qu'on ouvre
+    }
+  };
+
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end font-sans">
+    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end font-sans gap-4">
       
-      {/* Fenêtre de chat */}
+      {/* --- BULLE D'ACCROCHE (PROMPT) --- */}
+      {/* Elle s'affiche seulement si showPrompt est vrai ET que le chat est fermé */}
+      {showPrompt && !isOpen && (
+        <div className="animate-in slide-in-from-bottom-2 fade-in duration-500 max-w-[250px]">
+          <div className="bg-white p-4 rounded-2xl rounded-br-none shadow-xl border border-gray-100 relative">
+            {/* Bouton pour fermer juste la bulle */}
+            <button 
+              onClick={(e) => { e.stopPropagation(); setShowPrompt(false); }}
+              className="absolute -top-2 -right-2 bg-gray-200 rounded-full p-1 hover:bg-gray-300 transition"
+            >
+              <X className="w-3 h-3 text-gray-600" />
+            </button>
+            
+            <div className="flex items-start gap-3">
+              <div className="bg-purple-100 p-1.5 rounded-full flex-shrink-0">
+                <span className="text-xl">👋</span>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-800">
+                  Ia ora na ! Besoin d'aide pour choisir votre eSIM ?
+                </p>
+                <button 
+                  onClick={toggleChat}
+                  className="text-xs text-purple-600 font-bold mt-2 hover:underline"
+                >
+                  Discuter maintenant →
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- FENÊTRE DE CHAT --- */}
       {isOpen && (
-        <div className="bg-white w-[350px] h-[500px] rounded-2xl shadow-2xl border border-gray-200 flex flex-col mb-4 overflow-hidden animate-in slide-in-from-bottom-5 duration-300">
+        <div className="bg-white w-[350px] h-[500px] rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 duration-300 mb-2">
           
           {/* Header */}
           <div className="bg-gradient-to-r from-purple-600 to-orange-500 p-4 flex justify-between items-center text-white">
@@ -35,10 +90,10 @@ export default function ChatWidget() {
               </div>
               <div>
                 <h3 className="font-bold text-sm">Assistant FenuaSIM</h3>
-                <p className="text-xs text-white/80">En ligne</p>
+                <p className="text-xs text-white/80">Réponse instantanée</p>
               </div>
             </div>
-            <button onClick={() => setIsOpen(false)} className="hover:bg-white/20 p-1 rounded transition">
+            <button onClick={toggleChat} className="hover:bg-white/20 p-1 rounded transition">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -48,7 +103,7 @@ export default function ChatWidget() {
             {messages.length === 0 && (
               <div className="text-center text-gray-500 text-sm mt-10">
                 <p>👋 Bonjour !</p>
-                <p>Posez-moi vos questions sur l'eSIM.</p>
+                <p>Je suis là pour vous aider.</p>
               </div>
             )}
             
@@ -101,11 +156,19 @@ export default function ChatWidget() {
         </div>
       )}
 
-      {/* Bouton d'ouverture */}
+      {/* --- BOUTON PRINCIPAL (ROND) --- */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="group flex items-center justify-center w-14 h-14 bg-purple-600 text-white rounded-full shadow-lg hover:bg-purple-700 hover:scale-110 transition-all duration-300"
+        onClick={toggleChat}
+        className="group flex items-center justify-center w-14 h-14 bg-purple-600 text-white rounded-full shadow-lg hover:bg-purple-700 hover:scale-110 transition-all duration-300 relative"
       >
+        {/* Badge de notification (point rouge) si la bulle est affichée */}
+        {showPrompt && !isOpen && (
+          <span className="absolute top-0 right-0 flex h-4 w-4">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500"></span>
+          </span>
+        )}
+        
         {isOpen ? <X className="w-6 h-6" /> : <MessageCircle className="w-7 h-7" />}
       </button>
     </div>

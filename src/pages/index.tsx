@@ -3,100 +3,186 @@ import Image from "next/image";
 import Head from "next/head";
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import PackageCard from "@/components/shop/PackageCard";
 import type { Database } from "@/lib/supabase/config";
 import ChatWidget from "@/components/ChatWidget";
-import { 
-  Search, Globe, CheckCircle, Wifi, Star, 
-  Smartphone, Zap, ArrowRight, MapPin, Heart, ShieldCheck, Sparkles 
-} from "lucide-react";
-
-// --- CONSTANTES & CONFIGURATION ---
 
 const TOP_DESTINATIONS = [
-  "Japon",
-  "États-Unis",
   "Europe",
+  "Japon",
   "Australie",
+  "États-Unis",
+  "Fidji",
+  "Nouvelle-Zélande",
+  "Mexique",
   "France",
   "Asie",
   "Monde",
-  "Mexique",
 ];
 
-// Mapping pour associer les données Supabase à des images stylées
-const DESTINATION_META: Record<string, { image: string; badge: string | null }> = {
-  "Japon": { 
-    image: "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=800", 
-    badge: "🔥 Top Vente" 
-  },
-  "États-Unis": { 
-    image: "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?q=80&w=800", 
-    badge: "⚡ 5G" 
-  },
-  "Europe": { 
-    image: "https://images.unsplash.com/photo-1467269204594-9661b134dd2b?q=80&w=800", 
-    badge: "🇪🇺 Best Seller" 
-  },
-  "Australie": { 
-    image: "https://images.unsplash.com/photo-1523482580672-f109ba8cb9be?q=80&w=800", 
-    badge: null 
-  },
-  "France": { 
-    image: "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?q=80&w=800", 
-    badge: "🇫🇷 Local" 
-  },
-  "Asie": { 
-    image: "https://images.unsplash.com/photo-1535139262971-c51845709a48?q=80&w=800", 
-    badge: "🌏 Régional" 
-  },
-  "Monde": { 
-    image: "https://images.unsplash.com/photo-1526778548025-fa2f459cd5c1?q=80&w=800", 
-    badge: "✈️ Global" 
-  },
-  "Mexique": { 
-    image: "https://images.unsplash.com/photo-1518105779142-d975f22f1b0a?q=80&w=800", 
-    badge: null 
-  },
-  // Fallback image
-  "default": {
-    image: "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?q=80&w=800",
-    badge: null
-  }
-};
-
+// Translation mapping for English to French destination names
 const REGION_TRANSLATIONS: Record<string, string> = {
   "Discover Global": "Monde",
   "Asia": "Asie",
   "Europe": "Europe",
   "Japan": "Japon",
+  "Canary Islands": "Îles Canaries",
+  "South Korea": "Corée du Sud",
+  "Hong Kong": "Hong Kong",
   "United States": "États-Unis",
   "Australia": "Australie",
   "New Zealand": "Nouvelle-Zélande",
   "Mexico": "Mexique",
   "Fiji": "Fidji",
-  "Canada": "Canada",
   "Thailand": "Thaïlande",
-  // ... (Garder le reste de votre liste de traductions ici si nécessaire, j'ai abrégé pour la lisibilité)
+  "Singapore": "Singapour",
+  "Malaysia": "Malaisie",
+  "Indonesia": "Indonésie",
+  "Philippines": "Philippines",
+  "Vietnam": "Viêt Nam",
+  "India": "Inde",
+  "China": "Chine",
+  "Taiwan": "Taïwan",
+  "United Kingdom": "Royaume-Uni",
+  "Germany": "Allemagne",
+  "Spain": "Espagne",
+  "Italy": "Italie",
+  "Greece": "Grèce",
+  "Portugal": "Portugal",
+  "Netherlands": "Pays-Bas",
+  "Belgium": "Belgique",
+  "Switzerland": "Suisse",
+  "Austria": "Autriche",
+  "Poland": "Pologne",
+  "Czech Republic": "République tchèque",
+  "Turkey": "Turquie",
+  "Egypt": "Égypte",
+  "Morocco": "Maroc",
+  "South Africa": "Afrique du Sud",
+  "Brazil": "Brésil",
+  "Argentina": "Argentine",
+  "Chile": "Chili",
+  "Colombia": "Colombie",
+  "Peru": "Pérou",
+  "UAE": "Émirats arabes unis",
+  "United Arab Emirates": "Émirats arabes unis",
+  "Saudi Arabia": "Arabie saoudite",
+  "Israel": "Israël",
+  "Jordan": "Jordanie",
+  "Lebanon": "Liban",
+  "Qatar": "Qatar",
+  "Kuwait": "Koweït",
+  "Bahrain": "Bahreïn",
+  "Oman": "Oman",
+  "Azerbaijan": "Azerbaïdjan",
+  "Jamaica": "Jamaïque",
+  "Albania": "Albanie",
+  "Algeria": "Algérie",
+  "Angola": "Angola",
+  "Armenia": "Arménie",
+  "Bangladesh": "Bangladesh",
+  "Belarus": "Biélorussie",
+  "Bolivia": "Bolivie",
+  "Bosnia and Herzegovina": "Bosnie-Herzégovine",
+  "Botswana": "Botswana",
+  "Bulgaria": "Bulgarie",
+  "Cambodia": "Cambodge",
+  "Cameroon": "Cameroun",
+  "Chad": "Tchad",
+  "Croatia": "Croatie",
+  "Cuba": "Cuba",
+  "Cyprus": "Chypre",
+  "Denmark": "Danemark",
+  "Dominican Republic": "République dominicaine",
+  "Ecuador": "Équateur",
+  "Estonia": "Estonie",
+  "Ethiopia": "Éthiopie",
+  "Finland": "Finlande",
+  "Georgia": "Géorgie",
+  "Ghana": "Ghana",
+  "Guatemala": "Guatemala",
+  "Honduras": "Honduras",
+  "Hungary": "Hongrie",
+  "Iceland": "Islande",
+  "Ireland": "Irlande",
+  "Ivory Coast": "Côte d'Ivoire",
+  "Kazakhstan": "Kazakhstan",
+  "Kenya": "Kenya",
+  "Kyrgyzstan": "Kirghizistan",
+  "Laos": "Laos",
+  "Latvia": "Lettonie",
+  "Lithuania": "Lituanie",
+  "Luxembourg": "Luxembourg",
+  "Madagascar": "Madagascar",
+  "Malawi": "Malawi",
+  "Maldives": "Maldives",
+  "Mali": "Mali",
+  "Malta": "Malte",
+  "Mauritius": "Maurice",
+  "Moldova": "Moldavie",
+  "Mongolia": "Mongolie",
+  "Montenegro": "Monténégro",
+  "Myanmar": "Myanmar",
+  "Namibia": "Namibie",
+  "Nepal": "Népal",
+  "Nicaragua": "Nicaragua",
+  "Nigeria": "Nigeria",
+  "North Macedonia": "Macédoine du Nord",
+  "Norway": "Norvège",
+  "Pakistan": "Pakistan",
+  "Panama": "Panama",
+  "Paraguay": "Paraguay",
+  "Romania": "Roumanie",
+  "Russia": "Russie",
+  "Rwanda": "Rwanda",
+  "Senegal": "Sénégal",
+  "Serbia": "Serbie",
+  "Slovakia": "Slovaquie",
+  "Slovenia": "Slovénie",
+  "Sri Lanka": "Sri Lanka",
+  "Sweden": "Suède",
+  "Tanzania": "Tanzanie",
+  "Tunisia": "Tunisie",
+  "Ukraine": "Ukraine",
+  "Uruguay": "Uruguay",
+  "Uzbekistan": "Ouzbékistan",
+  "Venezuela": "Venezuela",
+  "Zambia": "Zambie",
+  "Zimbabwe": "Zimbabwe",
+  "Canada": "Canada",
 };
 
-// --- HELPER FUNCTIONS ---
-
+// Function to get French name with fallback to translation
 function getFrenchRegionName(regionFr: string | null, region: string | null): string {
+  // First priority: Use region_fr from database if available and it's actually French
   if (regionFr && regionFr.trim()) {
     const trimmedFr = regionFr.trim();
-    if (REGION_TRANSLATIONS[trimmedFr]) return REGION_TRANSLATIONS[trimmedFr];
+    // Check if region_fr is actually in English (needs translation)
+    if (REGION_TRANSLATIONS[trimmedFr]) {
+      // region_fr contains English name, translate it
+      return REGION_TRANSLATIONS[trimmedFr];
+    }
+    // region_fr is already in French, use it
     return trimmedFr;
   }
+  
+  // Second priority: Translate English region name to French
   if (region && region.trim()) {
     const trimmedRegion = region.trim();
-    if (REGION_TRANSLATIONS[trimmedRegion]) return REGION_TRANSLATIONS[trimmedRegion];
-    
-    // Case insensitive check
+    // Try exact match first
+    if (REGION_TRANSLATIONS[trimmedRegion]) {
+      return REGION_TRANSLATIONS[trimmedRegion];
+    }
+    // Try case-insensitive match
     const lowerRegion = trimmedRegion.toLowerCase();
     for (const [key, value] of Object.entries(REGION_TRANSLATIONS)) {
-      if (key.toLowerCase() === lowerRegion) return value;
+      if (key.toLowerCase() === lowerRegion) {
+        return value;
+      }
     }
   }
+  
+  // Fallback: return original region or "Autres"
   return region?.trim() || "Autres";
 }
 
@@ -105,16 +191,15 @@ type Package = Database["public"]["Tables"]["airalo_packages"]["Row"];
 export default function Home() {
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
 
-  // Plausible analytics
+  // Plausible analytics helper
   const plausible = useCallback((event: string, props?: Record<string, any>) => {
     if (typeof window !== "undefined" && (window as any).plausible) {
       (window as any).plausible(event, { props });
     }
   }, []);
 
-  // Fetch Data
+  // Fetch forfaits
   useEffect(() => {
     async function fetchPackages() {
       const { data } = await supabase
@@ -127,7 +212,7 @@ export default function Home() {
     fetchPackages();
   }, []);
 
-  // Trustpilot logic
+  // Trustpilot widget
   useEffect(() => {
     const script = document.createElement("script");
     script.src = "https://invitejs.trustpilot.com/tp.min.js";
@@ -135,12 +220,17 @@ export default function Home() {
     document.body.appendChild(script);
     script.onload = () => {
       /* @ts-ignore */
-      if (window.tp) window.tp("register", "t5j5yxc20tHVgyo");
+      if (window.tp) {
+        /* @ts-ignore */
+        window.tp("register", "t5j5yxc20tHVgyo");
+      }
     };
-    return () => document.body.removeChild(script);
+    return () => {
+      document.body.removeChild(script);
+    };
   }, []);
 
-  // Grouping logic
+  // Group forfaits by region
   const packagesByRegion = packages.reduce(
     (acc, pkg) => {
       const region = getFrenchRegionName(pkg.region_fr, pkg.region);
@@ -151,20 +241,37 @@ export default function Home() {
     {} as Record<string, Package[]>
   );
 
-  // Computing minimum price per region for display
-  const getMinPrice = (region: string) => {
-    const regionPkgs = packagesByRegion[region];
-    if (!regionPkgs || regionPkgs.length === 0) return "N/A";
-    const min = Math.min(...regionPkgs.map((p) => p.final_price_eur ?? 0));
-    return min.toFixed(2) + "€";
-  };
+  // Stats per region
+  const regionStats = Object.entries(packagesByRegion).reduce(
+    (acc, [region, pkgs]) => {
+      acc[region] = {
+        minData: Math.min(...pkgs.map((p) => p.data_amount ?? 0)),
+        maxData: Math.max(...pkgs.map((p) => p.data_amount ?? 0)),
+        minDays: Math.min(
+          ...pkgs.map((p) =>
+          parseInt(p.validity?.toString().split(" ")[0] || "0")
+        )),
+        maxDays: Math.max(
+          ...pkgs.map((p) =>
+            parseInt(p.validity?.toString().split(" ")[0] || "0")
+          )
+        ),
+        minPrice: Math.min(...pkgs.map((p) => p.final_price_eur ?? 0)),
+        packageCount: pkgs.length,
+      };
+      return acc;
+    },
+    {} as Record<string, any>
+  );
+
+  const topDestinations = TOP_DESTINATIONS.filter(
+    (region) => packagesByRegion[region]
+  );
 
   return (
-    <div className="min-h-screen bg-white font-sans">
+    <div className="min-h-screen bg-white">
       <Head>
-        <title>FenuaSIM - Votre eSIM partout dans le monde</title>
-        <meta name="description" content="Activez votre forfait instantanément dans plus de 180 pays." />
-        {/* FAQ JSON-LD (Conservé tel quel) */}
+        {/* FAQ JSON-LD */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -175,303 +282,143 @@ export default function Home() {
                 {
                   "@type": "Question",
                   "name": "Comment fonctionne l'eSIM ?",
-                  "acceptedAnswer": { "@type": "Answer", "text": "L'eSIM est une carte SIM intégrée à votre appareil. Vous recevez un QR code par email que vous scannez pour activer votre forfait." }
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text":
+                      "L'eSIM est une carte SIM intégrée à votre appareil. Vous recevez un QR code par email que vous scannez pour activer votre forfait.",
+                  },
                 },
                 {
                   "@type": "Question",
                   "name": "Mon appareil est-il compatible ?",
-                  "acceptedAnswer": { "@type": "Answer", "text": "La plupart des smartphones récents sont compatibles avec l'eSIM. Vérifiez la compatibilité de votre appareil dans notre guide." }
-                }
-              ]
-            })
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text":
+                      "La plupart des smartphones récents sont compatibles avec l'eSIM. Vérifiez la compatibilité de votre appareil dans notre guide.",
+                  },
+                },
+                {
+                  "@type": "Question",
+                  "name": "Quand dois-je activer mon eSIM ?",
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text":
+                      "Vous pouvez installer votre eSIM avant votre voyage, mais elle ne s'activera qu'à votre arrivée à destination.",
+                  },
+                },
+              ],
+            }),
           }}
         />
       </Head>
 
-      {/* ----------------------------------------------------------------------------------
-          1. HERO SECTION (IMMERSIVE)
-         ---------------------------------------------------------------------------------- */}
-      <section className="relative w-full min-h-[650px] flex items-center justify-center overflow-hidden bg-gray-900 text-white">
-        
-        {/* Fond d'écran avec Overlay */}
-        <div className="absolute inset-0 z-0">
-          <img 
-            src="https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?q=80&w=2021&auto=format&fit=crop" 
-            alt="Voyage" 
-            className="w-full h-full object-cover opacity-50"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/40 to-transparent"></div>
+      {/* Hero */}
+      <div className="relative bg-gradient-to-br from-purple-600 via-purple-500 to-orange-500">
+        <div className="absolute inset-0 overflow-hidden">
+          <svg
+            className="absolute bottom-0 left-0 w-full h-16 sm:h-20 lg:h-24 text-white/10"
+            viewBox="0 0 1200 120"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M0,0V46.29c47.79,22.2,103.59,32.17,158,28,70.36-5.37,136.33-33.31,206.8-37.5C438.64,32.43,512.34,53.67,583,72.05c69.27,18,138.3,24.88,209.4,13.08,36.15-6,69.85-17.84,104.45-29.34C989.49,25,1113-14.29,1200,52.47V0Z"
+              fill="currentColor"
+            />
+          </svg>
         </div>
 
-        {/* Contenu Hero */}
-        <div className="relative z-10 container mx-auto px-4 text-center pt-20">
-          
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-purple-200 text-sm font-semibold mb-6 animate-fade-in">
-            <Globe className="w-4 h-4" />
-            <span>L'eSIM par des voyageurs, pour des voyageurs</span>
-          </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 lg:py-24 relative">
+          <div className="flex flex-col-reverse md:flex-row items-center justify-between gap-10">
+            {/* Texte */}
+            <div className="md:w-1/2 text-center md:text-left">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold text-white leading-tight">
+                Votre eSIM{" "}
+                <span className="text-orange-200">partout dans le Monde</span>
+              </h1>
+              <p className="mt-4 sm:mt-6 max-w-2xl mx-auto md:mx-0 text-lg sm:text-xl text-white/95">
+                Activez votre forfait instantanément dans plus de 180 pays. Plus
+                besoin de carte physique, activez votre forfait en quelques clics.
+              </p>
+              <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row justify-center md:justify-start gap-3 sm:gap-4">
+                <Link
+                  href="/shop"
+                  onClick={() => plausible("CTA: Voir les forfaits")}
+                  aria-label="Voir tous les forfaits eSIM"
+                  className="inline-flex items-center justify-center px-6 sm:px-8 py-3 rounded-full font-semibold text-purple-700 bg-white shadow hover:bg-orange-50 transition"
+                >
+                  Voir les forfaits
+                </Link>
+                <Link
+                  href="/compatibilite"
+                  onClick={() => plausible("CTA: Vérifier compatibilité")}
+                  aria-label="Vérifier la compatibilité eSIM"
+                  className="inline-flex items-center justify-center px-6 sm:px-8 py-3 rounded-full font-semibold border border-white text-white hover:bg-white/10 transition"
+                >
+                  Vérifier la compatibilité
+                </Link>
+              </div>
+            </div>
 
-          <h1 className="text-4xl md:text-6xl font-extrabold mb-6 leading-tight max-w-4xl mx-auto">
-            Voyagez connecté, <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-orange-400">
-              simplement libre.
-            </span>
-          </h1>
-
-          <p className="text-lg md:text-xl text-gray-300 mb-10 max-w-2xl mx-auto">
-            Fini les frais d'itinérance.
-            <br className="hidden md:block" /> Installez votre eSIM en 2 minutes et profitez d'internet dans +180 pays.
-          </p>
-
-          {/* Barre de Recherche Visuelle (Redirection simple pour l'instant) */}
-          <div className="max-w-xl mx-auto bg-white/10 backdrop-blur-xl p-2 rounded-2xl border border-white/20 shadow-2xl mb-12 transform hover:scale-[1.01] transition-transform">
-            <div className="relative flex items-center">
-              <Search className="absolute left-4 w-6 h-6 text-gray-300" />
-              <input 
-                type="text" 
-                placeholder="Où allez-vous ? (ex: Japon, Bali...)" 
-                className="w-full bg-transparent rounded-xl py-4 pl-12 pr-4 text-white placeholder-gray-400 focus:outline-none text-lg font-medium"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+            {/* Visuel 3D */}
+            <div className="md:w-1/2 flex justify-center">
+              <Image
+                src="/images/hero-esim.png"
+                alt="Voyageurs FenuaSIM sélectionnant une destination eSIM"
+                width={520}
+                height={520}
+                priority
+                className="w-full h-auto max-w-xs sm:max-w-md"
               />
-              <Link 
-                href="/shop"
-                className="hidden md:block bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-xl font-bold transition-all shadow-lg shadow-purple-900/50"
-              >
-                Rechercher
-              </Link>
             </div>
           </div>
-
-          {/* Trust Badges */}
-          <div className="flex flex-wrap justify-center gap-4 md:gap-12 text-gray-300 text-sm font-medium">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-green-400" /> Installation instantanée
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-green-400" /> Pas de carte physique
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-green-400" /> Support Français 7j/7
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ----------------------------------------------------------------------------------
-          2. BANDEAU DE CONFIANCE
-         ---------------------------------------------------------------------------------- */}
-      <div className="bg-white border-b border-gray-100 py-8">
-        <div className="max-w-7xl mx-auto px-4 flex flex-wrap justify-center md:justify-between items-center gap-8 opacity-70 grayscale hover:grayscale-0 transition-all duration-500">
-          <span className="text-xl font-bold text-gray-400 flex items-center gap-2"><Star className="fill-gray-400 w-5 h-5" /> Trustpilot 4.8/5</span>
-          <span className="text-xl font-bold text-gray-400">10 000+ Voyageurs</span>
-          <span className="text-xl font-bold text-gray-400">Couverture 180+ Pays</span>
-          <span className="text-xl font-bold text-gray-400">Technologie 5G/4G</span>
         </div>
       </div>
 
-      {/* ----------------------------------------------------------------------------------
-          3. GRILLE DESTINATIONS (STYLE BENTO)
-         ---------------------------------------------------------------------------------- */}
-      <section className="py-20 bg-gray-50">
+      {/* Destinations */}
+      <div className="py-12 sm:py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          
-          <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-4">
-            <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Destinations populaires</h2>
-              <p className="text-gray-600 text-lg">Les coups de cœur de la communauté Fenuasim.</p>
-            </div>
-            <Link href="/shop" className="hidden md:flex items-center gap-2 text-purple-600 font-bold hover:text-purple-700 transition group">
-              Voir tous les pays <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </Link>
-          </div>
-
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 text-center mb-8 sm:mb-12">
+            Destinations populaires
+          </h2>
           {loading ? (
-             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="h-80 bg-gray-200 rounded-3xl animate-pulse"></div>
-                ))}
-             </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="animate-pulse bg-gray-100 rounded-xl h-40 sm:h-48"
+                />
+              ))}
+            </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {TOP_DESTINATIONS.map((region) => {
-                // On récupère les infos visuelles et les données réelles
-                const meta = DESTINATION_META[region] || DESTINATION_META["default"];
-                const minPrice = getMinPrice(region);
-                // Si aucune donnée pour ce pays, on ne l'affiche pas
-                if (minPrice === "N/A") return null;
-
-                // Mise en avant de l'Europe (Featured)
-                const isFeatured = region === "Europe";
-
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6">
+              {topDestinations.map((region) => {
+                const pkg = packagesByRegion[region]?.[0];
+                if (!pkg) return null;
                 return (
-                  <Link 
-                    href={`/shop/${encodeURIComponent(region)}`} 
-                    key={region} 
-                    className={`group relative h-80 rounded-3xl overflow-hidden cursor-pointer shadow-sm hover:shadow-2xl transition-all duration-300 ${isFeatured ? 'lg:col-span-2' : ''}`}
-                    onClick={() => plausible("Clic Destination Populaire", { region })}
-                  >
-                    {/* Image de fond */}
-                    <div className="absolute inset-0">
-                      <img 
-                        src={meta.image} 
-                        alt={region} 
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-90 group-hover:opacity-80 transition-opacity"></div>
-                    </div>
-
-                    {/* Badge */}
-                    {meta.badge && (
-                      <div className="absolute top-4 left-4 bg-white/20 backdrop-blur-md border border-white/30 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
-                        <Sparkles className="w-3 h-3 text-yellow-300 fill-yellow-300" /> {meta.badge}
-                      </div>
-                    )}
-
-                    {/* Contenu bas de carte */}
-                    <div className="absolute bottom-0 left-0 w-full p-6 text-white translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-                      <div className="flex justify-between items-end mb-1">
-                        <h3 className="text-2xl font-bold">{region}</h3>
-                        <div className="text-right">
-                          <p className="text-xs text-gray-300 font-light mb-0.5">dès</p>
-                          <p className="text-xl font-bold text-orange-400">{minPrice}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-4 text-sm text-gray-300 mb-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75">
-                         <span className="flex items-center gap-1"><Wifi className="w-3 h-3" /> Data 4G/5G</span>
-                         <span>•</span> <span>eSIM immédiate</span>
-                      </div>
-
-                      <button className="w-full bg-white text-purple-900 font-bold py-3 rounded-xl opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0 transition-all duration-300 text-sm">
-                        Voir les offres
-                      </button>
-                    </div>
-                  </Link>
+                  <PackageCard
+                    key={region}
+                    pkg={pkg}
+                    {...regionStats[region]}
+                    isPopular={true}
+                  />
                 );
               })}
             </div>
           )}
-          
-          <div className="mt-8 text-center md:hidden">
-            <Link href="/shop" className="inline-flex items-center gap-2 bg-white border border-gray-200 text-gray-800 px-6 py-3 rounded-full font-bold shadow-sm">
-              Voir les 180+ pays <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
         </div>
-      </section>
+      </div>
 
-      {/* ----------------------------------------------------------------------------------
-          4. POURQUOI NOUS (VALUE PROPOSITION)
-         ---------------------------------------------------------------------------------- */}
-      <section className="py-20 bg-gray-900 text-white rounded-t-[3rem] md:rounded-t-[5rem] -mt-8 relative z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
-            
-            <div className="space-y-8">
-              <h2 className="text-3xl md:text-5xl font-bold leading-tight">
-                Pourquoi choisir <span className="text-purple-400">Fenuasim</span> ?
-              </h2>
-              <p className="text-gray-400 text-lg">
-                Nous ne sommes pas un robot géant. Nous sommes une équipe passionnée qui veut rendre le voyage plus humain et accessible.
-              </p>
-
-              <div className="space-y-6">
-                <div className="flex gap-4">
-                  <div className="bg-purple-600/20 p-3 rounded-xl h-fit"><ShieldCheck className="w-6 h-6 text-purple-400" /></div>
-                  <div>
-                    <h4 className="text-xl font-bold mb-1">Sécurité garantie</h4>
-                    <p className="text-gray-400 text-sm">Paiement sécurisé et connexion cryptée via les réseaux officiels.</p>
-                  </div>
-                </div>
-                <div className="flex gap-4">
-                  <div className="bg-orange-500/20 p-3 rounded-xl h-fit"><Heart className="w-6 h-6 text-orange-400" /></div>
-                  <div>
-                    <h4 className="text-xl font-bold mb-1">Support humain & réactif</h4>
-                    <p className="text-gray-400 text-sm">Une question ? Notre équipe basée à Tahiti et en France vous répond.</p>
-                  </div>
-                </div>
-                <div className="flex gap-4">
-                  <div className="bg-blue-500/20 p-3 rounded-xl h-fit"><MapPin className="w-6 h-6 text-blue-400" /></div>
-                  <div>
-                    <h4 className="text-xl font-bold mb-1">Liberté totale</h4>
-                    <p className="text-gray-400 text-sm">Gardez votre numéro WhatsApp habituel tout en utilisant la data de l'eSIM.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Image d'ambiance */}
-            <div className="relative h-[400px] md:h-[500px] rounded-3xl overflow-hidden shadow-2xl border border-white/10">
-              <img 
-                src="https://images.unsplash.com/photo-1516483638261-f4dbaf036963?q=80&w=1000&auto=format&fit=crop" 
-                alt="Voyageur heureux" 
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute bottom-8 left-8 right-8 bg-white/10 backdrop-blur-md p-6 rounded-2xl border border-white/20">
-                <p className="text-white font-medium italic">"Le meilleur investissement de mon voyage au Japon. J'ai économisé 400€ de hors forfait !"</p>
-                <div className="flex gap-1 mt-2">
-                  {[...Array(5)].map((_, i) => <Star key={i} className="w-4 h-4 text-yellow-400 fill-yellow-400" />)}
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </section>
-
-      {/* ----------------------------------------------------------------------------------
-          5. COMMENT ÇA MARCHE (Step by Step)
-         ---------------------------------------------------------------------------------- */}
-      <section className="py-24 bg-white overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">C'est simple comme bonjour</h2>
-          <p className="text-gray-600 mb-16 max-w-2xl mx-auto">Plus besoin de faire la queue au guichet de l'aéroport. Tout se passe sur votre téléphone.</p>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 relative">
-            {/* Ligne connectrice (Desktop) */}
-            <div className="hidden md:block absolute top-12 left-[16%] right-[16%] h-0.5 bg-gradient-to-r from-purple-100 via-purple-300 to-purple-100 -z-0"></div>
-
-            {/* Étape 1 */}
-            <div className="relative z-10 flex flex-col items-center">
-              <div className="w-24 h-24 bg-purple-50 rounded-3xl flex items-center justify-center mb-6 shadow-sm border border-purple-100">
-                <Smartphone className="w-10 h-10 text-purple-600" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">1. Commandez</h3>
-              <p className="text-gray-600 text-sm px-8">Choisissez votre destination et votre forfait. Vous recevez votre eSIM par email instantanément.</p>
-            </div>
-
-            {/* Étape 2 */}
-            <div className="relative z-10 flex flex-col items-center">
-              <div className="w-24 h-24 bg-purple-50 rounded-3xl flex items-center justify-center mb-6 shadow-sm border border-purple-100">
-                <Zap className="w-10 h-10 text-purple-600" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">2. Scannez</h3>
-              <p className="text-gray-600 text-sm px-8">Scannez le QR code reçu dans vos réglages. C'est tout. Pas de carte plastique à insérer.</p>
-            </div>
-
-            {/* Étape 3 */}
-            <div className="relative z-10 flex flex-col items-center">
-              <div className="w-24 h-24 bg-green-50 rounded-3xl flex items-center justify-center mb-6 shadow-sm border border-green-100">
-                <Wifi className="w-10 h-10 text-green-600" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">3. Profitez</h3>
-              <p className="text-gray-600 text-sm px-8">Activez l'itinérance une fois arrivé. Vous êtes connecté automatiquement au meilleur réseau local.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ----------------------------------------------------------------------------------
-          6. AVIS CLIENTS (TRUSTPILOT)
-         ---------------------------------------------------------------------------------- */}
-      <div className="max-w-3xl mx-auto my-12 px-4">
+      {/* Avis Clients */}
+      <div className="max-w-3xl mx-auto my-12">
         <div className="bg-gradient-to-r from-purple-50 to-orange-50 rounded-2xl shadow-lg p-8 flex flex-col items-center border border-purple-100">
           <h3 className="text-2xl sm:text-3xl font-bold text-purple-800 mb-2 text-center">
             Ce que nos clients disent de FenuaSIM
           </h3>
           <p className="text-gray-700 text-center mb-6 max-w-xl">
-            Découvrez les avis de nos clients ou partagez votre expérience.
+            Votre satisfaction est notre priorité. Découvrez les avis de nos clients
+            ou partagez votre expérience pour aider d'autres voyageurs à rester
+            connectés partout dans le monde !
           </p>
           <div
             className="trustpilot-widget w-full"
@@ -491,31 +438,179 @@ export default function Home() {
               Voir tous les avis sur Trustpilot
             </a>
           </div>
+          <div className="mt-6 text-center">
+            <span className="inline-block bg-green-100 text-green-800 text-sm font-semibold px-4 py-2 rounded-full">
+              Merci à tous nos clients pour leur confiance !
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* ----------------------------------------------------------------------------------
-          7. FAQ & CTA FINAL
-         ---------------------------------------------------------------------------------- */}
+      {/* Avantages */}
       <div className="py-12 sm:py-16 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 text-center mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-12">
+            {[
+              {
+                title: "Configuration rapide",
+                desc: "Installez votre eSIM en quelques minutes et connectez-vous instantanément.",
+                icon: (
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M13 10V3L4 14h7v7l9-11h-7z"
+                  />
+                ),
+              },
+              {
+                title: "Service clientèle 7/7",
+                desc: "Notre équipe est disponible pour vous accompagner à tout moment.",
+                icon: (
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+                  />
+                ),
+              },
+              {
+                title: "Pour tous les budgets",
+                desc: "Des forfaits adaptés à tous les besoins et tous les budgets.",
+                icon: (
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                ),
+              },
+            ].map((item, i) => (
+              <div key={i} className="text-center">
+                <div className="flex justify-center">
+                  <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-full bg-purple-100 flex items-center justify-center">
+                    <svg
+                      className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      {item.icon}
+                    </svg>
+                  </div>
+                </div>
+                <h3 className="mt-4 sm:mt-6 text-lg sm:text-xl font-bold text-gray-900">
+                  {item.title}
+                </h3>
+                <p className="mt-2 sm:mt-3 text-sm sm:text-base text-gray-500 px-2">
+                  {item.desc}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Comment ça marche */}
+      <div className="py-12 sm:py-16 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 text-center mb-8 sm:mb-12">
+            Comment ça marche ?
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-12">
+            {[
+              {
+                step: 1,
+                title: "Choisissez votre forfait",
+                desc: "Sélectionnez le forfait qui correspond à vos besoins.",
+              },
+              {
+                step: 2,
+                title: "Recevez votre eSIM",
+                desc: "Obtenez votre eSIM par email avec un QR code.",
+              },
+              {
+                step: 3,
+                title: "Connectez-vous",
+                desc: "Scannez le QR code et profitez de votre connexion.",
+              },
+            ].map((item, i) => (
+              <div key={i} className="relative text-center">
+                <div className="flex justify-center">
+                  <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-full bg-gradient-to-br from-purple-600 to-orange-500 text-white flex items-center justify-center text-lg sm:text-2xl font-bold">
+                    {item.step}
+                  </div>
+                </div>
+                <h3 className="mt-4 sm:mt-6 text-lg sm:text-xl font-bold text-gray-900">
+                  {item.title}
+                </h3>
+                <p className="mt-2 sm:mt-3 text-sm sm:text-base text-gray-500 px-2">
+                  {item.desc}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* FAQ */}
+      <div className="py-12 sm:py-16 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 text-center mb-8 sm:mb-12">
             Questions fréquentes
           </h2>
-          <div className="max-w-3xl mx-auto space-y-4">
+          <div className="max-w-3xl mx-auto space-y-6">
             {[
-              { q: "Comment fonctionne l'eSIM ?", a: "L'eSIM est une carte SIM virtuelle. Plus besoin d'insérer une puce, tout se fait par scan de QR Code." },
-              { q: "Mon appareil est-il compatible ?", a: "La plupart des téléphones récents (iPhone XR+, Samsung S20+...) le sont. Vérifiez notre page de compatibilité." },
-              { q: "Quand activer mon eSIM ?", a: "Installez-la avant de partir (avec du WiFi). Elle ne s'activera qu'une fois connecté au réseau du pays de destination." },
-            ].map((item, i) => (
-               <div key={i} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                 <h3 className="font-bold text-gray-900 mb-2">{item.q}</h3>
-                 <p className="text-gray-600">{item.a}</p>
-               </div>
+              {
+                question: "Comment fonctionne l'eSIM ?",
+                answer:
+                  "L'eSIM est une carte SIM intégrée à votre appareil. Vous recevez un QR code par email que vous scannez pour activer votre forfait.",
+              },
+              {
+                question: "Mon appareil est-il compatible ?",
+                answer:
+                  "La plupart des smartphones récents sont compatibles avec l'eSIM. Vérifiez la compatibilité de votre appareil dans notre guide.",
+              },
+              {
+                question: "Quand dois-je activer mon eSIM ?",
+                answer:
+                  "Vous pouvez installer votre eSIM avant votre voyage, mais elle ne s'activera qu'à votre arrivée à destination.",
+              },
+            ].map((faq, i) => (
+              <div
+                key={i}
+                className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow border border-purple-100"
+              >
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {faq.question}
+                </h3>
+                <p className="mt-2 text-sm sm:text-base text-gray-500">
+                  {faq.answer}
+                </p>
+              </div>
             ))}
-            
-            <div className="text-center mt-8">
-              <Link href="/faq" className="text-purple-600 font-bold hover:underline">Voir toutes les questions &rarr;</Link>
+            <div className="text-center mt-6 sm:mt-8">
+              <Link
+                href="/faq"
+                className="inline-flex items-center text-purple-600 hover:text-purple-700 font-medium text-sm sm:text-base"
+              >
+                Voir toutes les FAQ
+                <svg
+                  className="ml-2 h-4 w-4 sm:h-5 sm:w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M17 8l4 4m0 0l-4 4m4-4H3"
+                  />
+                </svg>
+              </Link>
             </div>
           </div>
         </div>

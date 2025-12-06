@@ -6,7 +6,7 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-export const runtime = 'edge'; // <--- Indispensable pour la vitesse et éviter les timeouts
+export const runtime = 'edge';
 
 export async function POST(req: Request) {
   const { messages } = await req.json();
@@ -15,11 +15,14 @@ export async function POST(req: Request) {
     model: 'gpt-3.5-turbo',
     stream: true,
     messages: [
-        systemPrompt, 
-        ...messages
+      systemPrompt, 
+      ...messages
     ],
   });
 
-  const stream = OpenAIStream(response);
+  // --- CORRECTION ICI ---
+  // On ajoute "as any" pour dire à TypeScript d'ignorer la petite différence de version
+  const stream = OpenAIStream(response as any);
+  
   return new StreamingTextResponse(stream);
 }

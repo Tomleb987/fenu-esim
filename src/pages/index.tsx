@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
 import Head from "next/head";
@@ -6,9 +8,17 @@ import { supabase } from "@/lib/supabaseClient";
 import PackageCard from "@/components/shop/PackageCard";
 import type { Database } from "@/lib/supabase/config";
 import ChatWidget from "@/components/ChatWidget";
-import { 
-  ArrowRight, Wifi, CheckCircle, ShieldCheck, MapPin, Globe, ChevronDown, 
-  Star, Smartphone, Zap 
+import {
+  ArrowRight,
+  Wifi,
+  CheckCircle,
+  ShieldCheck,
+  MapPin,
+  Globe,
+  ChevronDown,
+  Star,
+  Smartphone,
+  Zap,
 } from "lucide-react";
 
 // --- CONSTANTES ---
@@ -25,13 +35,6 @@ const TOP_DESTINATIONS = [
   "Asie",
   "Monde",
 ];
-
-// Taux de change (Base EUR)
-const EXCHANGE_RATES = {
-  EUR: 1,
-  USD: 1.08,  // 1 EUR = 1.08 USD
-  XPF: 119.33 // 1 EUR = 119.33 XPF (Taux fixe)
-};
 
 const REGION_TRANSLATIONS: Record<string, string> = {
   "Discover Global": "Monde",
@@ -188,8 +191,9 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   
   // --- GESTION DE LA DEVISE ---
-  const [currency, setCurrency] = useState("EUR"); 
+  const [currency, setCurrency] = useState<"EUR" | "XPF" | "USD">("EUR"); 
   const [showCurrencyMenu, setShowCurrencyMenu] = useState(false);
+  const [margin, setMargin] = useState(0);
 
   const plausible = useCallback((event: string, props?: Record<string, any>) => {
     if (typeof window !== "undefined" && (window as any).plausible) {
@@ -210,7 +214,22 @@ export default function Home() {
     fetchPackages();
   }, []);
 
-  // Trustpilot
+  // Récupération devise & marge depuis localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const cur = localStorage.getItem("currency") as
+        | "EUR"
+        | "USD"
+        | "XPF"
+        | null;
+      if (cur) setCurrency(cur);
+
+      const storedMargin = parseFloat(localStorage.getItem("global_margin") || "0");
+      setMargin(storedMargin);
+    }
+  }, []);
+
+  // Trustpilot widget
   useEffect(() => {
     const script = document.createElement("script");
     script.src = "https://invitejs.trustpilot.com/tp.min.js";
@@ -228,6 +247,18 @@ export default function Home() {
     };
   }, []);
 
+  // Helper pour obtenir le prix selon la devise
+  const getPrice = (pkg: Package, currency: string): number => {
+    switch (currency) {
+      case "USD":
+        return pkg.final_price_usd || 0;
+      case "XPF":
+        return pkg.final_price_xpf || 0;
+      default:
+        return pkg.final_price_eur || 0;
+    }
+  };
+
   // Group forfaits by region
   const packagesByRegion = packages.reduce(
     (acc, pkg) => {
@@ -239,15 +270,19 @@ export default function Home() {
     {} as Record<string, Package[]>
   );
 
-  // Stats per region
-  // On calcule ici les valeurs, mais on ne fait pas de formatage texte pour ne pas casser le composant enfant
+  // Stats per region (UTILISATION DE getPrice POUR LA CONVERSION)
   const regionStats = Object.entries(packagesByRegion).reduce(
     (acc, [region, pkgs]) => {
-      // 1. Calcul du prix MINIMUM en EUR (Brut)
-      const minPriceEur = Math.min(...pkgs.map((p) => p.final_price_eur ?? 0));
+      // Calcul des prix avec la fonction getPrice qui gère la devise active
+      const prices = pkgs.map((p) => getPrice(p, currency)).filter((p) => p > 0);
       
-      // 2. Gestion si aucune donnée (évite -Infinity ou NaN)
-      const safeMinPriceEur = minPriceEur === Infinity ? 0 : minPriceEur;
+      // Calcul du min et max
+      const minPriceRaw = prices.length > 0 ? Math.min(...prices) : 0;
+      const maxPriceRaw = prices.length > 0 ? Math.max(...prices) : 0;
+
+      // Application de la marge (si elle existe)
+      const minPrice = minPriceRaw * (1 + margin);
+      const maxPrice = maxPriceRaw * (1 + margin);
 
       acc[region] = {
         minData: Math.min(...pkgs.map((p) => p.data_amount ?? 0)),
@@ -261,8 +296,11 @@ export default function Home() {
             parseInt(p.validity?.toString().split(" ")[0] || "0")
           )
         ),
-        minPriceEur: safeMinPriceEur, // On stocke la valeur EUR de base
+        minPrice: minPrice, // Le prix est maintenant dans la bonne devise + marge
+        maxPrice: maxPrice,
         packageCount: pkgs.length,
+        // On garde aussi le nom original pour les liens si besoin
+        originalRegion: pkgs[0]?.region || pkgs[0]?.region_fr || region
       };
       return acc;
     },
@@ -321,9 +359,9 @@ export default function Home() {
 
             {showCurrencyMenu && (
               <div className="absolute right-0 mt-2 w-32 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50 flex flex-col">
-                <button onClick={() => { setCurrency("EUR"); setShowCurrencyMenu(false); }} className="px-4 py-2 text-left hover:bg-purple-50 text-sm font-medium text-gray-700">EUR (€)</button>
-                <button onClick={() => { setCurrency("USD"); setShowCurrencyMenu(false); }} className="px-4 py-2 text-left hover:bg-purple-50 text-sm font-medium text-gray-700">USD ($)</button>
-                <button onClick={() => { setCurrency("XPF"); setShowCurrencyMenu(false); }} className="px-4 py-2 text-left hover:bg-purple-50 text-sm font-medium text-gray-700">XPF (₣)</button>
+                <button onClick={() => { setCurrency("EUR"); localStorage.setItem("currency", "EUR"); setShowCurrencyMenu(false); }} className="px-4 py-2 text-left hover:bg-purple-50 text-sm font-medium text-gray-700">EUR (€)</button>
+                <button onClick={() => { setCurrency("USD"); localStorage.setItem("currency", "USD"); setShowCurrencyMenu(false); }} className="px-4 py-2 text-left hover:bg-purple-50 text-sm font-medium text-gray-700">USD ($)</button>
+                <button onClick={() => { setCurrency("XPF"); localStorage.setItem("currency", "XPF"); setShowCurrencyMenu(false); }} className="px-4 py-2 text-left hover:bg-purple-50 text-sm font-medium text-gray-700">XPF (₣)</button>
               </div>
             )}
           </div>
@@ -408,7 +446,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Destinations (PRIX DYNAMIQUES CORRIGÉS) */}
+      {/* Destinations */}
       <div className="py-12 sm:py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 text-center mb-8 sm:mb-12">
@@ -424,35 +462,16 @@ export default function Home() {
                 const pkg = packagesByRegion[region]?.[0];
                 if (!pkg) return null;
                 
-                // 1. Récupération des stats (le minPriceEur calculé dans regionStats)
+                // On récupère les stats calculées avec la bonne devise
                 const stats = regionStats[region];
-                
-                // 2. Conversion du prix
-                // @ts-ignore
-                const rate = EXCHANGE_RATES[currency] || 1;
-                // Calcul de la valeur numérique
-                const convertedValue = (stats.minPriceEur || 0) * rate;
-                
-                // 3. Choix du symbole
-                let symbol = "€";
-                if (currency === "USD") symbol = "$";
-                if (currency === "XPF") symbol = "F";
 
                 return (
                   <PackageCard
                     key={region}
                     pkg={pkg}
                     {...stats}
-                    
-                    // CORRECTION ICI : On passe la valeur convertie (NOMBRE) à minPrice
-                    // pour que le composant puisse faire ses calculs s'il en a besoin
-                    // Si PackageCard affiche juste la valeur, il affichera "4.32" (pour USD).
-                    minPrice={convertedValue} 
-                    
-                    // On passe aussi la devise pour information (si PackageCard le supporte)
+                    // On passe la devise pour que PackageCard affiche le bon symbole
                     currency={currency}
-                    currencySymbol={symbol}
-                    
                     isPopular={true}
                   />
                 );

@@ -1,185 +1,156 @@
 "use client";
-
 import { useState } from "react";
+import { Phone, Settings, AlertTriangle, CheckCircle, Smartphone } from "lucide-react"; // Assure-toi d'avoir lucide-react ou utilise des emojis
 
-/* -------------------------------------------------
-   📌 LISTE COMPLÈTE DES TERMINAUX COMPATIBLES eSIM
---------------------------------------------------*/
-
-interface Device {
-  brand: string;
-  models: string[];
-}
-
-const TERMINAUX_ESIM: Device[] = [
-  {
-    brand: "Apple",
-    models: [
-      "iPhone 16", "iPhone 16 Plus", "iPhone 16 Pro", "iPhone 16 Pro Max",
-      "iPhone 16e", "iPhone 15", "iPhone 15 Plus", "iPhone 15 Pro",
-      "iPhone 15 Pro Max", "iPhone 14", "iPhone 14 Plus", "iPhone 14 Pro",
-      "iPhone 14 Pro Max", "iPhone 13", "iPhone 13 Mini", "iPhone 13 Pro",
-      "iPhone 13 Pro Max", "iPhone 12", "iPhone 12 Mini", "iPhone 12 Pro",
-      "iPhone 12 Pro Max", "iPhone 11", "iPhone 11 Pro", "iPhone 11 Pro Max",
-      "iPhone XS", "iPhone XS Max", "iPhone XR", "iPhone SE (2020)",
-      "iPhone SE (2022)", "iPad (7e génération et +)",
-      "iPad Air (3e génération et +)", "iPad Pro 11” (tous modèles)",
-      "iPad Pro 12.9” (3e génération et +)", "iPad Mini (5e génération et +)"
-    ]
-  },
-
-  {
-    brand: "Samsung",
-    models: [
-      "Galaxy S24", "Galaxy S24+", "Galaxy S24 Ultra", "Galaxy S24 FE",
-      "Galaxy S23", "Galaxy S23+", "Galaxy S23 Ultra", "Galaxy S23 FE",
-      "Galaxy S22", "Galaxy S22+", "Galaxy S22 Ultra", "Galaxy S21",
-      "Galaxy S21+", "Galaxy S21 Ultra", "Galaxy S20", "Galaxy S20+",
-      "Galaxy S20 Ultra", "Galaxy Note 20", "Galaxy Note 20 Ultra",
-      "Galaxy Z Fold", "Galaxy Z Fold 2", "Galaxy Z Fold 3", "Galaxy Z Fold 4",
-      "Galaxy Z Fold 5", "Galaxy Z Fold 6", "Galaxy Z Flip", "Galaxy Z Flip 3",
-      "Galaxy Z Flip 4", "Galaxy Z Flip 5", "Galaxy Z Flip 6", "Galaxy A23 5G",
-      "Galaxy A35 5G", "Galaxy A36", "Galaxy A54 5G", "Galaxy A55 5G",
-      "Galaxy A56", "Galaxy XCover7 Pro", "Galaxy Watch4", "Galaxy Watch5",
-      "Galaxy Watch6"
-    ]
-  },
-
-  {
-    brand: "Google",
-    models: [
-      "Pixel 9", "Pixel 9a", "Pixel 9 Pro", "Pixel 9 Pro XL",
-      "Pixel 9 Pro Fold", "Pixel 8", "Pixel 8a", "Pixel 8 Pro",
-      "Pixel 7", "Pixel 7a", "Pixel 7 Pro", "Pixel 6", "Pixel 6a",
-      "Pixel 6 Pro", "Pixel 5", "Pixel 5a", "Pixel 4", "Pixel 4 XL",
-      "Pixel 4a", "Pixel 4a 5G", "Pixel Fold"
-    ]
-  },
-
-  {
-    brand: "Oppo",
-    models: [
-      "Find X3 Pro", "Find X5", "Find X5 Pro", "Find X8", "Find X8 Pro",
-      "Find N2 Flip", "Find N5", "Reno6 Pro 5G", "Reno5 A",
-      "Reno14", "Reno14 Pro", "Oppo Watch", "Watch X2 Mini"
-    ]
-  },
-
-  {
-    brand: "Huawei",
-    models: ["P40", "P40 Pro", "Mate 40 Pro", "Watch 3", "Watch 3 Pro"]
-  },
-
-  {
-    brand: "Xiaomi",
-    models: [
-      "Xiaomi 12T Pro", "Xiaomi 13", "Xiaomi 13 Pro", "Xiaomi 13T",
-      "Xiaomi 13T Pro", "Xiaomi 13 Lite", "Xiaomi 14", "Xiaomi 14 Pro",
-      "Xiaomi 14T", "Xiaomi 14T Pro", "Xiaomi 15", "Xiaomi 15 Ultra",
-      "Poco X7"
-    ]
-  },
-
-  {
-    brand: "Redmi",
-    models: [
-      "Redmi Note 14 Pro", "Redmi Note 14 Pro 5G", "Redmi Note 14 Pro+",
-      "Redmi Note 14 Pro+ 5G", "Redmi Note 13 Pro",
-      "Redmi Note 13 Pro+", "Redmi Note 11 Pro 5G"
-    ]
-  },
-
-  {
-    brand: "Autres",
-    models: [
-      "Fairphone 4", "Fairphone 5", "Nothing Phone (3a) Pro",
-      "Nuu Mobile X5", "Realme 14 Pro+", "ASUS Zenfone 12 Ultra",
-      "ZTE nubia Flip2", "Alcatel V3 Ultra", "Surface Duo", "Surface Duo 2",
-      "Surface Pro 9", "Surface Go 3", "Surface Pro X", "Gemini PDA 4G+Wi-Fi"
-    ]
-  }
-];
-
-/* -------------------------------------------------
-   ⚙️  Vérification locale (sans Airalo)
---------------------------------------------------*/
-
-export default function Compatibilite() {
-  const [query, setQuery] = useState("");
-  const [result, setResult] = useState<string | null>(null);
-
-  const check = () => {
-    if (!query.trim()) return;
-
-    const normalized = query.toLowerCase();
-    let isCompatible = false;
-
-    for (const brand of TERMINAUX_ESIM) {
-      for (const model of brand.models) {
-        if (model.toLowerCase().includes(normalized)) {
-          isCompatible = true;
-          break;
-        }
-      }
-    }
-
-    setResult(
-      isCompatible
-        ? "✔️ Compatible eSIM"
-        : "❌ Non compatible eSIM — pensez à vérifier le EID avec *#06#"
-    );
-  };
+export default function GuideCompatibilite() {
+  const [activeTab, setActiveTab] = useState<"ios" | "android">("ios");
 
   return (
-    <div className="max-w-3xl mx-auto py-16 px-4 text-center">
-      <h1 className="text-4xl font-bold mb-8">Compatibilité eSIM</h1>
-
-      {/* Message pédagogique EID */}
-      <p className="mb-6 text-md text-gray-800 font-semibold bg-orange-50 border border-orange-200 px-4 py-4 rounded-lg">
-        Vérifiez la compatibilité immédiatement : composez <strong>*#06#</strong>.
-        <br />
-        ➜ Si un numéro <strong>EID</strong> apparaît → votre téléphone est compatible eSIM.
-        <br />
-        ➜ Si seul l’IMEI apparaît → votre appareil n’est pas compatible.
-      </p>
-
-      {/* Barre de recherche */}
-      <div className="bg-white p-6 rounded-xl shadow-md border mb-8">
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Ex : iPhone 15 Pro Max"
-          className="w-full px-4 py-2 border rounded-lg mb-4"
-        />
-
-        <button
-          onClick={check}
-          className="w-full bg-purple-600 text-white py-2 rounded-lg font-semibold hover:bg-purple-700 transition"
-        >
-          Vérifier
-        </button>
-
-        {/* Ici on garde le message simple */}
-        {result && <p className="mt-4 text-xl font-semibold">{result}</p>}
+    <div className="max-w-4xl mx-auto py-16 px-4">
+      {/* En-tête */}
+      <div className="text-center mb-12">
+        <h1 className="text-4xl font-bold text-gray-900 mb-4">
+          Votre téléphone est-il compatible eSIM ?
+        </h1>
+        <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+          Même si votre modèle est récent, certaines versions régionales (Chine, Hong Kong, etc.) ne sont pas compatibles. 
+          <span className="font-semibold text-purple-700"> La seule façon d'être sûr à 100% est de vérifier votre appareil.</span>
+        </p>
       </div>
 
-      {/* Liste complète */}
-      <div className="bg-white rounded-xl shadow p-6 border border-purple-100 text-left">
-        {TERMINAUX_ESIM.map(({ brand, models }) => (
-          <div key={brand} className="mb-6">
-            <h2 className="text-lg font-bold text-purple-700 mb-2">{brand}</h2>
-            <ul className="flex flex-wrap gap-2">
-              {models.map((m) => (
-                <li
-                  key={m}
-                  className="bg-orange-50 text-orange-700 px-3 py-1 rounded-full text-sm"
-                >
-                  {m}
-                </li>
-              ))}
+      {/* -------------------------------------------------
+          MÉTHODE 1 : LE CODE UNIVERSEL (Le plus fiable)
+         -------------------------------------------------- */}
+      <div className="bg-white rounded-2xl shadow-lg border border-purple-100 overflow-hidden mb-12 relative">
+        <div className="bg-purple-600 px-6 py-4 text-white flex items-center justify-center gap-2">
+          <Phone className="w-6 h-6" />
+          <h2 className="text-xl font-bold">Méthode rapide : le code magique</h2>
+        </div>
+        
+        <div className="p-8 md:flex items-center gap-8">
+          <div className="flex-1">
+             
+            <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-6 text-center mb-4">
+              <p className="text-gray-600 mb-2 font-medium">Ouvrez votre application téléphone et tapez :</p>
+              <p className="text-5xl font-black text-purple-700 tracking-widest my-4">*#06#</p>
+              <p className="text-sm text-gray-500">(Comme pour passer un appel)</p>
+            </div>
+          </div>
+
+          <div className="flex-1 space-y-4">
+            <h3 className="text-xl font-bold text-gray-800">Comment interpréter le résultat ?</h3>
+            <ul className="space-y-4">
+              <li className="flex items-start gap-3 bg-green-50 p-4 rounded-lg border border-green-200">
+                <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <span className="block font-bold text-green-800">C'est compatible !</span>
+                  <span className="text-sm text-green-700">
+                    Si vous voyez une ligne mentionnant <strong>EID</strong> (un numéro long de 32 chiffres).
+                  </span>
+                </div>
+              </li>
+              <li className="flex items-start gap-3 bg-red-50 p-4 rounded-lg border border-red-200">
+                <AlertTriangle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <span className="block font-bold text-red-800">Ce n'est pas compatible</span>
+                  <span className="text-sm text-red-700">
+                    Si vous ne voyez que des lignes IMEI ou MEID, sans mention de EID.
+                  </span>
+                </div>
+              </li>
             </ul>
           </div>
-        ))}
+        </div>
+      </div>
+
+      {/* -------------------------------------------------
+          MÉTHODE 2 : VÉRIFICATION DANS LES RÉGLAGES
+         -------------------------------------------------- */}
+      <div className="text-center mb-8">
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Ou vérifiez dans les réglages</h2>
+        <p className="text-gray-500">Sélectionnez votre type d'appareil pour voir le tutoriel pas à pas.</p>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden">
+        {/* Onglets */}
+        <div className="flex border-b">
+          <button
+            onClick={() => setActiveTab("ios")}
+            className={`flex-1 py-4 text-center font-bold text-lg transition-colors flex items-center justify-center gap-2
+              ${activeTab === "ios" ? "bg-purple-50 text-purple-700 border-b-4 border-purple-600" : "text-gray-500 hover:bg-gray-50"}`}
+          >
+            <Smartphone className="w-5 h-5" /> iPhone / iPad
+          </button>
+          <button
+            onClick={() => setActiveTab("android")}
+            className={`flex-1 py-4 text-center font-bold text-lg transition-colors flex items-center justify-center gap-2
+              ${activeTab === "android" ? "bg-purple-50 text-purple-700 border-b-4 border-purple-600" : "text-gray-500 hover:bg-gray-50"}`}
+          >
+            <Settings className="w-5 h-5" /> Samsung / Google / Android
+          </button>
+        </div>
+
+        {/* Contenu iOS */}
+        {activeTab === "ios" && (
+          <div className="p-8">
+            
+            <h3 className="text-xl font-bold mb-6">Sur un appareil Apple</h3>
+            <ol className="space-y-6 relative border-l-2 border-purple-100 ml-3">
+              <li className="pl-8 relative">
+                <span className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-purple-600 ring-4 ring-white"></span>
+                <p className="font-semibold text-gray-900">Allez dans les Réglages</p>
+                <p className="text-gray-600">Ouvrez l'application <strong>Réglages</strong> puis appuyez sur <strong>Données cellulaires</strong> (ou "Données mobiles").</p>
+              </li>
+              <li className="pl-8 relative">
+                <span className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-purple-600 ring-4 ring-white"></span>
+                <p className="font-semibold text-gray-900">Cherchez l'option eSIM</p>
+                <p className="text-gray-600">
+                  Si vous voyez l'option <strong>"Ajouter une eSIM"</strong> ou <strong>"Ajouter un forfait cellulaire"</strong>, votre iPhone est compatible.
+                </p>
+              </li>
+              <li className="pl-8 relative">
+                <span className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-orange-400 ring-4 ring-white"></span>
+                <div className="bg-orange-50 p-4 rounded-lg border border-orange-200 mt-2">
+                  <span className="text-orange-800 text-sm font-semibold">Note importante :</span>
+                  <p className="text-orange-700 text-sm">
+                    Si votre téléphone est bloqué par un opérateur (simlocké), vous ne pourrez peut-être pas installer d'eSIM d'un autre fournisseur.
+                  </p>
+                </div>
+              </li>
+            </ol>
+          </div>
+        )}
+
+        {/* Contenu Android */}
+        {activeTab === "android" && (
+          <div className="p-8">
+             
+            <h3 className="text-xl font-bold mb-6">Sur Samsung, Google Pixel et autres</h3>
+            <ol className="space-y-6 relative border-l-2 border-purple-100 ml-3">
+              <li className="pl-8 relative">
+                <span className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-purple-600 ring-4 ring-white"></span>
+                <p className="font-semibold text-gray-900">Accédez aux Paramètres</p>
+                <p className="text-gray-600">
+                  Allez dans <strong>Paramètres</strong> {'>'} <strong>Connexions</strong> (ou Réseau et Internet).
+                </p>
+              </li>
+              <li className="pl-8 relative">
+                <span className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-purple-600 ring-4 ring-white"></span>
+                <p className="font-semibold text-gray-900">Gestionnaire de carte SIM</p>
+                <p className="text-gray-600">
+                  Cliquez sur <strong>Gestionnaire de carte SIM</strong> (ou SIMs).
+                </p>
+              </li>
+              <li className="pl-8 relative">
+                <span className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-purple-600 ring-4 ring-white"></span>
+                <p className="font-semibold text-gray-900">Vérifiez l'option</p>
+                <p className="text-gray-600">
+                  Si vous avez une option <strong>"Ajouter un forfait mobile"</strong> ou <strong>"Ajouter une eSIM"</strong>, c'est gagné !
+                </p>
+              </li>
+            </ol>
+          </div>
+        )}
       </div>
     </div>
   );

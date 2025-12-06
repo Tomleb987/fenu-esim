@@ -31,7 +31,7 @@ export default function Contact() {
         <p className="text-lg text-gray-600 max-w-2xl mx-auto">
           Une question sur votre installation ? Un partenariat ? 
           <br className="hidden md:block" />
-          Notre équipe est basée à Tahiti et en France pour vous répondre sur tous les fuseaux horaires.
+          Notre équipe vous répondra sur tous les fuseaux horaires.
         </p>
       </div>
 

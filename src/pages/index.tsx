@@ -1,15 +1,16 @@
 import Link from "next/link";
 import Image from "next/image";
 import Head from "next/head";
-import { useRouter } from "next/router"; // ⚠️ Import nécessaire pour la recherche
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import PackageCard from "@/components/shop/PackageCard";
 import type { Database } from "@/lib/supabase/config";
 import ChatWidget from "@/components/ChatWidget";
 import { 
-  MapPin, ArrowRight, Wifi, CheckCircle, ShieldCheck 
-} from "lucide-react"; // ⚠️ Import des nouvelles icônes
+  ArrowRight, Wifi, CheckCircle, ShieldCheck, MapPin, Globe 
+} from "lucide-react";
+
+// --- CONSTANTES ---
 
 const TOP_DESTINATIONS = [
   "Europe",
@@ -24,7 +25,6 @@ const TOP_DESTINATIONS = [
   "Monde",
 ];
 
-// Translation mapping for English to French destination names
 const REGION_TRANSLATIONS: Record<string, string> = {
   "Discover Global": "Monde",
   "Asia": "Asie",
@@ -177,10 +177,8 @@ function getFrenchRegionName(regionFr: string | null, region: string | null): st
 type Package = Database["public"]["Tables"]["airalo_packages"]["Row"];
 
 export default function Home() {
-  const router = useRouter(); // <--- Initialisation du routeur
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState(""); // <--- État pour la recherche
 
   // Plausible analytics helper
   const plausible = useCallback((event: string, props?: Record<string, any>) => {
@@ -188,14 +186,6 @@ export default function Home() {
       (window as any).plausible(event, { props });
     }
   }, []);
-
-  // --- FONCTION DE RECHERCHE ---
-  const handleSearch = () => {
-    if (search.trim()) {
-      plausible("Recherche Hero", { query: search });
-      router.push(`/shop/${encodeURIComponent(search.trim())}`);
-    }
-  };
 
   // Fetch forfaits
   useEffect(() => {
@@ -269,7 +259,6 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-white">
       <Head>
-        {/* FAQ JSON-LD */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -282,8 +271,7 @@ export default function Home() {
                   "name": "Comment fonctionne l'eSIM ?",
                   "acceptedAnswer": {
                     "@type": "Answer",
-                    "text":
-                      "L'eSIM est une carte SIM intégrée à votre appareil. Vous recevez un QR code par email que vous scannez pour activer votre forfait.",
+                    "text": "L'eSIM est une carte SIM intégrée à votre appareil. Vous recevez un QR code par email que vous scannez pour activer votre forfait.",
                   },
                 },
                 {
@@ -291,17 +279,7 @@ export default function Home() {
                   "name": "Mon appareil est-il compatible ?",
                   "acceptedAnswer": {
                     "@type": "Answer",
-                    "text":
-                      "La plupart des smartphones récents sont compatibles avec l'eSIM. Vérifiez la compatibilité de votre appareil dans notre guide.",
-                  },
-                },
-                {
-                  "@type": "Question",
-                  "name": "Quand dois-je activer mon eSIM ?",
-                  "acceptedAnswer": {
-                    "@type": "Answer",
-                    "text":
-                      "Vous pouvez installer votre eSIM avant votre voyage, mais elle ne s'activera qu'à votre arrivée à destination.",
+                    "text": "La plupart des smartphones récents sont compatibles avec l'eSIM. Vérifiez la compatibilité de votre appareil dans notre guide.",
                   },
                 },
               ],
@@ -311,107 +289,115 @@ export default function Home() {
       </Head>
 
       {/* ----------------------------------------------------------------------------------
-          NOUVEAU HERO SECTION (LIGHT & SPLIT SCREEN)
+          HERO SECTION AVEC MOSAÏQUE & FOND DISCRET
          ---------------------------------------------------------------------------------- */}
-      <section className="relative w-full min-h-[700px] flex items-center bg-gradient-to-br from-white via-purple-50/30 to-orange-50/30 overflow-hidden">
+      <section className="relative w-full min-h-[600px] flex items-center bg-gradient-to-br from-purple-50 via-white to-orange-50 overflow-hidden">
         
-        {/* Éléments de fond abstraits */}
-        <div className="absolute top-[-10%] right-[-5%] w-96 h-96 bg-purple-200/40 rounded-full blur-3xl opacity-50 animate-pulse"></div>
-        <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-orange-200/40 rounded-full blur-3xl opacity-40"></div>
+        {/* Cercles décoratifs très subtils */}
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-purple-100/40 rounded-full blur-3xl opacity-60"></div>
+        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-orange-100/40 rounded-full blur-3xl opacity-60"></div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 z-10 w-full">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 z-10 w-full py-12 md:py-20">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
             
-            {/* --- COLONNE GAUCHE : TEXTE & RECHERCHE --- */}
+            {/* --- COLONNE GAUCHE : TEXTE & CTA --- */}
             <div className="text-left space-y-8">
               
-              {/* Badge */}
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-100 text-purple-700 text-sm font-bold">
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-purple-100 shadow-sm text-purple-700 text-sm font-bold">
                 <Wifi className="w-4 h-4" />
                 <span>La connexion de voyage simplifiée</span>
               </div>
 
-              {/* Titre */}
               <h1 className="text-4xl md:text-6xl font-extrabold text-gray-900 leading-tight">
                 Explorez le monde, <br />
                 restez <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-orange-500">connecté.</span>
               </h1>
 
-              {/* Sous-titre */}
-              <p className="text-xl text-gray-600 max-w-lg">
-                Activez votre eSIM en 2 minutes. Profitez de la data locale dans +180 pays, sans frais cachés, dès l'atterrissage.
+              <p className="text-lg text-gray-600 max-w-lg leading-relaxed">
+                Fini le hors forfait. Activez votre eSIM en 2 minutes et profitez de la data locale dans +180 pays dès l'atterrissage.
               </p>
 
-              {/* Widget de Recherche Style "Carte" */}
-              <div className="bg-white p-2 rounded-2xl shadow-xl border border-gray-100 flex flex-col sm:flex-row gap-2 max-w-lg">
-                <div className="relative flex-grow flex items-center">
-                   <MapPin className="absolute left-4 w-6 h-6 text-purple-500" />
-                   <input 
-                    type="text" 
-                    placeholder="Où partez-vous ? (ex: Japon)" 
-                    className="w-full bg-transparent rounded-xl py-4 pl-12 pr-4 text-gray-900 placeholder-gray-400 focus:outline-none text-lg font-medium"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleSearch();
-                    }}
-                  />
-                </div>
-                <button 
-                  onClick={handleSearch}
-                  className="sm:w-auto w-full bg-purple-600 hover:bg-purple-700 text-white px-8 py-4 rounded-xl font-bold transition-all flex items-center justify-center gap-2 shrink-0 shadow-lg shadow-purple-200"
+              {/* Nouveau Bouton Principal */}
+              <div>
+                <Link 
+                  href="/shop"
+                  className="inline-flex items-center gap-3 bg-purple-600 hover:bg-purple-700 text-white px-8 py-4 rounded-xl font-bold transition-all shadow-lg shadow-purple-200 transform hover:scale-[1.02]"
                 >
-                  Rechercher <ArrowRight className="w-5 h-5" />
-                </button>
+                  Nos destinations <ArrowRight className="w-5 h-5" />
+                </Link>
+                <p className="mt-4 text-sm text-gray-500 flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                  Installation instantanée par QR code
+                </p>
               </div>
 
-               {/* Arguments */}
-               <div className="flex flex-wrap gap-6 text-gray-600 font-medium text-sm sm:text-base">
-                  <div className="flex items-center gap-2">
-                    <div className="bg-green-100 p-1 rounded-full text-green-600"><CheckCircle className="w-4 h-4" /></div>
-                    Installation immédiate
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="bg-blue-100 p-1 rounded-full text-blue-600"><ShieldCheck className="w-4 h-4" /></div>
-                    Paiement sécurisé
-                  </div>
-               </div>
             </div>
 
-            {/* --- COLONNE DROITE : VISUEL COMPOSITE --- */}
-            <div className="relative hidden lg:block h-[600px]">
+            {/* --- COLONNE DROITE : MOSAÏQUE DESTINATIONS --- */}
+            <div className="relative hidden lg:grid grid-cols-2 gap-4 h-[500px] items-center">
               
-              {/* Image principale (Mockup Téléphone) */}
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] z-20 hover:scale-105 transition-transform duration-500">
-                 {/* Image statique, remplacez src par votre propre image si besoin */}
-                 <img 
-                   src="https://images.unsplash.com/photo-1592434134753-a70baf7979d5?q=80&w=1000&auto=format&fit=crop" 
-                   alt="App FenuaSIM" 
-                   className="w-full rounded-[2.5rem] shadow-2xl border-[8px] border-white"
-                 />
-              </div>
+              {/* Colonne d'images 1 (Décalée vers le bas) */}
+              <div className="space-y-4 pt-12">
+                 {/* Carte 1 */}
+                 <div className="relative h-48 rounded-2xl overflow-hidden shadow-lg border-4 border-white transform hover:-translate-y-1 transition-transform duration-300">
+                    <img 
+                      src="https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=600&auto=format&fit=crop" 
+                      alt="Japon" 
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                    <div className="absolute bottom-3 left-3 text-white">
+                       <p className="font-bold text-sm">Japon</p>
+                    </div>
+                 </div>
 
-              {/* Cartes flottantes */}
-              <div className="absolute top-24 right-4 bg-white p-4 rounded-2xl shadow-xl flex items-center gap-4 z-30 animate-bounce">
-                 <img src="https://flagcdn.com/w80/jp.png" alt="Japon" className="w-10 h-10 rounded-full object-cover shadow-sm border border-gray-100" />
-                 <div>
-                    <p className="font-bold text-gray-900 text-sm">Japon 5G</p>
-                    <p className="text-xs text-purple-600 font-semibold">Activé ✔</p>
+                 {/* Carte 2 */}
+                 <div className="relative h-64 rounded-2xl overflow-hidden shadow-lg border-4 border-white transform hover:-translate-y-1 transition-transform duration-300">
+                    <img 
+                      src="https://images.unsplash.com/photo-1501594907352-04cda38ebc29?q=80&w=600&auto=format&fit=crop" 
+                      alt="USA" 
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                    <div className="absolute bottom-3 left-3 text-white">
+                       <p className="font-bold text-sm">États-Unis</p>
+                    </div>
                  </div>
               </div>
 
-              <div className="absolute bottom-32 left-8 bg-white p-4 rounded-2xl shadow-xl flex items-center gap-4 z-10 animate-bounce" style={{ animationDelay: "1s" }}>
-                 <img src="https://flagcdn.com/w80/us.png" alt="USA" className="w-10 h-10 rounded-full object-cover shadow-sm border border-gray-100" />
-                 <div>
-                    <p className="font-bold text-gray-900 text-sm">USA Data</p>
-                    <p className="text-xs text-orange-500 font-semibold">4.00€ / Go</p>
+              {/* Colonne d'images 2 (Décalée vers le haut) */}
+              <div className="space-y-4 pb-12">
+                 {/* Carte 3 */}
+                 <div className="relative h-64 rounded-2xl overflow-hidden shadow-lg border-4 border-white transform hover:-translate-y-1 transition-transform duration-300">
+                    <img 
+                      src="https://images.unsplash.com/photo-1506929562872-bb421503ef21?q=80&w=600&auto=format&fit=crop" 
+                      alt="Plage" 
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                    <div className="absolute bottom-3 left-3 text-white">
+                       <p className="font-bold text-sm">Monde</p>
+                    </div>
+                 </div>
+
+                 {/* Carte 4 */}
+                 <div className="relative h-48 rounded-2xl overflow-hidden shadow-lg border-4 border-white transform hover:-translate-y-1 transition-transform duration-300">
+                    <img 
+                      src="https://images.unsplash.com/photo-1467269204594-9661b134dd2b?q=80&w=600&auto=format&fit=crop" 
+                      alt="Europe" 
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                    <div className="absolute bottom-3 left-3 text-white">
+                       <p className="font-bold text-sm">Europe</p>
+                    </div>
                  </div>
               </div>
 
-              {/* Data stat */}
-              <div className="absolute bottom-12 right-24 bg-purple-600 text-white p-4 rounded-2xl shadow-xl z-30 transform rotate-3">
-                 <p className="text-xs opacity-80 mb-1">Data restante</p>
-                 <p className="font-bold text-xl flex items-center gap-2"><Wifi className="w-5 h-5" /> 18.5 GB</p>
+              {/* Badge flottant central */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white/90 backdrop-blur-md px-6 py-3 rounded-full shadow-xl border border-white z-20 flex items-center gap-2">
+                 <Globe className="w-5 h-5 text-purple-600" />
+                 <span className="font-bold text-gray-800 text-sm whitespace-nowrap">180+ Destinations</span>
               </div>
 
             </div>
@@ -419,7 +405,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Destinations (Suite du code existant) */}
+      {/* Destinations (Reste inchangé) */}
       <div className="py-12 sm:py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 text-center mb-8 sm:mb-12">

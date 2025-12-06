@@ -7,7 +7,7 @@ import PackageCard from "@/components/shop/PackageCard";
 import type { Database } from "@/lib/supabase/config";
 import ChatWidget from "@/components/ChatWidget";
 import { 
-  ArrowRight, Wifi, CheckCircle, ShieldCheck, MapPin, Globe 
+  ArrowRight, Wifi, CheckCircle, ShieldCheck, MapPin, Globe, ChevronDown 
 } from "lucide-react";
 
 // --- CONSTANTES ---
@@ -156,7 +156,6 @@ const REGION_TRANSLATIONS: Record<string, string> = {
   "Canada": "Canada",
 };
 
-// Function to get French name with fallback to translation
 function getFrenchRegionName(regionFr: string | null, region: string | null): string {
   if (regionFr && regionFr.trim()) {
     const trimmedFr = regionFr.trim();
@@ -179,6 +178,10 @@ type Package = Database["public"]["Tables"]["airalo_packages"]["Row"];
 export default function Home() {
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // --- GESTION DE LA DEVISE ---
+  const [currency, setCurrency] = useState("EUR"); 
+  const [showCurrencyMenu, setShowCurrencyMenu] = useState(false);
 
   // Plausible analytics helper
   const plausible = useCallback((event: string, props?: Record<string, any>) => {
@@ -259,6 +262,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-white">
       <Head>
+        {/* FAQ JSON-LD */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -271,7 +275,8 @@ export default function Home() {
                   "name": "Comment fonctionne l'eSIM ?",
                   "acceptedAnswer": {
                     "@type": "Answer",
-                    "text": "L'eSIM est une carte SIM intégrée à votre appareil. Vous recevez un QR code par email que vous scannez pour activer votre forfait.",
+                    "text":
+                      "L'eSIM est une carte SIM intégrée à votre appareil. Vous recevez un QR code par email que vous scannez pour activer votre forfait.",
                   },
                 },
                 {
@@ -279,7 +284,17 @@ export default function Home() {
                   "name": "Mon appareil est-il compatible ?",
                   "acceptedAnswer": {
                     "@type": "Answer",
-                    "text": "La plupart des smartphones récents sont compatibles avec l'eSIM. Vérifiez la compatibilité de votre appareil dans notre guide.",
+                    "text":
+                      "La plupart des smartphones récents sont compatibles avec l'eSIM. Vérifiez la compatibilité de votre appareil dans notre guide.",
+                  },
+                },
+                {
+                  "@type": "Question",
+                  "name": "Quand dois-je activer mon eSIM ?",
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text":
+                      "Vous pouvez installer votre eSIM avant votre voyage, mais elle ne s'activera qu'à votre arrivée à destination.",
                   },
                 },
               ],
@@ -289,20 +304,41 @@ export default function Home() {
       </Head>
 
       {/* ----------------------------------------------------------------------------------
-          HERO SECTION AVEC MOSAÏQUE & FOND DISCRET
+          HERO SECTION (COULEUR + MOSAÏQUE + DEVISE)
          ---------------------------------------------------------------------------------- */}
-      <section className="relative w-full min-h-[600px] flex items-center bg-gradient-to-br from-purple-50 via-white to-orange-50 overflow-hidden">
+      <section className="relative w-full min-h-[600px] flex items-center bg-gradient-to-br from-purple-100 via-purple-50/30 to-orange-100 overflow-hidden">
         
-        {/* Cercles décoratifs très subtils */}
-        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-purple-100/40 rounded-full blur-3xl opacity-60"></div>
-        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-orange-100/40 rounded-full blur-3xl opacity-60"></div>
+        {/* Cercles décoratifs plus soutenus */}
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-purple-300/30 rounded-full blur-3xl opacity-70 pointer-events-none"></div>
+        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-orange-300/30 rounded-full blur-3xl opacity-70 pointer-events-none"></div>
+
+        {/* --- SELECTEUR DE DEVISE (FLOTTANT) --- */}
+        <div className="absolute top-6 right-6 md:right-12 z-50">
+          <div className="relative">
+            <button 
+              onClick={() => setShowCurrencyMenu(!showCurrencyMenu)}
+              className="flex items-center gap-2 bg-white/80 backdrop-blur-md px-4 py-2 rounded-full shadow-sm border border-gray-200 text-gray-700 font-bold hover:bg-white transition-all text-sm"
+            >
+              <Globe className="w-4 h-4 text-purple-600" />
+              <span>{currency}</span>
+              <ChevronDown className={`w-4 h-4 transition-transform ${showCurrencyMenu ? "rotate-180" : ""}`} />
+            </button>
+
+            {showCurrencyMenu && (
+              <div className="absolute right-0 mt-2 w-32 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50 flex flex-col">
+                <button onClick={() => { setCurrency("EUR"); setShowCurrencyMenu(false); }} className="px-4 py-2 text-left hover:bg-purple-50 text-sm font-medium text-gray-700">EUR (€)</button>
+                <button onClick={() => { setCurrency("USD"); setShowCurrencyMenu(false); }} className="px-4 py-2 text-left hover:bg-purple-50 text-sm font-medium text-gray-700">USD ($)</button>
+                <button onClick={() => { setCurrency("XPF"); setShowCurrencyMenu(false); }} className="px-4 py-2 text-left hover:bg-purple-50 text-sm font-medium text-gray-700">XPF (₣)</button>
+              </div>
+            )}
+          </div>
+        </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 z-10 w-full py-12 md:py-20">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
             
-            {/* --- COLONNE GAUCHE : TEXTE & CTA --- */}
+            {/* COLONNE GAUCHE : CONTENU */}
             <div className="text-left space-y-8">
-              
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-purple-100 shadow-sm text-purple-700 text-sm font-bold">
                 <Wifi className="w-4 h-4" />
                 <span>La connexion de voyage simplifiée</span>
@@ -317,7 +353,6 @@ export default function Home() {
                 Fini le hors forfait. Activez votre eSIM en 2 minutes et profitez de la data locale dans +180 pays dès l'atterrissage.
               </p>
 
-              {/* Nouveau Bouton Principal */}
               <div>
                 <Link 
                   href="/shop"
@@ -330,82 +365,65 @@ export default function Home() {
                   Installation instantanée par QR code
                 </p>
               </div>
-
             </div>
 
-            {/* --- COLONNE DROITE : MOSAÏQUE DESTINATIONS --- */}
+            {/* COLONNE DROITE : MOSAÏQUE VISUELLE */}
             <div className="relative hidden lg:grid grid-cols-2 gap-4 h-[500px] items-center">
-              
-              {/* Colonne d'images 1 (Décalée vers le bas) */}
               <div className="space-y-4 pt-12">
                  {/* Carte 1 */}
-                 <div className="relative h-48 rounded-2xl overflow-hidden shadow-lg border-4 border-white transform hover:-translate-y-1 transition-transform duration-300">
+                 <div className="relative h-48 rounded-2xl overflow-hidden shadow-lg border-4 border-white transform hover:-translate-y-1 transition-transform duration-300 group">
                     <img 
-                      src="https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=600&auto=format&fit=crop" 
+                      src="https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=600" 
                       alt="Japon" 
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                    <div className="absolute bottom-3 left-3 text-white">
-                       <p className="font-bold text-sm">Japon</p>
-                    </div>
+                    <div className="absolute bottom-3 left-3 text-white font-bold text-sm drop-shadow-md">Japon</div>
                  </div>
-
                  {/* Carte 2 */}
-                 <div className="relative h-64 rounded-2xl overflow-hidden shadow-lg border-4 border-white transform hover:-translate-y-1 transition-transform duration-300">
+                 <div className="relative h-64 rounded-2xl overflow-hidden shadow-lg border-4 border-white transform hover:-translate-y-1 transition-transform duration-300 group">
                     <img 
-                      src="https://images.unsplash.com/photo-1501594907352-04cda38ebc29?q=80&w=600&auto=format&fit=crop" 
+                      src="https://images.unsplash.com/photo-1501594907352-04cda38ebc29?q=80&w=600" 
                       alt="USA" 
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                    <div className="absolute bottom-3 left-3 text-white">
-                       <p className="font-bold text-sm">États-Unis</p>
-                    </div>
+                    <div className="absolute bottom-3 left-3 text-white font-bold text-sm drop-shadow-md">États-Unis</div>
                  </div>
               </div>
-
-              {/* Colonne d'images 2 (Décalée vers le haut) */}
               <div className="space-y-4 pb-12">
                  {/* Carte 3 */}
-                 <div className="relative h-64 rounded-2xl overflow-hidden shadow-lg border-4 border-white transform hover:-translate-y-1 transition-transform duration-300">
+                 <div className="relative h-64 rounded-2xl overflow-hidden shadow-lg border-4 border-white transform hover:-translate-y-1 transition-transform duration-300 group">
                     <img 
-                      src="https://images.unsplash.com/photo-1506929562872-bb421503ef21?q=80&w=600&auto=format&fit=crop" 
-                      alt="Plage" 
-                      className="w-full h-full object-cover"
+                      src="https://images.unsplash.com/photo-1506929562872-bb421503ef21?q=80&w=600" 
+                      alt="Monde" 
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                    <div className="absolute bottom-3 left-3 text-white">
-                       <p className="font-bold text-sm">Monde</p>
-                    </div>
+                    <div className="absolute bottom-3 left-3 text-white font-bold text-sm drop-shadow-md">Monde</div>
                  </div>
-
                  {/* Carte 4 */}
-                 <div className="relative h-48 rounded-2xl overflow-hidden shadow-lg border-4 border-white transform hover:-translate-y-1 transition-transform duration-300">
+                 <div className="relative h-48 rounded-2xl overflow-hidden shadow-lg border-4 border-white transform hover:-translate-y-1 transition-transform duration-300 group">
                     <img 
-                      src="https://images.unsplash.com/photo-1467269204594-9661b134dd2b?q=80&w=600&auto=format&fit=crop" 
+                      src="https://images.unsplash.com/photo-1467269204594-9661b134dd2b?q=80&w=600" 
                       alt="Europe" 
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                    <div className="absolute bottom-3 left-3 text-white">
-                       <p className="font-bold text-sm">Europe</p>
-                    </div>
+                    <div className="absolute bottom-3 left-3 text-white font-bold text-sm drop-shadow-md">Europe</div>
                  </div>
               </div>
-
-              {/* Badge flottant central */}
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white/90 backdrop-blur-md px-6 py-3 rounded-full shadow-xl border border-white z-20 flex items-center gap-2">
+              {/* Badge flottant */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white/90 backdrop-blur-md px-6 py-3 rounded-full shadow-xl border border-white z-20 flex items-center gap-2 animate-bounce-slow">
                  <Globe className="w-5 h-5 text-purple-600" />
                  <span className="font-bold text-gray-800 text-sm whitespace-nowrap">180+ Destinations</span>
               </div>
-
             </div>
           </div>
         </div>
       </section>
 
-      {/* Destinations (Reste inchangé) */}
+      {/* Destinations */}
       <div className="py-12 sm:py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 text-center mb-8 sm:mb-12">
@@ -440,7 +458,7 @@ export default function Home() {
       </div>
 
       {/* Avis Clients */}
-      <div className="max-w-3xl mx-auto my-12">
+      <div className="max-w-3xl mx-auto my-12 px-4">
         <div className="bg-gradient-to-r from-purple-50 to-orange-50 rounded-2xl shadow-lg p-8 flex flex-col items-center border border-purple-100">
           <h3 className="text-2xl sm:text-3xl font-bold text-purple-800 mb-2 text-center">
             Ce que nos clients disent de FenuaSIM

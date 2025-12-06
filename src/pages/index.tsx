@@ -7,7 +7,8 @@ import PackageCard from "@/components/shop/PackageCard";
 import type { Database } from "@/lib/supabase/config";
 import ChatWidget from "@/components/ChatWidget";
 import { 
-  ArrowRight, Wifi, CheckCircle, ShieldCheck, MapPin, Globe, ChevronDown 
+  ArrowRight, Wifi, CheckCircle, ShieldCheck, MapPin, Globe, ChevronDown, 
+  Star, Smartphone, Zap 
 } from "lucide-react";
 
 // --- CONSTANTES ---
@@ -197,7 +198,6 @@ export default function Home() {
     const converted = priceInEur * rate;
     
     if (currency === "XPF") {
-      // Pour le XPF on arrondit sans décimales
       return Math.round(converted).toLocaleString('fr-FR') + " F";
     } else if (currency === "USD") {
       return "$" + converted.toFixed(2);
@@ -254,7 +254,7 @@ export default function Home() {
     {} as Record<string, Package[]>
   );
 
-  // Stats per region (On garde le minPriceEur brut ici)
+  // Stats per region (On garde le minPriceEur brut pour le calcul)
   const regionStats = Object.entries(packagesByRegion).reduce(
     (acc, [region, pkgs]) => {
       const minPriceEur = Math.min(...pkgs.map((p) => p.final_price_eur ?? 0));
@@ -271,7 +271,7 @@ export default function Home() {
             parseInt(p.validity?.toString().split(" ")[0] || "0")
           )
         ),
-        minPriceEur: minPriceEur, // On stocke la valeur brute
+        minPriceEur: minPriceEur, 
         packageCount: pkgs.length,
       };
       return acc;
@@ -310,11 +310,11 @@ export default function Home() {
       </Head>
 
       {/* ----------------------------------------------------------------------------------
-          HERO SECTION AVEC SÉLECTEUR DE DEVISE & MOSAÏQUE
+          HERO SECTION (COMPATIBLE MOBILE & DESKTOP + DEVISE)
          ---------------------------------------------------------------------------------- */}
       <section className="relative w-full min-h-[600px] flex items-center bg-gradient-to-br from-purple-100 via-purple-50/30 to-orange-100 overflow-hidden">
         
-        {/* Cercles décoratifs plus soutenus */}
+        {/* Cercles décoratifs */}
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-purple-300/30 rounded-full blur-3xl opacity-70 pointer-events-none"></div>
         <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-orange-300/30 rounded-full blur-3xl opacity-70 pointer-events-none"></div>
 
@@ -343,8 +343,8 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 z-10 w-full py-12 md:py-20">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
             
-            {/* COLONNE GAUCHE */}
-            <div className="text-left space-y-8">
+            {/* --- COLONNE GAUCHE : CONTENU --- */}
+            <div className="text-left space-y-8 pt-8 lg:pt-0">
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-purple-100 shadow-sm text-purple-700 text-sm font-bold">
                 <Wifi className="w-4 h-4" />
                 <span>La connexion de voyage simplifiée</span>
@@ -373,7 +373,21 @@ export default function Home() {
               </div>
             </div>
 
-            {/* COLONNE DROITE : MOSAÏQUE VISUELLE */}
+            {/* --- VERSION MOBILE (VISIBLE UNIQUEMENT SUR PETITS ÉCRANS) --- */}
+            <div className="block lg:hidden mt-4">
+              <div className="grid grid-cols-2 gap-4 h-40">
+                 <div className="relative rounded-2xl overflow-hidden shadow-lg border-2 border-white transform translate-y-3">
+                    <img src="https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=600" alt="Japon" className="w-full h-full object-cover" />
+                    <div className="absolute bottom-2 left-2 text-white font-bold text-xs drop-shadow-md">Japon</div>
+                 </div>
+                 <div className="relative rounded-2xl overflow-hidden shadow-lg border-2 border-white transform -translate-y-3">
+                    <img src="https://images.unsplash.com/photo-1501594907352-04cda38ebc29?q=80&w=600" alt="USA" className="w-full h-full object-cover" />
+                    <div className="absolute bottom-2 left-2 text-white font-bold text-xs drop-shadow-md">États-Unis</div>
+                 </div>
+              </div>
+            </div>
+
+            {/* --- VERSION DESKTOP (MOSAÏQUE COMPLÈTE) --- */}
             <div className="relative hidden lg:grid grid-cols-2 gap-4 h-[500px] items-center">
               <div className="space-y-4 pt-12">
                  <div className="relative h-48 rounded-2xl overflow-hidden shadow-lg border-4 border-white transform hover:-translate-y-1 transition-transform duration-300 group">
@@ -400,11 +414,12 @@ export default function Home() {
                  <span className="font-bold text-gray-800 text-sm whitespace-nowrap">180+ Destinations</span>
               </div>
             </div>
+
           </div>
         </div>
       </section>
 
-      {/* Destinations (AVEC PRIX DYNAMIQUES) */}
+      {/* Destinations (PRIX DYNAMIQUES) */}
       <div className="py-12 sm:py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 text-center mb-8 sm:mb-12">
@@ -431,7 +446,7 @@ export default function Home() {
                     key={region}
                     pkg={pkg}
                     {...stats}
-                    // 3. On passe le prix converti en string
+                    // 3. On passe le prix converti en string à la carte
                     minPrice={displayPrice} 
                     isPopular={true}
                   />
@@ -453,7 +468,46 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Avantages & FAQ */}
+      {/* Avantages */}
+      <div className="py-12 sm:py-16 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-12">
+            {[{title: "Configuration rapide", desc: "Installez votre eSIM en quelques minutes.", icon: <Smartphone className="w-8 h-8 text-purple-600"/>},
+              {title: "Service clientèle 7/7", desc: "Notre équipe est disponible pour vous accompagner.", icon: <ShieldCheck className="w-8 h-8 text-purple-600"/>},
+              {title: "Pour tous les budgets", desc: "Des forfaits adaptés à tous les besoins.", icon: <Star className="w-8 h-8 text-purple-600"/>}
+            ].map((item, i) => (
+              <div key={i} className="text-center">
+                <div className="flex justify-center mb-4">
+                  <div className="h-16 w-16 rounded-full bg-purple-100 flex items-center justify-center">{item.icon}</div>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900">{item.title}</h3>
+                <p className="mt-2 text-gray-500">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Comment ça marche */}
+      <div className="py-12 sm:py-16 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-3xl font-extrabold text-gray-900 text-center mb-12">Comment ça marche ?</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+            {[{step: 1, title: "Choisissez", desc: "Sélectionnez votre destination et forfait."},
+              {step: 2, title: "Recevez", desc: "QR code reçu instantanément par email."},
+              {step: 3, title: "Connectez", desc: "Scannez et profitez d'internet."}
+            ].map((item, i) => (
+              <div key={i} className="text-center">
+                <div className="inline-flex h-16 w-16 rounded-full bg-gradient-to-br from-purple-600 to-orange-500 text-white items-center justify-center text-2xl font-bold mb-6">{item.step}</div>
+                <h3 className="text-xl font-bold text-gray-900">{item.title}</h3>
+                <p className="mt-2 text-gray-500">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* FAQ */}
       <div className="py-12 sm:py-16 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 text-center mb-8">Questions fréquentes</h2>

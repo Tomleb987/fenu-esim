@@ -25,6 +25,13 @@ const TOP_DESTINATIONS = [
   "Monde",
 ];
 
+// Taux de change (Base EUR)
+const EXCHANGE_RATES = {
+  EUR: 1,
+  USD: 1.08,  // 1 EUR = 1.08 USD
+  XPF: 119.33 // 1 EUR = 119.33 XPF (Taux fixe)
+};
+
 const REGION_TRANSLATIONS: Record<string, string> = {
   "Discover Global": "Monde",
   "Asia": "Asie",
@@ -183,7 +190,22 @@ export default function Home() {
   const [currency, setCurrency] = useState("EUR"); 
   const [showCurrencyMenu, setShowCurrencyMenu] = useState(false);
 
-  // Plausible analytics helper
+  // Fonction de conversion
+  const convertPrice = (priceInEur: number) => {
+    // @ts-ignore
+    const rate = EXCHANGE_RATES[currency] || 1;
+    const converted = priceInEur * rate;
+    
+    if (currency === "XPF") {
+      // Pour le XPF on arrondit sans décimales
+      return Math.round(converted).toLocaleString('fr-FR') + " F";
+    } else if (currency === "USD") {
+      return "$" + converted.toFixed(2);
+    } else {
+      return converted.toFixed(2) + " €";
+    }
+  };
+
   const plausible = useCallback((event: string, props?: Record<string, any>) => {
     if (typeof window !== "undefined" && (window as any).plausible) {
       (window as any).plausible(event, { props });
@@ -203,7 +225,7 @@ export default function Home() {
     fetchPackages();
   }, []);
 
-  // Trustpilot widget
+  // Trustpilot
   useEffect(() => {
     const script = document.createElement("script");
     script.src = "https://invitejs.trustpilot.com/tp.min.js";
@@ -232,9 +254,11 @@ export default function Home() {
     {} as Record<string, Package[]>
   );
 
-  // Stats per region
+  // Stats per region (On garde le minPriceEur brut ici)
   const regionStats = Object.entries(packagesByRegion).reduce(
     (acc, [region, pkgs]) => {
+      const minPriceEur = Math.min(...pkgs.map((p) => p.final_price_eur ?? 0));
+      
       acc[region] = {
         minData: Math.min(...pkgs.map((p) => p.data_amount ?? 0)),
         maxData: Math.max(...pkgs.map((p) => p.data_amount ?? 0)),
@@ -247,7 +271,7 @@ export default function Home() {
             parseInt(p.validity?.toString().split(" ")[0] || "0")
           )
         ),
-        minPrice: Math.min(...pkgs.map((p) => p.final_price_eur ?? 0)),
+        minPriceEur: minPriceEur, // On stocke la valeur brute
         packageCount: pkgs.length,
       };
       return acc;
@@ -262,7 +286,6 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-white">
       <Head>
-        {/* FAQ JSON-LD */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -273,29 +296,12 @@ export default function Home() {
                 {
                   "@type": "Question",
                   "name": "Comment fonctionne l'eSIM ?",
-                  "acceptedAnswer": {
-                    "@type": "Answer",
-                    "text":
-                      "L'eSIM est une carte SIM intégrée à votre appareil. Vous recevez un QR code par email que vous scannez pour activer votre forfait.",
-                  },
+                  "acceptedAnswer": { "@type": "Answer", "text": "L'eSIM est une carte SIM intégrée à votre appareil..." },
                 },
                 {
                   "@type": "Question",
                   "name": "Mon appareil est-il compatible ?",
-                  "acceptedAnswer": {
-                    "@type": "Answer",
-                    "text":
-                      "La plupart des smartphones récents sont compatibles avec l'eSIM. Vérifiez la compatibilité de votre appareil dans notre guide.",
-                  },
-                },
-                {
-                  "@type": "Question",
-                  "name": "Quand dois-je activer mon eSIM ?",
-                  "acceptedAnswer": {
-                    "@type": "Answer",
-                    "text":
-                      "Vous pouvez installer votre eSIM avant votre voyage, mais elle ne s'activera qu'à votre arrivée à destination.",
-                  },
+                  "acceptedAnswer": { "@type": "Answer", "text": "La plupart des smartphones récents sont compatibles..." },
                 },
               ],
             }),
@@ -304,7 +310,7 @@ export default function Home() {
       </Head>
 
       {/* ----------------------------------------------------------------------------------
-          HERO SECTION (COULEUR + MOSAÏQUE + DEVISE)
+          HERO SECTION AVEC SÉLECTEUR DE DEVISE & MOSAÏQUE
          ---------------------------------------------------------------------------------- */}
       <section className="relative w-full min-h-[600px] flex items-center bg-gradient-to-br from-purple-100 via-purple-50/30 to-orange-100 overflow-hidden">
         
@@ -337,7 +343,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 z-10 w-full py-12 md:py-20">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
             
-            {/* COLONNE GAUCHE : CONTENU */}
+            {/* COLONNE GAUCHE */}
             <div className="text-left space-y-8">
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-purple-100 shadow-sm text-purple-700 text-sm font-bold">
                 <Wifi className="w-4 h-4" />
@@ -370,50 +376,25 @@ export default function Home() {
             {/* COLONNE DROITE : MOSAÏQUE VISUELLE */}
             <div className="relative hidden lg:grid grid-cols-2 gap-4 h-[500px] items-center">
               <div className="space-y-4 pt-12">
-                 {/* Carte 1 */}
                  <div className="relative h-48 rounded-2xl overflow-hidden shadow-lg border-4 border-white transform hover:-translate-y-1 transition-transform duration-300 group">
-                    <img 
-                      src="https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=600" 
-                      alt="Japon" 
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                    <img src="https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=600" alt="Japon" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                     <div className="absolute bottom-3 left-3 text-white font-bold text-sm drop-shadow-md">Japon</div>
                  </div>
-                 {/* Carte 2 */}
                  <div className="relative h-64 rounded-2xl overflow-hidden shadow-lg border-4 border-white transform hover:-translate-y-1 transition-transform duration-300 group">
-                    <img 
-                      src="https://images.unsplash.com/photo-1501594907352-04cda38ebc29?q=80&w=600" 
-                      alt="USA" 
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                    <img src="https://images.unsplash.com/photo-1501594907352-04cda38ebc29?q=80&w=600" alt="USA" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                     <div className="absolute bottom-3 left-3 text-white font-bold text-sm drop-shadow-md">États-Unis</div>
                  </div>
               </div>
               <div className="space-y-4 pb-12">
-                 {/* Carte 3 */}
                  <div className="relative h-64 rounded-2xl overflow-hidden shadow-lg border-4 border-white transform hover:-translate-y-1 transition-transform duration-300 group">
-                    <img 
-                      src="https://images.unsplash.com/photo-1506929562872-bb421503ef21?q=80&w=600" 
-                      alt="Monde" 
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                    <img src="https://images.unsplash.com/photo-1506929562872-bb421503ef21?q=80&w=600" alt="Monde" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                     <div className="absolute bottom-3 left-3 text-white font-bold text-sm drop-shadow-md">Monde</div>
                  </div>
-                 {/* Carte 4 */}
                  <div className="relative h-48 rounded-2xl overflow-hidden shadow-lg border-4 border-white transform hover:-translate-y-1 transition-transform duration-300 group">
-                    <img 
-                      src="https://images.unsplash.com/photo-1467269204594-9661b134dd2b?q=80&w=600" 
-                      alt="Europe" 
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                    <img src="https://images.unsplash.com/photo-1467269204594-9661b134dd2b?q=80&w=600" alt="Europe" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                     <div className="absolute bottom-3 left-3 text-white font-bold text-sm drop-shadow-md">Europe</div>
                  </div>
               </div>
-              {/* Badge flottant */}
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white/90 backdrop-blur-md px-6 py-3 rounded-full shadow-xl border border-white z-20 flex items-center gap-2 animate-bounce-slow">
                  <Globe className="w-5 h-5 text-purple-600" />
                  <span className="font-bold text-gray-800 text-sm whitespace-nowrap">180+ Destinations</span>
@@ -423,7 +404,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Destinations */}
+      {/* Destinations (AVEC PRIX DYNAMIQUES) */}
       <div className="py-12 sm:py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 text-center mb-8 sm:mb-12">
@@ -431,23 +412,27 @@ export default function Home() {
           </h2>
           {loading ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="animate-pulse bg-gray-100 rounded-xl h-40 sm:h-48"
-                />
-              ))}
+              {Array.from({ length: 5 }).map((_, i) => <div key={i} className="animate-pulse bg-gray-100 rounded-xl h-40 sm:h-48" />)}
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6">
               {topDestinations.map((region) => {
                 const pkg = packagesByRegion[region]?.[0];
                 if (!pkg) return null;
+                
+                // 1. On récupère les stats
+                const stats = regionStats[region];
+                
+                // 2. On convertit le prix min
+                const displayPrice = convertPrice(stats.minPriceEur);
+
                 return (
                   <PackageCard
                     key={region}
                     pkg={pkg}
-                    {...regionStats[region]}
+                    {...stats}
+                    // 3. On passe le prix converti en string
+                    minPrice={displayPrice} 
                     isPopular={true}
                   />
                 );
@@ -460,205 +445,27 @@ export default function Home() {
       {/* Avis Clients */}
       <div className="max-w-3xl mx-auto my-12 px-4">
         <div className="bg-gradient-to-r from-purple-50 to-orange-50 rounded-2xl shadow-lg p-8 flex flex-col items-center border border-purple-100">
-          <h3 className="text-2xl sm:text-3xl font-bold text-purple-800 mb-2 text-center">
-            Ce que nos clients disent de FenuaSIM
-          </h3>
-          <p className="text-gray-700 text-center mb-6 max-w-xl">
-            Votre satisfaction est notre priorité. Découvrez les avis de nos clients
-            ou partagez votre expérience pour aider d'autres voyageurs à rester
-            connectés partout dans le monde !
-          </p>
-          <div
-            className="trustpilot-widget w-full"
-            data-locale="fr-FR"
-            data-template-id="53aa8807dec7e10d38f59f32"
-            data-businessunit-id="t5j5yxc20tHVgyo"
-            data-style-height="500px"
-            data-style-width="100%"
-            data-theme="light"
-          >
-            <a
-              href="https://fr.trustpilot.com/review/fenuasim.com"
-              target="_blank"
-              rel="noopener"
-              className="text-purple-700 underline flex justify-center"
-            >
-              Voir tous les avis sur Trustpilot
-            </a>
-          </div>
-          <div className="mt-6 text-center">
-            <span className="inline-block bg-green-100 text-green-800 text-sm font-semibold px-4 py-2 rounded-full">
-              Merci à tous nos clients pour leur confiance !
-            </span>
+          <h3 className="text-2xl sm:text-3xl font-bold text-purple-800 mb-2 text-center">Ce que nos clients disent de FenuaSIM</h3>
+          <p className="text-gray-700 text-center mb-6 max-w-xl">Votre satisfaction est notre priorité.</p>
+          <div className="trustpilot-widget w-full" data-locale="fr-FR" data-template-id="53aa8807dec7e10d38f59f32" data-businessunit-id="t5j5yxc20tHVgyo" data-style-height="500px" data-style-width="100%" data-theme="light">
+            <a href="https://fr.trustpilot.com/review/fenuasim.com" target="_blank" rel="noopener" className="text-purple-700 underline flex justify-center">Voir tous les avis sur Trustpilot</a>
           </div>
         </div>
       </div>
 
-      {/* Avantages */}
+      {/* Avantages & FAQ */}
       <div className="py-12 sm:py-16 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-12">
-            {[
-              {
-                title: "Configuration rapide",
-                desc: "Installez votre eSIM en quelques minutes et connectez-vous instantanément.",
-                icon: (
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M13 10V3L4 14h7v7l9-11h-7z"
-                  />
-                ),
-              },
-              {
-                title: "Service clientèle 7/7",
-                desc: "Notre équipe est disponible pour vous accompagner à tout moment.",
-                icon: (
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
-                  />
-                ),
-              },
-              {
-                title: "Pour tous les budgets",
-                desc: "Des forfaits adaptés à tous les besoins et tous les budgets.",
-                icon: (
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                ),
-              },
-            ].map((item, i) => (
-              <div key={i} className="text-center">
-                <div className="flex justify-center">
-                  <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-full bg-purple-100 flex items-center justify-center">
-                    <svg
-                      className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      {item.icon}
-                    </svg>
-                  </div>
-                </div>
-                <h3 className="mt-4 sm:mt-6 text-lg sm:text-xl font-bold text-gray-900">
-                  {item.title}
-                </h3>
-                <p className="mt-2 sm:mt-3 text-sm sm:text-base text-gray-500 px-2">
-                  {item.desc}
-                </p>
-              </div>
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 text-center mb-8">Questions fréquentes</h2>
+          <div className="max-w-3xl mx-auto space-y-4">
+            {[{q: "Comment fonctionne l'eSIM ?", a: "Vous recevez un QR code par email, vous scannez, c'est connecté."}, {q: "Mon appareil est-il compatible ?", a: "La majorité des téléphones récents le sont. Vérifiez notre page compatibilité."}, {q: "Quand activer mon eSIM ?", a: "Installez-la avant de partir, elle s'activera sur place."}].map((item, i) => (
+               <div key={i} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                 <h3 className="font-bold text-gray-900 mb-2">{item.q}</h3>
+                 <p className="text-gray-600">{item.a}</p>
+               </div>
             ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Comment ça marche */}
-      <div className="py-12 sm:py-16 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 text-center mb-8 sm:mb-12">
-            Comment ça marche ?
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-12">
-            {[
-              {
-                step: 1,
-                title: "Choisissez votre forfait",
-                desc: "Sélectionnez le forfait qui correspond à vos besoins.",
-              },
-              {
-                step: 2,
-                title: "Recevez votre eSIM",
-                desc: "Obtenez votre eSIM par email avec un QR code.",
-              },
-              {
-                step: 3,
-                title: "Connectez-vous",
-                desc: "Scannez le QR code et profitez de votre connexion.",
-              },
-            ].map((item, i) => (
-              <div key={i} className="relative text-center">
-                <div className="flex justify-center">
-                  <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-full bg-gradient-to-br from-purple-600 to-orange-500 text-white flex items-center justify-center text-lg sm:text-2xl font-bold">
-                    {item.step}
-                  </div>
-                </div>
-                <h3 className="mt-4 sm:mt-6 text-lg sm:text-xl font-bold text-gray-900">
-                  {item.title}
-                </h3>
-                <p className="mt-2 sm:mt-3 text-sm sm:text-base text-gray-500 px-2">
-                  {item.desc}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* FAQ */}
-      <div className="py-12 sm:py-16 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 text-center mb-8 sm:mb-12">
-            Questions fréquentes
-          </h2>
-          <div className="max-w-3xl mx-auto space-y-6">
-            {[
-              {
-                question: "Comment fonctionne l'eSIM ?",
-                answer:
-                  "L'eSIM est une carte SIM intégrée à votre appareil. Vous recevez un QR code par email que vous scannez pour activer votre forfait.",
-              },
-              {
-                question: "Mon appareil est-il compatible ?",
-                answer:
-                  "La plupart des smartphones récents sont compatibles avec l'eSIM. Vérifiez la compatibilité de votre appareil dans notre guide.",
-              },
-              {
-                question: "Quand dois-je activer mon eSIM ?",
-                answer:
-                  "Vous pouvez installer votre eSIM avant votre voyage, mais elle ne s'activera qu'à votre arrivée à destination.",
-              },
-            ].map((faq, i) => (
-              <div
-                key={i}
-                className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow border border-purple-100"
-              >
-                <h3 className="text-lg font-semibold text-gray-900">
-                  {faq.question}
-                </h3>
-                <p className="mt-2 text-sm sm:text-base text-gray-500">
-                  {faq.answer}
-                </p>
-              </div>
-            ))}
-            <div className="text-center mt-6 sm:mt-8">
-              <Link
-                href="/faq"
-                className="inline-flex items-center text-purple-600 hover:text-purple-700 font-medium text-sm sm:text-base"
-              >
-                Voir toutes les FAQ
-                <svg
-                  className="ml-2 h-4 w-4 sm:h-5 sm:w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M17 8l4 4m0 0l-4 4m4-4H3"
-                  />
-                </svg>
-              </Link>
+            <div className="text-center mt-8">
+              <Link href="/faq" className="text-purple-600 font-bold hover:underline">Voir toutes les questions &rarr;</Link>
             </div>
           </div>
         </div>

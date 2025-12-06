@@ -387,12 +387,23 @@ export default function Home() {
               </p>
 
               <div>
-                <Link 
-                  href="/shop"
-                  className="inline-flex items-center gap-3 bg-purple-600 hover:bg-purple-700 text-white px-8 py-4 rounded-xl font-bold transition-all shadow-lg shadow-purple-200 transform hover:scale-[1.02]"
-                >
-                  Nos destinations <ArrowRight className="w-5 h-5" />
-                </Link>
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <Link 
+                    href="/shop"
+                    className="inline-flex justify-center items-center gap-3 bg-purple-600 hover:bg-purple-700 text-white px-8 py-4 rounded-xl font-bold transition-all shadow-lg shadow-purple-200 transform hover:scale-[1.02]"
+                  >
+                    Nos destinations <ArrowRight className="w-5 h-5" />
+                  </Link>
+
+                  <Link 
+                    href="https://www.fenuasim.com/compatibilite"
+                    className="inline-flex justify-center items-center gap-3 bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 px-8 py-4 rounded-xl font-bold transition-all shadow-md transform hover:scale-[1.02]"
+                  >
+                    <Smartphone className="w-5 h-5" />
+                    Vérifier la compatibilité
+                  </Link>
+                </div>
+
                 <p className="mt-4 text-sm text-gray-500 flex items-center gap-2">
                   <CheckCircle className="w-4 h-4 text-green-500" />
                   Installation instantanée par QR code

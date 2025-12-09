@@ -1,63 +1,80 @@
-// src/pages/assurance/success.tsx
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/router';
+import React, { useEffect } from "react";
+import Head from "next/head";
+import Link from "next/link";
+import { CheckCircle, Home, Mail, ShieldCheck } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default function AssuranceSuccessPage() {
-  const router = useRouter();
-  const { session_id } = router.query;
-
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
-  const [adhesionNumber, setAdhesionNumber] = useState<string | null>(null);
-
+  
+  // 1. On active le thème Lovable (Police Inter + Couleurs)
   useEffect(() => {
-    if (!session_id || typeof session_id !== 'string') return;
-
-    async function handleSession() {
-      try {
-        // 1️⃣ Récupère la session Stripe
-        const res = await fetch(`/api/assurance/stripe-session?session_id=${session_id}`);
-        const { session } = await res.json();
-
-        if (!session || session.payment_status !== 'paid') {
-          setStatus('error');
-          return;
-        }
-
-        // 2️⃣ Marque comme payé dans Supabase
-        const resMark = await fetch(`/api/assurance/mark-paid`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            insurance_id: session.metadata.insurance_id,
-            adhesion_number: session.metadata.adhesion_number,
-          }),
-        });
-
-        const markResult = await resMark.json();
-        if (markResult.success) {
-          setAdhesionNumber(session.metadata.adhesion_number);
-          setStatus('success');
-        } else {
-          setStatus('error');
-        }
-      } catch (err) {
-        console.error("💥 Erreur success:", err);
-        setStatus('error');
-      }
-    }
-
-    handleSession();
-  }, [session_id]);
-
-  if (status === 'loading') return <p>⏳ Vérification du paiement...</p>;
-  if (status === 'error') return <p>❌ Une erreur est survenue. Merci de nous contacter.</p>;
+    document.body.classList.add("assurance-mode");
+    return () => {
+      document.body.classList.remove("assurance-mode");
+    };
+  }, []);
 
   return (
-    <div className="max-w-xl mx-auto text-center py-12">
-      <h1 className="text-2xl font-bold text-green-600">✅ Paiement confirmé !</h1>
-      <p className="mt-4">
-        Votre contrat d’assurance AVA est validé. Référence : <strong>{adhesionNumber}</strong>
-      </p>
-    </div>
+    <>
+      <Head>
+        <title>Confirmation | Fenuasim Assurance</title>
+        <meta name="robots" content="noindex" />
+      </Head>
+
+      {/* 2. Fond avec le dégradé et la texture vignette */}
+      <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-4 font-sans">
+        
+        {/* Carte de succès animée */}
+        <div className="bg-white/95 backdrop-blur-md p-8 md:p-12 rounded-2xl shadow-2xl max-w-lg w-full text-center animate-in fade-in zoom-in duration-500 border border-white/20">
+            
+            {/* Icône Succès */}
+            <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                <CheckCircle className="w-12 h-12 text-green-600" />
+            </div>
+
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 tracking-tight">
+                Paiement Validé !
+            </h1>
+            
+            <p className="text-lg text-gray-600 mb-8 leading-relaxed">
+                Merci pour votre confiance. Votre souscription d'assurance voyage est confirmée.
+            </p>
+
+            {/* Boîte d'information */}
+            <div className="bg-purple-50 p-6 rounded-xl border border-purple-100 text-left mb-8 shadow-sm">
+                <div className="flex items-start gap-4">
+                    <div className="bg-white p-2 rounded-full shadow-sm">
+                        <Mail className="w-6 h-6 text-primary" />
+                    </div>
+                    <div>
+                        <h3 className="font-bold text-gray-900 mb-1">Vérifiez vos emails</h3>
+                        <p className="text-sm text-gray-600">
+                            Vous allez recevoir votre <strong>certificat d'assurance</strong> et votre contrat signé dans quelques instants.
+                        </p>
+                        <p className="text-xs text-gray-400 mt-2">
+                            (Pensez à vérifier vos spams si besoin)
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Actions */}
+            <div className="space-y-4">
+                <Link href="/" className="block w-full">
+                    <Button className="w-full h-12 text-lg bg-primary hover:bg-primary/90 text-white shadow-lg transition-transform hover:scale-[1.02]">
+                        <Home className="w-5 h-5 mr-2" />
+                        Retour à l'accueil
+                    </Button>
+                </Link>
+            </div>
+            
+            {/* Footer discret */}
+            <div className="mt-8 pt-6 border-t border-gray-100 flex items-center justify-center gap-2 text-xs text-gray-400 font-medium">
+                <ShieldCheck className="w-4 h-4" />
+                Partenaire officiel ANSET ASSURANCES
+            </div>
+        </div>
+      </div>
+    </>
   );
 }

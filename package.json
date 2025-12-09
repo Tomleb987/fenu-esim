@@ -65,6 +65,10 @@
     "react-day-picker": {
       "react": "$react",
       "react-dom": "$react-dom"
+    },
+    "vaul": {
+      "react": "$react",
+      "react-dom": "$react-dom"
     }
   }
 }

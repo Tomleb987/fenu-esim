@@ -123,7 +123,16 @@ export const InsuranceForm = () => {
             <Button variant="ghost" onClick={() => setCurrentStep(c => c - 1)} disabled={currentStep === 1}>
                 <ArrowLeft className="w-4 h-4 mr-2"/> Retour
             </Button>
-            <Button variant="gradient" onClick={handleNext} disabled={isLoading}>
+            
+            {/* MODIFICATION ICI : 
+               J'ai remplacé variant="gradient" par une className explicite 
+               qui utilise votre nouveau dégradé Lovable (bg-gradient-hero).
+            */}
+            <Button 
+                onClick={handleNext} 
+                disabled={isLoading}
+                className="bg-gradient-hero text-white hover:opacity-90 shadow-lg transition-all px-8"
+            >
                 {isLoading ? <Loader2 className="animate-spin"/> : (currentStep === 5 ? "Payer" : "Continuer")} 
                 {!isLoading && <ArrowRight className="w-4 h-4 ml-2"/>}
             </Button>

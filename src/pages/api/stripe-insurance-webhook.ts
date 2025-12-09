@@ -1,11 +1,12 @@
-import { buffer } from "micro";
+import { buffer } from "micro"; // Nécessaire pour Stripe
 import type { NextApiRequest, NextApiResponse } from "next";
 import Stripe from "stripe";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { validateAvaAdhesion } from "@/lib/ava";
-import { sendEmail } from "@/utils/sendEmail"; // Assurez-vous d'avoir une fonction d'envoi d'email
+// 👇 Import du service dédié (aucun risque de conflit avec eSIM)
+import { sendInsuranceEmail } from "@/utils/sendInsuranceEmail"; 
 
-// Important : Stripe a besoin du corps brut pour vérifier la signature
+// Configuration Next.js pour ne pas parser le body (Stripe le veut brut)
 export const config = {
   api: {
     bodyParser: false,
@@ -13,7 +14,7 @@ export const config = {
 };
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2023-10-16', // Utilisez une version stable récente
+  apiVersion: '2023-10-16',
 });
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET_INSURANCE!;
@@ -26,35 +27,36 @@ export default async function handler(
     return res.status(405).json({ message: "Method not allowed" });
   }
 
-  const buf = await buffer(req);
-  const sig = req.headers["stripe-signature"]!;
-
   let event: Stripe.Event;
 
   try {
+    const buf = await buffer(req);
+    const sig = req.headers["stripe-signature"]!;
     event = stripe.webhooks.constructEvent(buf, sig, webhookSecret);
   } catch (err: any) {
-    console.error(`❌ Erreur Webhook Stripe: ${err.message}`);
+    console.error(`❌ Erreur Signature Webhook: ${err.message}`);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  // On écoute uniquement le succès du paiement
+  // Filtrage : On ne traite que les succès de paiement
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
     
-    // Vérifier que c'est bien une vente d'assurance
+    // 🛡️ SÉCURITÉ : On vérifie que c'est bien une ASSURANCE
+    // Si c'est une eSIM, ce code l'ignore totalement -> Pas de conflit.
     if (session.metadata?.type !== 'insurance_ava') {
+        console.log("Ignoré par le webhook assurance (Type incorrect)");
         return res.json({ received: true, ignored: true });
     }
 
     const adhesionNumber = session.metadata.adhesion_number;
     const userEmail = session.customer_email || session.metadata.user_email;
 
-    console.log(`💰 Paiement reçu pour l'adhésion AVA n°${adhesionNumber}`);
+    console.log(`💰 Paiement Assurance validé pour ${adhesionNumber}`);
 
     try {
-      // 1. Mettre à jour Supabase : Statut PAYÉ
-      const { error: updateError } = await supabaseAdmin
+      // 1. Mettre à jour la base de données (Passage en 'paid')
+      await supabaseAdmin
         .from("insurances")
         .update({ 
             status: "paid", 
@@ -62,33 +64,31 @@ export default async function handler(
         })
         .eq("adhesion_number", adhesionNumber);
 
-      if (updateError) console.error("Erreur update Supabase:", updateError);
-
-      // 2. Valider le contrat chez AVA (Essentiel !)
-      // C'est cette étape qui transforme le devis/brouillon en vrai contrat
-      const validationResult = await validateAvaAdhesion(adhesionNumber);
+      // 2. Valider le contrat chez l'assureur (AVA)
+      // C'est ici que le "brouillon" devient un vrai contrat
+      await validateAvaAdhesion(adhesionNumber);
       
-      console.log("✅ Contrat AVA validé :", validationResult);
-
-      // 3. Envoyer l'email de confirmation avec le contrat
-      // Vous pouvez récupérer le lien du contrat depuis validationResult ou depuis Supabase
+      // 3. Envoyer l'email de confirmation (Via le canal dédié Assurance)
       if (userEmail) {
-          await sendEmail({
+          await sendInsuranceEmail({
             to: userEmail,
-            subject: "Votre Assurance Voyage FENUASIM - Confirmation",
+            subject: "Confirmation de votre Assurance Voyage FENUASIM",
             html: `
-              <h1>Merci pour votre souscription !</h1>
-              <p>Votre paiement a été validé.</p>
-              <p>Votre numéro d'adhésion : <strong>${adhesionNumber}</strong></p>
-              <p>Vous recevrez votre certificat d'assurance directement par AVA ou via ce lien si disponible.</p>
+              <div style="font-family: sans-serif; color: #333;">
+                <h1 style="color: #A020F0;">Merci pour votre confiance !</h1>
+                <p>Votre souscription est confirmée.</p>
+                <p><strong>Numéro d'adhésion :</strong> ${adhesionNumber}</p>
+                <p>Vous êtes désormais couvert par AVA Assurances via FENUASIM.</p>
+                <p><em>Conservez cet email comme preuve de paiement.</em></p>
+              </div>
             `,
           });
       }
 
     } catch (err) {
-      console.error("❌ Erreur lors de la validation post-paiement :", err);
-      // Ne pas renvoyer d'erreur 500 à Stripe sinon il va réessayer en boucle
-      // Mieux vaut logger l'erreur et alerter l'admin
+      console.error("❌ Erreur traitement post-paiement :", err);
+      // On retourne 200 pour éviter que Stripe ne réessaie en boucle si c'est une erreur logique
+      return res.json({ received: true, error: "Processing failed" });
     }
   }
 

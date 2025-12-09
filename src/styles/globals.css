@@ -6,15 +6,24 @@
 
 @layer base {
   :root {
+    /* --- VOS VARIABLES GLOBALES (Site actuel Fenuasim) --- */
     --background: #ffffff;
     --foreground: #171717;
     --fenua-violet: #A020F0;
     --fenua-orange: #FF7F11;
+    --fenua-coral: #FF7F50;
   }
 
-  /* --- THÈME LOVABLE (Appliqué via une classe) --- */
-  .lovable-theme {
-    font-family: 'Inter', sans-serif;
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: Arial, Helvetica, sans-serif; /* Police par défaut du site */
+  }
+
+  /* --- VARIABLES DU TUNNEL ASSURANCE (Design Lovable) --- */
+  /* Cette classe s'active uniquement via document.body.classList.add("assurance-mode") */
+  body.assurance-mode {
+    font-family: 'Inter', sans-serif !important; /* Force la police moderne */
     
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
@@ -37,22 +46,72 @@
     --ring: 271 76% 53%;
     --radius: 0.75rem;
 
-    /* DÉGRADÉS */
+    /* --- NOUVEAU : LE MOTIF DE FOND (Vignettes) --- */
+    /* SVG encodé en blanc avec 5% d'opacité pour la texture */
+    --pattern-overlay: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M0 38.59l2.83-2.83 1.41 1.41L1.41 40H0v-1.41zM0 1.4l2.83 2.83 1.41-1.41L1.41 0H0v1.41zM38.59 40l-2.83-2.83 1.41-1.41L40 38.59V40h-1.41zM40 1.41l-2.83 2.83-1.41-1.41L38.59 0H40v1.41zM20 18.6l2.83-2.83 1.41 1.41L21.41 20l2.83 2.83-1.41 1.41L20 21.41l-2.83 2.83-1.41-1.41L18.59 20l-2.83-2.83 1.41-1.41L20 18.59z'/%3E%3C/g%3E%3C/svg%3E");
+
+    /* Gradients spécifiques Lovable (Violet -> Rose -> Orange) */
     --gradient-hero: linear-gradient(135deg, hsl(271, 76%, 53%) 0%, hsl(320, 72%, 60%) 50%, hsl(32, 95%, 55%) 100%);
     --gradient-primary: linear-gradient(135deg, hsl(271, 76%, 53%) 0%, hsl(320, 72%, 60%) 100%);
   }
 }
 
 @layer components {
-  /* Vos styles existants */
+  /* --- VOS BOUTONS ACTUELS (Ne pas toucher) --- */
   .btn-gradient {
     @apply relative overflow-hidden rounded-full px-6 py-3 text-white font-semibold transition-all duration-300 shadow-md;
     background: linear-gradient(90deg, var(--fenua-violet), var(--fenua-orange));
+    box-shadow: 0 4px 16px 0 rgba(160,32,240,0.10), 0 1.5px 6px 0 rgba(255,127,17,0.10);
+    letter-spacing: 0.02em;
+  }
+
+  .btn-gradient:hover {
+    @apply transform scale-105 shadow-lg;
+    background: linear-gradient(90deg, var(--fenua-orange), var(--fenua-violet));
+  }
+
+  .btn-gradient:active {
+    @apply transform scale-95;
+  }
+
+  .btn-gradient::after {
+    content: '';
+    @apply absolute inset-0 opacity-0 transition-opacity duration-300;
+    background: linear-gradient(90deg, var(--fenua-orange), var(--fenua-violet));
+  }
+
+  .btn-gradient:hover::after {
+    @apply opacity-100;
+  }
+
+  .nav-link {
+    @apply relative transition-colors duration-200 px-1;
+  }
+  .nav-link::after {
+    content: '';
+    @apply absolute left-0 right-0 -bottom-1 h-1.5 rounded-full opacity-0 transition-all duration-300;
+    background: linear-gradient(90deg, var(--fenua-violet), var(--fenua-orange));
+  }
+  .nav-link:hover::after,
+  .nav-link:focus::after {
+    @apply opacity-100;
+  }
+
+  .navbar-shadow {
+    @apply shadow-lg transition-shadow duration-300;
+    box-shadow: 0 2px 16px 0 rgba(160,32,240,0.08), 0 1.5px 6px 0 rgba(255,127,17,0.08);
+  }
+
+  /* --- UTILITAIRES LOVABLE --- */
+  .gradient-primary {
+    background: var(--gradient-primary);
   }
   
-  /* Utilitaires Lovable */
-  .gradient-hero { background: var(--gradient-hero); }
-  .gradient-primary { background: var(--gradient-primary); }
+  .shadow-card {
+    box-shadow: 0 4px 24px -4px hsl(271 76% 53% / 0.1);
+  }
   
-  .shadow-elevated { box-shadow: 0 8px 32px -8px hsl(271 76% 53% / 0.15); }
+  .shadow-elevated {
+    box-shadow: 0 8px 32px -8px hsl(271 76% 53% / 0.15);
+  }
 }

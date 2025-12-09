@@ -7,10 +7,7 @@ export default function AssurancePage() {
   
   // Active le mode "Assurance" (Police Inter + Couleurs Lovable) sur toute la page
   useEffect(() => {
-    // Ajoute la classe au body au montage
     document.body.classList.add("assurance-mode");
-    
-    // Nettoie la classe quand on quitte la page (pour ne pas casser le reste du site)
     return () => {
       document.body.classList.remove("assurance-mode");
     };
@@ -33,10 +30,10 @@ export default function AssurancePage() {
         <section className="relative overflow-hidden bg-gradient-hero text-primary-foreground pt-16 pb-32 px-6">
             
             <div className="relative max-w-4xl mx-auto text-center z-10">
-                {/* Badge "Partenaire Officiel" */}
+                {/* Badge "Partenaire Officiel" - MODIFIÉ ICI */}
                 <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-1.5 mb-6 border border-white/20 shadow-sm">
                     <Shield className="w-4 h-4" />
-                    <span className="text-sm font-medium">Partenaire officiel AVA Assurances</span>
+                    <span className="text-sm font-medium">Partenaire officiel ANSET ASSURANCES</span>
                 </div>
 
                 {/* Titre Principal */}
@@ -59,7 +56,7 @@ export default function AssurancePage() {
             <InsuranceForm />
         </div>
 
-        {/* Section de réassurance en bas (Optionnel, pour habiller le bas de page) */}
+        {/* Section de réassurance en bas */}
         <div className="text-center mt-16 text-muted-foreground text-sm">
             <p>Paiement sécurisé via Stripe • Support client 7j/7</p>
         </div>

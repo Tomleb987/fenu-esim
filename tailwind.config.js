@@ -16,11 +16,12 @@ const config: Config = {
     },
     extend: {
       colors: {
-        // --- COULEURS FENUASIM (Conservées) ---
+        // --- 1. COULEURS FENUASIM (Pour le reste du site) ---
         'fenua-violet': '#A020F0',
         'fenua-orange': '#FF7F11',
+        'fenua-coral': '#FF7F50',
         
-        // --- SYSTÈME LOVABLE (Lié au CSS) ---
+        // --- 2. SYSTÈME LOVABLE (Variables CSS) ---
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -55,10 +56,14 @@ const config: Config = {
           foreground: "hsl(var(--card-foreground))",
         },
       },
-      // --- DÉGRADÉS ---
+      // --- 3. DÉGRADÉS & TEXTURES ---
       backgroundImage: {
-        'gradient-hero': 'var(--gradient-hero)',       
+        // C'est ici que la magie opère : Motif (au-dessus) + Dégradé (en-dessous)
+        'gradient-hero': 'var(--pattern-overlay), var(--gradient-hero)',
+        
+        // Autres dégradés
         'gradient-primary': 'var(--gradient-primary)', 
+        'fenua-gradient': 'linear-gradient(90deg, #A020F0 0%, #FF7F11 100%)',
       },
       borderRadius: {
         lg: "var(--radius)",

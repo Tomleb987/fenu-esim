@@ -5,7 +5,7 @@ module.exports = {
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/**/*.{ts,tsx}', // Important pour attraper tous les fichiers
+    './src/**/*.{ts,tsx}', 
   ],
   theme: {
     container: {
@@ -17,13 +17,13 @@ module.exports = {
     },
     extend: {
       colors: {
-        // 1. VOS COULEURS FENUASIM (Pour que le site actuel reste intact)
+        // --- 1. COULEURS FENUASIM (On les garde pour le reste du site) ---
         'fenua-violet': '#A020F0',
         'fenua-orange': '#FF7F11',
         'fenua-coral': '#FF7F50',
         
-        // 2. LE SYSTÈME LOVABLE (Connecté aux variables CSS)
-        // Au lieu d'une couleur fixe, on dit à Tailwind : "Va chercher la variable --primary"
+        // --- 2. SYSTÈME LOVABLE (Connecté au CSS) ---
+        // C'est ici que la magie opère : on pointe vers les variables CSS
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -63,7 +63,6 @@ module.exports = {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
-      // Animations requises pour les menus déroulants et accordéons
       keyframes: {
         "accordion-down": {
           from: { height: "0" },
@@ -80,6 +79,5 @@ module.exports = {
       },
     },
   },
-  // N'oubliez pas d'avoir installé ce plugin via npm install tailwindcss-animate
   plugins: [require("tailwindcss-animate")],
 };

@@ -2,158 +2,92 @@
 @tailwind components;
 @tailwind utilities;
 
+/* --- 1. SITE GLOBAL (Vos styles d'origine) --- */
 @layer base {
   :root {
-    /* --- COULEURS FENUASIM EXISTANTES (Hex) --- */
+    /* Vos variables d'origine intactes */
+    --background: #ffffff;
+    --foreground: #171717;
     --fenua-violet: #A020F0;
     --fenua-orange: #FF7F11;
-
-    /* --- THEME LOVABLE / SHADCN (HSL) --- */
-    /* Ces variables pilotent tous les nouveaux composants (Cartes, Inputs, etc.) */
     
-    /* Fond et Texte de base */
+    /* Variables additionnelles d'origine */
+    --fenua-orange-alt: #FF6B35;
+    --fenua-purple-alt: #6B4EFF;
+  }
+  
+  /* On garde le body d'origine pour ne pas impacter le reste du site */
+  body {
+    background: #fff !important;
+    color: var(--foreground);
+    font-family: Arial, Helvetica, sans-serif;
+  }
+}
+
+/* --- 2. ZONE PROTÉGÉE ASSURANCE (Nouveau Design) --- */
+@layer base {
+  /* Ces variables ne s'appliqueront QUE si la classe "theme-assurance" est présente */
+  .theme-assurance {
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
-
-    /* Cartes (Card) */
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
-
-    /* Popups et Menus */
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-
-    /* COULEUR PRIMAIRE (Le violet Lovable) */
-    /* Correspond à un violet vibrant: hsl(271, 76%, 53%) */
     --primary: 271 76% 53%;
     --primary-foreground: 210 40% 98%;
-
-    /* COULEUR SECONDAIRE (Le rose/magenta Lovable) */
     --secondary: 320 72% 60%;
     --secondary-foreground: 210 40% 98%;
-
-    /* ELEMENTS MUETS (Grisés) */
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
-
-    /* ACCENTS (Orange Lovable) */
     --accent: 32 95% 55%;
     --accent-foreground: 222.2 47.4% 11.2%;
-
-    /* DESTRUCTIF (Erreurs) */
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-
-    /* BORDURES & INPUTS */
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 271 76% 53%; /* Focus ring couleur primaire */
-
-    --radius: 0.75rem; /* Arrondi des coins (12px) */
-    
-    /* Gradients Lovable */
+    --ring: 271 76% 53%;
+    --radius: 0.75rem;
     --gradient-hero: linear-gradient(135deg, hsl(271, 76%, 53%) 0%, hsl(320, 72%, 60%) 50%, hsl(32, 95%, 55%) 100%);
     --gradient-primary: linear-gradient(135deg, hsl(271, 76%, 53%) 0%, hsl(320, 72%, 60%) 100%);
   }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 271 76% 53%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 320 72% 60%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 32 95% 55%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-  }
 }
 
-@layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-    font-family: Arial, Helvetica, sans-serif; /* Votre police actuelle */
-  }
-}
-
-/* --- VOS CLASSES PERSONNALISÉES (Conservées) --- */
 @layer components {
-  /* Classes utilitaires Lovable */
-  .gradient-primary {
-    background: var(--gradient-primary);
-  }
-  
-  .shadow-card {
-    box-shadow: 0 4px 24px -4px hsl(271 76% 53% / 0.1);
-  }
-  
-  .shadow-elevated {
-    box-shadow: 0 8px 32px -8px hsl(271 76% 53% / 0.15);
-  }
-
-  /* Vos boutons Fenuasim existants */
+  /* Vos classes utilitaires globales (btn-gradient, etc.) restent ici */
   .btn-gradient {
     @apply relative overflow-hidden rounded-full px-6 py-3 text-white font-semibold transition-all duration-300 shadow-md;
     background: linear-gradient(90deg, var(--fenua-violet), var(--fenua-orange));
     box-shadow: 0 4px 16px 0 rgba(160,32,240,0.10), 0 1.5px 6px 0 rgba(255,127,17,0.10);
     letter-spacing: 0.02em;
   }
-
   .btn-gradient:hover {
     @apply transform scale-105 shadow-lg;
     background: linear-gradient(90deg, var(--fenua-orange), var(--fenua-violet));
   }
-
-  .btn-gradient:active {
-    @apply transform scale-95;
-  }
-
+  .btn-gradient:active { @apply transform scale-95; }
   .btn-gradient::after {
     content: '';
     @apply absolute inset-0 opacity-0 transition-opacity duration-300;
     background: linear-gradient(90deg, var(--fenua-orange), var(--fenua-violet));
   }
+  .btn-gradient:hover::after { @apply opacity-100; }
 
-  .btn-gradient:hover::after {
-    @apply opacity-100;
-  }
-
-  .nav-link {
-    @apply relative transition-colors duration-200 px-1;
-  }
+  .nav-link { @apply relative transition-colors duration-200 px-1; }
   .nav-link::after {
     content: '';
     @apply absolute left-0 right-0 -bottom-1 h-1.5 rounded-full opacity-0 transition-all duration-300;
     background: linear-gradient(90deg, var(--fenua-violet), var(--fenua-orange));
   }
-  .nav-link:hover::after,
-  .nav-link:focus::after {
-    @apply opacity-100;
-  }
+  .nav-link:hover::after, .nav-link:focus::after { @apply opacity-100; }
 
   .navbar-shadow {
     @apply shadow-lg transition-shadow duration-300;
     box-shadow: 0 2px 16px 0 rgba(160,32,240,0.08), 0 1.5px 6px 0 rgba(255,127,17,0.08);
   }
+
+  /* Classes spécifiques Assurance */
+  .gradient-primary { background: var(--gradient-primary); }
+  .shadow-card { box-shadow: 0 4px 24px -4px hsl(271 76% 53% / 0.1); }
+  .shadow-elevated { box-shadow: 0 8px 32px -8px hsl(271 76% 53% / 0.15); }
 }

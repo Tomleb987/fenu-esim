@@ -1,5 +1,6 @@
-/** @type {import('tailwindcss').Config} */
-module.exports = {
+import type { Config } from 'tailwindcss'
+
+const config: Config = {
   darkMode: ["class"],
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
@@ -15,11 +16,11 @@ module.exports = {
     },
     extend: {
       colors: {
-        // COULEURS FENUASIM (On garde l'existant)
+        // --- COULEURS FENUASIM (Conservées) ---
         'fenua-violet': '#A020F0',
         'fenua-orange': '#FF7F11',
         
-        // SYSTÈME LOVABLE (Variables CSS)
+        // --- SYSTÈME LOVABLE (Lié au CSS) ---
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -54,14 +55,10 @@ module.exports = {
           foreground: "hsl(var(--card-foreground))",
         },
       },
-      // C'EST ICI QUE SE JOUE LE DÉGRADÉ
+      // --- DÉGRADÉS ---
       backgroundImage: {
-        // Le fameux dégradé Violet -> Rose -> Orange de Lovable
         'gradient-hero': 'var(--gradient-hero)',       
-        // Le dégradé Violet -> Rose
         'gradient-primary': 'var(--gradient-primary)', 
-        // Votre ancien dégradé Fenuasim
-        'fenua-gradient': 'linear-gradient(90deg, #A020F0 0%, #FF7F11 100%)',
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -85,4 +82,6 @@ module.exports = {
     },
   },
   plugins: [require("tailwindcss-animate")],
-};
+}
+
+export default config

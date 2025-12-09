@@ -11,18 +11,15 @@ module.exports = {
     container: {
       center: true,
       padding: "2rem",
-      screens: {
-        "2xl": "1400px",
-      },
+      screens: { "2xl": "1400px" },
     },
     extend: {
       colors: {
-        // COULEURS FENUASIM
+        // COULEURS FENUASIM (On garde l'existant)
         'fenua-violet': '#A020F0',
         'fenua-orange': '#FF7F11',
-        'fenua-coral': '#FF7F50',
         
-        // COULEURS LOVABLE (Variables CSS)
+        // SYSTÈME LOVABLE (Variables CSS)
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -57,11 +54,13 @@ module.exports = {
           foreground: "hsl(var(--card-foreground))",
         },
       },
-      // C'EST ICI QUE LE DÉGRADÉ EST DÉFINI
+      // C'EST ICI QUE SE JOUE LE DÉGRADÉ
       backgroundImage: {
-        'gradient-primary': 'var(--gradient-primary)', // Violet -> Rose
-        'gradient-hero': 'var(--gradient-hero)',       // Violet -> Rose -> Orange
-        // Votre dégradé Fenuasim classique
+        // Le fameux dégradé Violet -> Rose -> Orange de Lovable
+        'gradient-hero': 'var(--gradient-hero)',       
+        // Le dégradé Violet -> Rose
+        'gradient-primary': 'var(--gradient-primary)', 
+        // Votre ancien dégradé Fenuasim
         'fenua-gradient': 'linear-gradient(90deg, #A020F0 0%, #FF7F11 100%)',
       },
       borderRadius: {

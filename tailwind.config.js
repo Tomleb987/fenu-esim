@@ -17,13 +17,12 @@ module.exports = {
     },
     extend: {
       colors: {
-        // --- 1. COULEURS FENUASIM (On les garde pour le reste du site) ---
+        // COULEURS FENUASIM
         'fenua-violet': '#A020F0',
         'fenua-orange': '#FF7F11',
         'fenua-coral': '#FF7F50',
         
-        // --- 2. SYSTÈME LOVABLE (Connecté au CSS) ---
-        // C'est ici que la magie opère : on pointe vers les variables CSS
+        // COULEURS LOVABLE (Variables CSS)
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -57,6 +56,13 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+      },
+      // C'EST ICI QUE LE DÉGRADÉ EST DÉFINI
+      backgroundImage: {
+        'gradient-primary': 'var(--gradient-primary)', // Violet -> Rose
+        'gradient-hero': 'var(--gradient-hero)',       // Violet -> Rose -> Orange
+        // Votre dégradé Fenuasim classique
+        'fenua-gradient': 'linear-gradient(90deg, #A020F0 0%, #FF7F11 100%)',
       },
       borderRadius: {
         lg: "var(--radius)",

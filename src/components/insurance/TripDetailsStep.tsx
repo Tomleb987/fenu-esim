@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { InsuranceFormData } from "@/types/insurance";
 import { COUNTRIES } from "@/lib/countries"; 
-import { MapPin, Calendar, Euro, Globe, ChevronDown } from "lucide-react";
+// ON RETIRE LES IMPORTS D'ICÔNES POUR L'INSTANT
+// import { MapPin, Calendar, Euro, Globe, ChevronDown } from "lucide-react";
 
 interface TripDetailsStepProps {
   formData: InsuranceFormData;
@@ -20,8 +21,8 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
   // Sécurité : Liste vide par défaut pour éviter le crash .map
   const countryList = COUNTRIES || [];
 
-  // Style commun pour simuler les composants Shadcn/Lovable avec du HTML natif
-  const labelStyle = "flex items-center gap-2 text-sm font-semibold mb-2 block text-gray-700";
+  // Style commun
+  const labelStyle = "block text-sm font-semibold mb-2 text-gray-700";
   const selectStyle = "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 appearance-none";
 
   return (
@@ -36,7 +37,7 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
         {/* PAYS RÉSIDENCE */}
         <div className="space-y-2">
           <label className={labelStyle}>
-            <Globe className="w-4 h-4 text-primary" />
+            {/* Icône retirée pour éviter le crash */}
             <span>Votre pays de résidence *</span>
           </label>
           <div className="relative">
@@ -52,15 +53,12 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
                 </option>
               ))}
             </select>
-            {/* Petite flèche pour le style */}
-            <ChevronDown className="absolute right-3 top-3 h-4 w-4 opacity-50 pointer-events-none" />
           </div>
         </div>
 
         {/* DESTINATION */}
         <div className="space-y-2">
           <label className={labelStyle}>
-             <MapPin className="w-4 h-4 text-primary" />
              <span>Destination *</span>
           </label>
           <div className="relative">
@@ -76,7 +74,6 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
                 </option>
               ))}
             </select>
-            <ChevronDown className="absolute right-3 top-3 h-4 w-4 opacity-50 pointer-events-none" />
           </div>
           {errors.destination && <p className="text-red-500 text-xs mt-1">{errors.destination}</p>}
         </div>
@@ -85,7 +82,6 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <label className={labelStyle}>
-              <Calendar className="w-4 h-4 text-primary" />
               <span>Date de départ</span>
             </label>
             <Input
@@ -98,7 +94,6 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
 
           <div className="space-y-2">
             <label className={labelStyle}>
-              <Calendar className="w-4 h-4 text-primary" />
               <span>Date de retour</span>
             </label>
             <Input
@@ -113,7 +108,6 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
         {/* PRIX */}
         <div className="space-y-2">
           <label className={labelStyle}>
-            <Euro className="w-4 h-4 text-primary" />
             <span>Prix total du voyage (€)</span>
           </label>
           <Input

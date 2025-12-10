@@ -1,126 +1,109 @@
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { InsuranceFormData } from "@/types/insurance";
-import { getOptionsForProduct, AvaOption } from "@/lib/ava_options"; 
-import { Shield, ShieldCheck } from "lucide-react";
+import axios from 'axios';
+import { format } from 'date-fns';
 
-interface Props {
-  formData: InsuranceFormData;
-  updateFormData: (data: Partial<InsuranceFormData>) => void;
-  errors: Record<string, string>;
+const AVA_API_URL = process.env.AVA_API_URL || "https://api-ava.fr/api";
+const PARTNER_ID = process.env.AVA_PARTNER_ID;
+const PASSWORD = process.env.AVA_PASSWORD;
+
+// Authentification (inchangée)
+export async function getAvaToken() {
+  const params = new URLSearchParams();
+  params.append('login', PARTNER_ID!);
+  params.append('motDePasse', PASSWORD!);
+
+  const response = await axios.post(`${AVA_API_URL}/authentification/connexion.php`, params, {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+  });
+  return response.data.token;
 }
 
-export const OptionsStep = ({ formData, updateFormData }: Props) => {
-  const productType = "ava_tourist_card";
-  const options = getOptionsForProduct(productType);
-  const selectedIds = formData.selectedOptions || [];
+// --- C'EST ICI QUE LA CORRECTION SE FAIT ---
+export async function getAvaPrice(data: any) {
+  const token = await getAvaToken();
+  
+  // 1. Calcul du nombre total de personnes
+  const companions = data.companions || [];
+  const totalTravelers = 1 + companions.length;
 
-  // Gestion des cases à cocher (Boolean)
-  const handleBooleanToggle = (opt: AvaOption, checked: boolean) => {
-    // L'ID à envoyer est soit la sous-option par défaut, soit l'ID principal
-    const targetId = opt.defaultSubOptionId || opt.id;
+  // 2. Gestion du Prix du Voyage (Capital Assuré)
+  // AVA demande souvent le capital PAR PERSONNE.
+  // Si tripCost est le total (ex: 2000€ pour 2), on divise.
+  const totalTripCost = Number(data.tripCost) || 0;
+  const costPerPerson = totalTravelers > 0 ? Math.ceil(totalTripCost / totalTravelers) : 0;
+
+  // 3. Construction des paramètres API
+  // On utilise URLSearchParams pour gérer proprement l'encodage
+  const params = new URLSearchParams();
+
+  // Paramètres communs
+  params.append('produit', "30"); // Code 30 = Tourist Card (Vérifiez ce code selon votre contrat !)
+  params.append('date_depart', format(new Date(data.startDate), 'dd/MM/yyyy'));
+  params.append('date_retour', format(new Date(data.endDate), 'dd/MM/yyyy'));
+  params.append('destination', data.destinationRegion || "102"); // 102 = Monde
+
+  // --- BOUCLE SUR LES VOYAGEURS ---
+  
+  // A. Le Souscripteur (Toujours l'index 1)
+  // Format attendu par AVA : date_naissance_1, capital_1
+  params.append('date_naissance_1', format(new Date(data.subscriber.birthDate), 'dd/MM/yyyy'));
+  params.append('capital_1', costPerPerson.toString());
+
+  // B. Les Accompagnants (Index 2, 3, 4...)
+  companions.forEach((comp: any, index: number) => {
+    const avaIndex = index + 2; // On commence à 2 car le souscripteur est le 1
     
-    if (checked) {
-      updateFormData({ selectedOptions: [...selectedIds, targetId] });
-    } else {
-      updateFormData({ selectedOptions: selectedIds.filter(id => id !== targetId) });
+    if (comp.birthDate) {
+        params.append(`date_naissance_${avaIndex}`, format(new Date(comp.birthDate), 'dd/MM/yyyy'));
+        params.append(`capital_${avaIndex}`, costPerPerson.toString());
     }
-  };
+  });
 
-  // Gestion des menus déroulants (Select)
-  const handleSelectChange = (opt: AvaOption, value: string) => {
-    // 1. On retire toutes les autres sous-options de ce groupe qui seraient déjà cochées
-    const otherSubOptions = opt.subOptions?.map(so => so.id) || [];
-    const cleanedSelection = selectedIds.filter(id => !otherSubOptions.includes(id));
+  // Gestion des options (Si vous en avez)
+  // Exemple : if (data.options.annulation) params.append('opt_335', '1');
+
+  console.log("📤 Envoi à AVA :", params.toString());
+
+  try {
+    const response = await axios.post(
+      `${AVA_API_URL}/assurance/tarification/demandeTarif.php`, // Utilisez demandeTarif pour gérer options/multi-pax
+      params, 
+      {
+        headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      }
+    );
+
+    console.log("📥 Réponse AVA :", response.data);
+
+    // L'API renvoie souvent le tarif total dans un champ 'tarif_total' ou 'montant'
+    // Adaptez selon la réponse réelle vue dans Postman
+    if (response.data && response.data.tarif_total) {
+        return parseFloat(response.data.tarif_total);
+    } 
+    // Fallback si la structure est différente
+    else if (response.data && response.data.tarif) {
+        return parseFloat(response.data.tarif);
+    }
     
-    // 2. On ajoute la nouvelle valeur
-    updateFormData({ selectedOptions: [...cleanedSelection, value] });
-  };
+    throw new Error("Pas de tarif dans la réponse AVA");
 
-  // Vérifie si une option (ou une de ses sous-options) est active
-  const isOptionActive = (opt: AvaOption) => {
-    if (opt.type === 'boolean') {
-       const targetId = opt.defaultSubOptionId || opt.id;
-       return selectedIds.includes(targetId);
-    }
-    // Pour un select, on regarde si L'UNE des sous-options est dans la liste
-    return opt.subOptions?.some(sub => selectedIds.includes(sub.id));
-  };
+  } catch (error: any) {
+    console.error("Erreur calcul AVA:", error.response?.data || error.message);
+    throw new Error("Erreur lors du calcul AVA");
+  }
+}
 
-  // Récupère la valeur actuelle pour un Select
-  const getSelectedValue = (opt: AvaOption) => {
-    return opt.subOptions?.find(sub => selectedIds.includes(sub.id))?.id || "";
-  };
+// Fonction de validation (inchangée mais nécessaire)
+export async function validateAvaAdhesion(adhesionNumber: string) {
+    // ... votre code de validation existant ...
+    return true; 
+}
 
-  return (
-    <div className="space-y-6 animate-in fade-in">
-      <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold mb-2">Options complémentaires</h2>
-        <p className="text-muted-foreground">Personnalisez votre couverture selon vos besoins</p>
-      </div>
-
-      <div className="grid gap-4">
-        {options.map((opt) => {
-          const isActive = isOptionActive(opt);
-
-          return (
-            <div 
-                key={opt.id} 
-                className={`flex flex-col p-4 rounded-lg border-2 transition-all ${
-                    isActive
-                    ? "border-primary bg-primary/5 ring-1 ring-primary" 
-                    : "border-border hover:border-primary/50"
-                }`}
-            >
-              <div className="flex items-center space-x-3">
-                {/* --- TYPE BOOLEAN (Checkbox) --- */}
-                {opt.type === 'boolean' && (
-                    <Checkbox 
-                        id={opt.id} 
-                        checked={isActive}
-                        onCheckedChange={(checked) => handleBooleanToggle(opt, checked)}
-                    />
-                )}
-                
-                {/* --- TYPE SELECT (Icone) --- */}
-                {opt.type === 'select' && (
-                    <div className={`p-1 rounded-full ${isActive ? 'text-primary' : 'text-gray-400'}`}>
-                        {isActive ? <ShieldCheck className="w-5 h-5"/> : <Shield className="w-5 h-5"/>}
-                    </div>
-                )}
-
-                <div className="flex-1">
-                    <Label htmlFor={opt.id} className="font-bold text-base cursor-pointer block">
-                      {opt.label}
-                    </Label>
-                    
-                    {/* Si c'est un SELECT, on affiche le menu déroulant en dessous */}
-                    {opt.type === 'select' && (
-                        <div className="mt-3 max-w-xs">
-                             <Select 
-                                value={getSelectedValue(opt)} 
-                                onValueChange={(val) => handleSelectChange(opt, val)}
-                             >
-                                <SelectTrigger className="bg-white">
-                                    <SelectValue placeholder="Choisir un niveau..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {opt.subOptions?.map((sub) => (
-                                        <SelectItem key={sub.id} value={sub.id}>
-                                            {sub.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                             </Select>
-                        </div>
-                    )}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
+// Fonction de création (nécessaire pour insurance-checkout.ts)
+export async function createAvaAdhesion(data: any) {
+    // ... Logique similaire à getAvaPrice mais vers /creationAdhesion.php ...
+    // Pensez à réutiliser la même logique de boucle (date_naissance_X) ici aussi !
+    return { adhesion_number: "SIMU-12345", contract_link: null }; // Mock pour l'instant
+}

@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label"; // Vérifiez que ce fichier existe !
+// On retire l'import de Label qui pose problème
+// import { Label } from "@/components/ui/label"; 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { InsuranceFormData } from "@/types/insurance";
 import { COUNTRIES } from "@/lib/countries"; 
-// On importe les icônes de manière sécurisée
 import { MapPin, Calendar, Euro, Globe } from "lucide-react";
 
 interface TripDetailsStepProps {
@@ -20,10 +20,11 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
     setToday(new Date().toISOString().split('T')[0]);
   }, []);
 
-  // SÉCURITÉ : Si la liste des pays n'est pas chargée, on affiche un chargement
-  if (!COUNTRIES || COUNTRIES.length === 0) {
-    return <div className="p-4 text-red-500">Erreur : Liste des pays introuvable (Vérifiez src/lib/countries.ts)</div>;
-  }
+  // Sécurité anti-crash si la liste des pays est vide
+  const countryList = COUNTRIES && Array.isArray(COUNTRIES) ? COUNTRIES : [];
+
+  // Style partagé pour les labels
+  const labelStyle = "flex items-center gap-2 text-sm font-semibold mb-2 block";
 
   return (
     <div className="space-y-6 animate-in fade-in">
@@ -35,10 +36,11 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
       <div className="space-y-4">
         {/* PAYS RÉSIDENCE */}
         <div className="space-y-2">
-          <Label className="flex items-center gap-2 text-sm font-semibold">
+          {/* On utilise une balise label standard HTML au lieu du composant custom */}
+          <label className={labelStyle}>
             <Globe className="w-4 h-4 text-primary" />
             <span>Votre pays de résidence *</span>
-          </Label>
+          </label>
           <Select
             value={formData.subscriberCountry}
             onValueChange={(value) => updateFormData({ subscriberCountry: value })}
@@ -47,7 +49,7 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
               <SelectValue placeholder="Sélectionnez..." />
             </SelectTrigger>
             <SelectContent className="max-h-[300px]">
-              {COUNTRIES.map((country) => (
+              {countryList.map((country) => (
                 <SelectItem key={country.code} value={country.code}>
                   {country.name}
                 </SelectItem>
@@ -58,10 +60,10 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
 
         {/* DESTINATION */}
         <div className="space-y-2">
-          <Label className="flex items-center gap-2 text-sm font-semibold">
+          <label className={labelStyle}>
              <MapPin className="w-4 h-4 text-primary" />
              <span>Destination *</span>
-          </Label>
+          </label>
           <Select
             value={formData.destination}
             onValueChange={(value) => updateFormData({ destination: value })}
@@ -70,7 +72,7 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
               <SelectValue placeholder="Sélectionnez..." />
             </SelectTrigger>
             <SelectContent className="max-h-[300px]">
-              {COUNTRIES.map((country) => (
+              {countryList.map((country) => (
                 <SelectItem key={country.code} value={country.code}>
                   {country.name}
                 </SelectItem>
@@ -82,10 +84,10 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
         {/* DATES */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label className="flex items-center gap-2 text-sm font-semibold">
+            <label className={labelStyle}>
               <Calendar className="w-4 h-4 text-primary" />
               <span>Date de départ</span>
-            </Label>
+            </label>
             <Input
               type="date"
               value={formData.departureDate}
@@ -95,10 +97,10 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
           </div>
 
           <div className="space-y-2">
-            <Label className="flex items-center gap-2 text-sm font-semibold">
+            <label className={labelStyle}>
               <Calendar className="w-4 h-4 text-primary" />
               <span>Date de retour</span>
-            </Label>
+            </label>
             <Input
               type="date"
               value={formData.returnDate}
@@ -110,10 +112,10 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
 
         {/* PRIX */}
         <div className="space-y-2">
-          <Label className="flex items-center gap-2 text-sm font-semibold">
+          <label className={labelStyle}>
             <Euro className="w-4 h-4 text-primary" />
             <span>Prix total du voyage (€)</span>
-          </Label>
+          </label>
           <Input
             type="number"
             placeholder="Ex: 2500"

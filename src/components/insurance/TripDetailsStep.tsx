@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react"; // Ajout de useEffect et useState
+import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Label } from "@/components/ui/label"; // Vérifiez que ce fichier existe !
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { InsuranceFormData } from "@/types/insurance";
 import { COUNTRIES } from "@/lib/countries"; 
+// On importe les icônes de manière sécurisée
 import { MapPin, Calendar, Euro, Globe } from "lucide-react";
 
 interface TripDetailsStepProps {
@@ -13,12 +14,16 @@ interface TripDetailsStepProps {
 }
 
 export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetailsStepProps) => {
-  // CORRECTION HYDRATATION : On calcule la date uniquement sur le client
   const [today, setToday] = useState("");
 
   useEffect(() => {
     setToday(new Date().toISOString().split('T')[0]);
   }, []);
+
+  // SÉCURITÉ : Si la liste des pays n'est pas chargée, on affiche un chargement
+  if (!COUNTRIES || COUNTRIES.length === 0) {
+    return <div className="p-4 text-red-500">Erreur : Liste des pays introuvable (Vérifiez src/lib/countries.ts)</div>;
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in">
@@ -31,7 +36,8 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
         {/* PAYS RÉSIDENCE */}
         <div className="space-y-2">
           <Label className="flex items-center gap-2 text-sm font-semibold">
-            <Globe className="w-4 h-4 text-primary" /> Votre pays de résidence
+            <Globe className="w-4 h-4 text-primary" />
+            <span>Votre pays de résidence *</span>
           </Label>
           <Select
             value={formData.subscriberCountry}
@@ -53,7 +59,8 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
         {/* DESTINATION */}
         <div className="space-y-2">
           <Label className="flex items-center gap-2 text-sm font-semibold">
-            <MapPin className="w-4 h-4 text-primary" /> Destination
+             <MapPin className="w-4 h-4 text-primary" />
+             <span>Destination *</span>
           </Label>
           <Select
             value={formData.destination}
@@ -76,25 +83,27 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label className="flex items-center gap-2 text-sm font-semibold">
-              <Calendar className="w-4 h-4 text-primary" /> Date de départ
+              <Calendar className="w-4 h-4 text-primary" />
+              <span>Date de départ</span>
             </Label>
             <Input
               type="date"
               value={formData.departureDate}
               onChange={(e) => updateFormData({ departureDate: e.target.value })}
-              min={today} // Utilisation de la date sécurisée
+              min={today}
             />
           </div>
 
           <div className="space-y-2">
             <Label className="flex items-center gap-2 text-sm font-semibold">
-              <Calendar className="w-4 h-4 text-primary" /> Date de retour
+              <Calendar className="w-4 h-4 text-primary" />
+              <span>Date de retour</span>
             </Label>
             <Input
               type="date"
               value={formData.returnDate}
               onChange={(e) => updateFormData({ returnDate: e.target.value })}
-              min={formData.departureDate || today} // Utilisation de la date sécurisée
+              min={formData.departureDate || today}
             />
           </div>
         </div>
@@ -102,7 +111,8 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
         {/* PRIX */}
         <div className="space-y-2">
           <Label className="flex items-center gap-2 text-sm font-semibold">
-            <Euro className="w-4 h-4 text-primary" /> Prix total du voyage (€)
+            <Euro className="w-4 h-4 text-primary" />
+            <span>Prix total du voyage (€)</span>
           </Label>
           <Input
             type="number"

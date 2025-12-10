@@ -1,11 +1,8 @@
 import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
-// On retire l'import de Label qui pose problème
-// import { Label } from "@/components/ui/label"; 
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { InsuranceFormData } from "@/types/insurance";
 import { COUNTRIES } from "@/lib/countries"; 
-import { MapPin, Calendar, Euro, Globe } from "lucide-react";
+import { MapPin, Calendar, Euro, Globe, ChevronDown } from "lucide-react";
 
 interface TripDetailsStepProps {
   formData: InsuranceFormData;
@@ -20,11 +17,12 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
     setToday(new Date().toISOString().split('T')[0]);
   }, []);
 
-  // Sécurité anti-crash si la liste des pays est vide
-  const countryList = COUNTRIES && Array.isArray(COUNTRIES) ? COUNTRIES : [];
+  // Sécurité : Liste vide par défaut pour éviter le crash .map
+  const countryList = COUNTRIES || [];
 
-  // Style partagé pour les labels
-  const labelStyle = "flex items-center gap-2 text-sm font-semibold mb-2 block";
+  // Style commun pour simuler les composants Shadcn/Lovable avec du HTML natif
+  const labelStyle = "flex items-center gap-2 text-sm font-semibold mb-2 block text-gray-700";
+  const selectStyle = "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 appearance-none";
 
   return (
     <div className="space-y-6 animate-in fade-in">
@@ -34,28 +32,29 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
       </div>
 
       <div className="space-y-4">
+        
         {/* PAYS RÉSIDENCE */}
         <div className="space-y-2">
-          {/* On utilise une balise label standard HTML au lieu du composant custom */}
           <label className={labelStyle}>
             <Globe className="w-4 h-4 text-primary" />
             <span>Votre pays de résidence *</span>
           </label>
-          <Select
-            value={formData.subscriberCountry}
-            onValueChange={(value) => updateFormData({ subscriberCountry: value })}
-          >
-            <SelectTrigger className={errors.subscriberCountry ? "border-destructive" : ""}>
-              <SelectValue placeholder="Sélectionnez..." />
-            </SelectTrigger>
-            <SelectContent className="max-h-[300px]">
+          <div className="relative">
+            <select
+              className={selectStyle}
+              value={formData.subscriberCountry}
+              onChange={(e) => updateFormData({ subscriberCountry: e.target.value })}
+            >
+              <option value="" disabled>Sélectionnez...</option>
               {countryList.map((country) => (
-                <SelectItem key={country.code} value={country.code}>
+                <option key={country.code} value={country.code}>
                   {country.name}
-                </SelectItem>
+                </option>
               ))}
-            </SelectContent>
-          </Select>
+            </select>
+            {/* Petite flèche pour le style */}
+            <ChevronDown className="absolute right-3 top-3 h-4 w-4 opacity-50 pointer-events-none" />
+          </div>
         </div>
 
         {/* DESTINATION */}
@@ -64,21 +63,22 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
              <MapPin className="w-4 h-4 text-primary" />
              <span>Destination *</span>
           </label>
-          <Select
-            value={formData.destination}
-            onValueChange={(value) => updateFormData({ destination: value })}
-          >
-            <SelectTrigger className={errors.destination ? "border-destructive" : ""}>
-              <SelectValue placeholder="Sélectionnez..." />
-            </SelectTrigger>
-            <SelectContent className="max-h-[300px]">
+          <div className="relative">
+            <select
+              className={`${selectStyle} ${errors.destination ? "border-red-500" : ""}`}
+              value={formData.destination}
+              onChange={(e) => updateFormData({ destination: e.target.value })}
+            >
+              <option value="" disabled>Sélectionnez...</option>
               {countryList.map((country) => (
-                <SelectItem key={country.code} value={country.code}>
+                <option key={country.code} value={country.code}>
                   {country.name}
-                </SelectItem>
+                </option>
               ))}
-            </SelectContent>
-          </Select>
+            </select>
+            <ChevronDown className="absolute right-3 top-3 h-4 w-4 opacity-50 pointer-events-none" />
+          </div>
+          {errors.destination && <p className="text-red-500 text-xs mt-1">{errors.destination}</p>}
         </div>
 
         {/* DATES */}
@@ -121,6 +121,7 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
             placeholder="Ex: 2500"
             value={formData.tripPrice || ""}
             onChange={(e) => updateFormData({ tripPrice: parseFloat(e.target.value) || 0 })}
+            className={errors.tripPrice ? "border-red-500" : ""}
           />
         </div>
       </div>

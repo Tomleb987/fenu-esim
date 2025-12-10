@@ -1,8 +1,9 @@
+import { useEffect, useState } from "react"; // Ajout de useEffect et useState
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { InsuranceFormData } from "@/types/insurance";
-import { COUNTRIES } from "@/lib/countries"; // ✅ C'est cet import qui charge la liste
+import { COUNTRIES } from "@/lib/countries"; 
 import { MapPin, Calendar, Euro, Globe } from "lucide-react";
 
 interface TripDetailsStepProps {
@@ -12,18 +13,25 @@ interface TripDetailsStepProps {
 }
 
 export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetailsStepProps) => {
+  // CORRECTION HYDRATATION : On calcule la date uniquement sur le client
+  const [today, setToday] = useState("");
+
+  useEffect(() => {
+    setToday(new Date().toISOString().split('T')[0]);
+  }, []);
+
   return (
     <div className="space-y-6 animate-in fade-in">
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold text-foreground mb-2">Détails de votre voyage</h2>
-        <p className="text-muted-foreground">Où souhaitez-vous aller ?</p>
+        <p className="text-muted-foreground">Commençons par les informations sur votre séjour</p>
       </div>
 
       <div className="space-y-4">
-        {/* PAYS DE RÉSIDENCE */}
+        {/* PAYS RÉSIDENCE */}
         <div className="space-y-2">
-          <Label className="flex items-center gap-2">
-            <Globe className="w-4 h-4 text-primary" /> Pays de résidence
+          <Label className="flex items-center gap-2 text-sm font-semibold">
+            <Globe className="w-4 h-4 text-primary" /> Votre pays de résidence
           </Label>
           <Select
             value={formData.subscriberCountry}
@@ -33,7 +41,6 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
               <SelectValue placeholder="Sélectionnez..." />
             </SelectTrigger>
             <SelectContent className="max-h-[300px]">
-              {/* On filtre pour mettre la Polynésie et la France en premier si besoin, sinon on affiche tout */}
               {COUNTRIES.map((country) => (
                 <SelectItem key={country.code} value={country.code}>
                   {country.name}
@@ -45,7 +52,7 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
 
         {/* DESTINATION */}
         <div className="space-y-2">
-          <Label className="flex items-center gap-2">
+          <Label className="flex items-center gap-2 text-sm font-semibold">
             <MapPin className="w-4 h-4 text-primary" /> Destination
           </Label>
           <Select
@@ -63,29 +70,46 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
               ))}
             </SelectContent>
           </Select>
-          {errors.destination && <p className="text-destructive text-xs">{errors.destination}</p>}
         </div>
 
-        {/* DATES ET PRIX */}
-        <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-                <Label>Départ</Label>
-                <Input type="date" value={formData.departureDate} onChange={(e) => updateFormData({ departureDate: e.target.value })} />
-            </div>
-            <div className="space-y-2">
-                <Label>Retour</Label>
-                <Input type="date" value={formData.returnDate} onChange={(e) => updateFormData({ returnDate: e.target.value })} />
-            </div>
-        </div>
-        
-        <div className="space-y-2">
-            <Label>Prix du voyage (€)</Label>
-            <Input 
-                type="number" 
-                placeholder="Ex: 1000" 
-                value={formData.tripPrice || ''} 
-                onChange={(e) => updateFormData({ tripPrice: Number(e.target.value) })} 
+        {/* DATES */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2 text-sm font-semibold">
+              <Calendar className="w-4 h-4 text-primary" /> Date de départ
+            </Label>
+            <Input
+              type="date"
+              value={formData.departureDate}
+              onChange={(e) => updateFormData({ departureDate: e.target.value })}
+              min={today} // Utilisation de la date sécurisée
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2 text-sm font-semibold">
+              <Calendar className="w-4 h-4 text-primary" /> Date de retour
+            </Label>
+            <Input
+              type="date"
+              value={formData.returnDate}
+              onChange={(e) => updateFormData({ returnDate: e.target.value })}
+              min={formData.departureDate || today} // Utilisation de la date sécurisée
+            />
+          </div>
+        </div>
+
+        {/* PRIX */}
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2 text-sm font-semibold">
+            <Euro className="w-4 h-4 text-primary" /> Prix total du voyage (€)
+          </Label>
+          <Input
+            type="number"
+            placeholder="Ex: 2500"
+            value={formData.tripPrice || ""}
+            onChange={(e) => updateFormData({ tripPrice: parseFloat(e.target.value) || 0 })}
+          />
         </div>
       </div>
     </div>

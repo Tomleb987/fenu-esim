@@ -20,14 +20,14 @@ export default async function handler(
     const { quoteData, userEmail, amount } = req.body;
 
     if (!quoteData || !userEmail || typeof amount !== "number") {
-      return res
-        .status(400)
-        .json({ error: "quoteData, userEmail ou amount manquant" });
+      return res.status(400).json({
+        error: "quoteData, userEmail ou amount manquant",
+      });
     }
 
     const internalRef = `CMD-${Date.now()}`;
 
-    // 1️⃣ Création contrat AVA
+    // 1️⃣ Création contrat AVA (à condition que createAvaAdhesion soit branchée pour de vrai)
     const avaResult = await createAvaAdhesion({
       ...quoteData,
       internalReference: internalRef,
@@ -53,7 +53,7 @@ export default async function handler(
       });
     }
 
-    // 2️⃣ Montant : on utilise le montant validé côté front
+    // 2️⃣ Montant : on utilise le montant validé AVA côté front
     const price = amount;
     if (Number.isNaN(price)) {
       return res

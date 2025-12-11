@@ -1,116 +1,190 @@
-import { useEffect, useState } from "react";
+"use client";
+
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { StepIndicator } from "./StepIndicator";
+import { TripDetailsStep } from "./TripDetailsStep";
+import { PersonalInfoStep } from "./PersonalInfoStep";
+import { TravelersStep } from "./TravelersStep";
+import { OptionsStep } from "./OptionsStep";
+import { SummaryStep } from "./SummaryStep";
+import { ConfirmationStep } from "./ConfirmationStep";
 import { InsuranceFormData } from "@/types/insurance";
-import { COUNTRIES } from "@/lib/countries"; // Gardé pour le pays de résidence
+import { toast } from "sonner";
 
-// Note: On n'importe PLUS de composants externes pour éviter le crash #130
-// On utilise du HTML natif et des classes Tailwind pour le style
+const STEPS = ["Voyage", "Infos", "Voyageurs", "Options", "Récap"];
 
-interface TripDetailsStepProps {
-  formData: InsuranceFormData;
-  updateFormData: (data: Partial<InsuranceFormData>) => void;
-  errors: Record<string, string>;
-}
+const initialFormData: InsuranceFormData = {
+  destination: "", // Sera "102", "58" ou "53"
+  departureDate: "",
+  returnDate: "",
+  tripPrice: 0,
+  subscriberCountry: "PF",
+  firstName: "",
+  lastName: "",
+  birthDate: "",
+  email: "",
+  phone: "",
+  address: "",
+  postalCode: "",
+  city: "",
+  additionalTravelers: [],
+  selectedOptions: [],
+  acceptTerms: false,
+  acceptPrivacy: false,
+  acceptMarketing: false,
+};
 
-export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetailsStepProps) => {
-  const [today, setToday] = useState("");
+export default function InsuranceForm() {
+  const [currentStep, setCurrentStep] = useState(1);
+  const [formData, setFormData] = useState<InsuranceFormData>(initialFormData);
+  const [quote, setQuote] = useState<{ premium: number } | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSubmitted, setIsSubmitted] = useState(false);
 
+  const updateFormData = (data: Partial<InsuranceFormData>) => {
+    setFormData((prev) => ({ ...prev, ...data }));
+    setErrors({});
+  };
+
+  const fetchQuote = async (isBackground = false) => {
+    if (!isBackground) setIsLoading(true);
+    try {
+        const response = await fetch('/api/get-quote', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                quoteData: {
+                    productType: "ava_tourist_card",
+                    startDate: formData.departureDate,
+                    endDate: formData.returnDate,
+                    // On envoie la zone choisie par l'utilisateur (ou 102 par défaut)
+                    destinationRegion: formData.destination || 102, 
+                    tripCost: formData.tripPrice, 
+                    subscriber: { 
+                        firstName: formData.firstName,
+                        lastName: formData.lastName,
+                        birthDate: formData.birthDate,
+                        email: formData.email,
+                        address: formData.address,
+                        postalCode: formData.postalCode,
+                        city: formData.city
+                    },
+                    companions: formData.additionalTravelers,
+                    options: formData.selectedOptions 
+                }
+            })
+        });
+        const data = await response.json();
+        
+        if (response.ok && data.price) {
+            setQuote({ premium: data.price });
+            if (!isBackground) toast.success(`Tarif mis à jour : ${data.price} €`);
+        } else {
+            console.error("Info tarif:", data);
+            if (!isBackground) toast.error("Impossible de calculer le tarif pour ces dates.");
+        }
+    } catch (e) {
+        console.error(e);
+        if (!isBackground) toast.error("Erreur de connexion au serveur.");
+    } finally {
+        if (!isBackground) setIsLoading(false);
+    }
+  };
+
+  // Recalcul automatique si on change les options à l'étape 4 ou plus
   useEffect(() => {
-    setToday(new Date().toISOString().split('T')[0]);
-  }, []);
+      if (currentStep >= 4) {
+          const timer = setTimeout(() => {
+              fetchQuote(true);
+          }, 500);
+          return () => clearTimeout(timer);
+      }
+  }, [formData.selectedOptions, currentStep]);
 
-  // Sécurité : Si COUNTRIES est vide ou mal chargé
-  const countryList = Array.isArray(COUNTRIES) ? COUNTRIES : [];
+  const handleNext = async () => {
+    // --- ÉTAPE 1 : VOYAGE ---
+    if (currentStep === 1) {
+        if (!formData.destination) { setErrors({ destination: "Requis" }); return; }
+        if (!formData.tripPrice) { setErrors({ tripPrice: "Requis" }); return; }
+        // Pas de calcul ici, on attend d'avoir toutes les infos
+    }
 
-  // Styles CSS (Tailwind)
-  const labelClass = "block text-sm font-semibold mb-2 text-gray-700";
-  const selectClass = "flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent appearance-none";
-  const inputClass = "flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50";
+    // --- ÉTAPE 2 : INFOS ---
+    if (currentStep === 2) {
+        if (!formData.firstName || !formData.lastName || !formData.birthDate || !formData.email) {
+             toast.error("Veuillez remplir vos informations personnelles");
+             return;
+        }
+    }
+
+    // --- ÉTAPE 3 : VOYAGEURS ---
+    if (currentStep === 3) {
+        // Vérifie si un voyageur a des champs vides
+        const invalid = formData.additionalTravelers.some(t => !t.firstName || !t.birthDate);
+        if (invalid) {
+            toast.error("Veuillez compléter les informations de tous les voyageurs");
+            return;
+        }
+    }
+
+    // --- ÉTAPE 4 : OPTIONS ---
+    if (currentStep === 4) {
+        // C'est le moment critique : on lance le calcul final avec TOUTES les données
+        await fetchQuote(); 
+    }
+
+    // --- NAVIGATION ---
+    if (currentStep < 5) {
+        setCurrentStep(prev => prev + 1);
+        window.scrollTo(0, 0);
+    } else {
+        // Vers le paiement
+        setIsSubmitted(true);
+        window.location.href = "/api/insurance-checkout"; 
+    }
+  };
+
+  if (isSubmitted) return <ConfirmationStep formData={formData} onReset={() => window.location.reload()} />;
 
   return (
-    <div className="space-y-6 animate-in fade-in">
-      <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Détails de votre voyage</h2>
-        <p className="text-gray-500">Commençons par les informations sur votre séjour</p>
-      </div>
+    <Card className="w-full max-w-4xl mx-auto shadow-elevated border-none relative overflow-hidden">
+      
+      {/* Le prix s'affiche dès qu'il est disponible (Étape 4+) */}
+      {quote && currentStep >= 4 && (
+          <div className="absolute top-0 right-0 bg-primary text-white px-6 py-2 rounded-bl-xl shadow-md z-20 font-bold animate-in slide-in-from-right">
+              {quote.premium} €
+              <span className="text-xs font-normal opacity-80 block text-right">Total</span>
+          </div>
+      )}
 
-      <div className="space-y-4">
-        
-        {/* PAYS RÉSIDENCE (Reste la liste complète des pays) */}
-        <div>
-          <label className={labelClass}>Votre pays de résidence *</label>
-          <div className="relative">
-            <select
-              className={selectClass}
-              value={formData.subscriberCountry}
-              onChange={(e) => updateFormData({ subscriberCountry: e.target.value })}
+      <CardContent className="p-6 md:p-8 pt-12">
+        <StepIndicator currentStep={currentStep} totalSteps={5} steps={STEPS} />
+
+        <div className="mt-8 min-h-[300px]">
+            {currentStep === 1 && <TripDetailsStep formData={formData} updateFormData={updateFormData} errors={errors} />}
+            {currentStep === 2 && <PersonalInfoStep formData={formData} updateFormData={updateFormData} errors={errors} />}
+            {currentStep === 3 && <TravelersStep formData={formData} updateFormData={updateFormData} errors={errors} />}
+            {currentStep === 4 && <OptionsStep formData={formData} updateFormData={updateFormData} errors={errors} />}
+            {currentStep === 5 && <SummaryStep formData={formData} updateFormData={updateFormData} errors={errors} quote={quote} isLoadingQuote={isLoading} />}
+        </div>
+
+        <div className="flex justify-between mt-8 pt-6 border-t border-gray-100">
+            <Button variant="ghost" onClick={() => setCurrentStep(c => c - 1)} disabled={currentStep === 1}>
+                Retour
+            </Button>
+            
+            <Button 
+                onClick={handleNext} 
+                disabled={isLoading}
+                className="bg-gradient-hero text-white px-8 shadow-lg transition-transform hover:scale-[1.02]"
             >
-              <option value="" disabled>Sélectionnez...</option>
-              {countryList.map((country) => (
-                <option key={country.code} value={country.code}>
-                  {country.name}
-                </option>
-              ))}
-            </select>
-          </div>
+                {isLoading ? "Calcul du tarif..." : (currentStep === 5 ? "Payer" : "Continuer")} 
+            </Button>
         </div>
-
-        {/* DESTINATION (MODIFIÉ : Seulement les 3 zones AVA) */}
-        <div>
-          <label className={labelClass}>Zone de destination *</label>
-          <div className="relative">
-            <select
-              className={`${selectClass} ${errors.destination ? "border-red-500 ring-red-200" : ""}`}
-              value={formData.destination}
-              onChange={(e) => updateFormData({ destination: e.target.value })}
-            >
-              <option value="" disabled>Sélectionnez votre zone...</option>
-              {/* Les codes 102, 58, 53 sont les IDs techniques d'AVA */}
-              <option value="102">Monde Entier (Hors USA/Canada) 🌍</option>
-              <option value="58">USA & Canada 🇺🇸 🇨🇦</option>
-              <option value="53">Europe 🇪🇺</option>
-            </select>
-          </div>
-          {errors.destination && <p className="text-red-500 text-xs mt-1">{errors.destination}</p>}
-        </div>
-
-        {/* DATES */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className={labelClass}>Date de départ</label>
-            <input
-              type="date"
-              className={inputClass}
-              value={formData.departureDate}
-              onChange={(e) => updateFormData({ departureDate: e.target.value })}
-              min={today}
-            />
-          </div>
-
-          <div>
-            <label className={labelClass}>Date de retour</label>
-            <input
-              type="date"
-              className={inputClass}
-              value={formData.returnDate}
-              onChange={(e) => updateFormData({ returnDate: e.target.value })}
-              min={formData.departureDate || today}
-            />
-          </div>
-        </div>
-
-        {/* PRIX */}
-        <div>
-          <label className={labelClass}>Prix total du voyage (€)</label>
-          <input
-            type="number"
-            placeholder="Ex: 2500"
-            className={`${inputClass} ${errors.tripPrice ? "border-red-500" : ""}`}
-            value={formData.tripPrice || ""}
-            onChange={(e) => updateFormData({ tripPrice: parseFloat(e.target.value) || 0 })}
-          />
-        </div>
-
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 };

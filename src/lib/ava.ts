@@ -11,14 +11,16 @@ function assertEnvVar(name: string, value: string | undefined) {
   }
 }
 
-// Authentification
+// 🔐 Authentification
 export async function getAvaToken() {
   assertEnvVar("AVA_PARTNER_ID", PARTNER_ID);
   assertEnvVar("AVA_PASSWORD", PASSWORD);
 
+  // Équivalent de :
+  // curl --form 'partnerId=...' --form 'password=...'
   const params = new URLSearchParams();
-  params.append("login", PARTNER_ID!);
-  params.append("motDePasse", PASSWORD!);
+  params.append("partnerId", PARTNER_ID!);
+  params.append("password", PASSWORD!);
 
   const response = await axios.post(
     `${AVA_API_URL}/authentification/connexion.php`,
@@ -28,6 +30,9 @@ export async function getAvaToken() {
     }
   );
 
+  console.log("Réponse AVA auth :", response.data);
+
+  // ⚠️ Si le champ s'appelle autrement (ex: accessToken), adapte ici
   if (!response.data?.token) {
     throw new Error("Token AVA manquant dans la réponse");
   }
@@ -35,7 +40,7 @@ export async function getAvaToken() {
   return response.data.token as string;
 }
 
-// --- Calcul de tarif ---
+// --- 💰 Calcul de tarif ---
 export async function getAvaPrice(data: any) {
   const token = await getAvaToken();
 
@@ -94,7 +99,7 @@ export async function getAvaPrice(data: any) {
     console.log("📥 Réponse AVA (tarif) :", response.data);
     const d = response.data;
 
-    // ➜ adapte ici en fonction de la vraie réponse AVA
+    // ➜ À adapter selon la doc AVA (nom du champ de tarif total)
     if (d?.tarif_total) {
       return parseFloat(d.tarif_total);
     }

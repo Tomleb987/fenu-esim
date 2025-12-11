@@ -1,48 +1,36 @@
-import type { NextApiRequest, NextApiResponse } from "next";
-import { getAvaPrice } from "@/lib/ava";
+// src/pages/api/get-quote.ts
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { getAvaPrice } from '@/lib/ava';
 
-type Data =
-  | { price: number; currency: string }
-  | { error: string; details?: unknown };
-
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse<Data>
-) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ message: 'Method not allowed' });
   }
 
   try {
     const { quoteData } = req.body;
 
-    if (!quoteData) {
-      return res.status(400).json({ error: "Missing quoteData" });
-    }
-
-    console.log("💰 [API] Calcul Tarif AVA avec :", quoteData);
-
-    // getAvaPrice utilise maintenant la tarification complexe AVA
+    // 1. On appelle la fonction (qui renvoie maintenant un chiffre ou 0)
     const price = await getAvaPrice(quoteData);
 
-    if (typeof price !== "number" || Number.isNaN(price)) {
-      return res.status(500).json({
-        error: "Tarif AVA invalide",
-        details: price,
+    console.log("💰 Tarif final reçu dans API:", price);
+
+    // 2. On vérifie juste si c'est un nombre positif
+    if (typeof price === 'number' && price > 0) {
+      return res.status(200).json({
+        price: price,
+        currency: "EUR",
+      });
+    } else {
+      // Si 0, c'est une erreur
+      return res.status(400).json({
+        error: "Tarif non disponible (Vérifiez les dates et âges)",
+        price: 0
       });
     }
 
-    console.log("[DEBUG] Prix final renvoyé au front :", price);
-
-    return res.status(200).json({
-      price,
-      currency: "EUR",
-    });
   } catch (error: any) {
-    console.error("💥 Erreur Serveur /api/get-quote:", error);
-    return res.status(500).json({
-      error: "Erreur lors du calcul de tarif",
-      details: error?.message ?? error,
-    });
+    console.error("💥 Crash API:", error.message);
+    return res.status(500).json({ error: "Erreur serveur interne" });
   }
 }

@@ -2,9 +2,7 @@ import { useEffect, useState } from "react";
 import { InsuranceFormData } from "@/types/insurance";
 import { COUNTRIES } from "@/lib/countries";
 
-// On n'importe PLUS de composants externes pour éviter le crash #130
-// import { Input } from "@/components/ui/input"; 
-// import { MapPin, Calendar, Euro, Globe, ChevronDown } from "lucide-react";
+// Note : On n'importe AUCUN composant externe pour garantir la stabilité (Zéro crash)
 
 interface TripDetailsStepProps {
   formData: InsuranceFormData;
@@ -16,28 +14,31 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
   const [today, setToday] = useState("");
 
   useEffect(() => {
+    // Calcul de la date côté client uniquement pour éviter les erreurs d'hydratation
     setToday(new Date().toISOString().split('T')[0]);
   }, []);
 
-  // Sécurité : Si COUNTRIES est vide ou mal chargé, on utilise une liste vide pour ne pas crasher
+  // Sécurité : Si le fichier pays est mal chargé, on utilise une liste vide
   const countryList = Array.isArray(COUNTRIES) ? COUNTRIES : [];
 
-  // Styles CSS (Tailwind) pour garder le design propre
+  // Styles CSS (Tailwind) pour imiter le design Shadcn sans utiliser de composants React
   const labelClass = "block text-sm font-semibold mb-2 text-gray-700";
-  const inputClass = "flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50";
-  const selectClass = "flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent appearance-none";
+  // Style input identique au composant UI mais en pur CSS
+  const inputClass = "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
+  // Style select
+  const selectClass = "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 appearance-none";
 
   return (
     <div className="space-y-6 animate-in fade-in">
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Détails de votre voyage</h2>
-        <p className="text-gray-500">Commençons par les informations sur votre séjour</p>
+        <h2 className="text-2xl font-bold text-foreground mb-2">Détails de votre voyage</h2>
+        <p className="text-muted-foreground">Commençons par les informations sur votre séjour</p>
       </div>
 
       <div className="space-y-4">
         
         {/* PAYS RÉSIDENCE */}
-        <div>
+        <div className="space-y-2">
           <label className={labelClass}>Votre pays de résidence *</label>
           <div className="relative">
             <select
@@ -56,7 +57,7 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
         </div>
 
         {/* DESTINATION */}
-        <div>
+        <div className="space-y-2">
           <label className={labelClass}>Destination *</label>
           <div className="relative">
             <select
@@ -77,7 +78,7 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
 
         {/* DATES */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
+          <div className="space-y-2">
             <label className={labelClass}>Date de départ</label>
             <input
               type="date"
@@ -88,7 +89,7 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
             />
           </div>
 
-          <div>
+          <div className="space-y-2">
             <label className={labelClass}>Date de retour</label>
             <input
               type="date"
@@ -101,7 +102,7 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
         </div>
 
         {/* PRIX */}
-        <div>
+        <div className="space-y-2">
           <label className={labelClass}>Prix total du voyage (€)</label>
           <input
             type="number"

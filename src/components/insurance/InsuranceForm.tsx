@@ -11,8 +11,10 @@ import { OptionsStep } from "./OptionsStep";
 import { SummaryStep } from "./SummaryStep";
 import { ConfirmationStep } from "./ConfirmationStep";
 import { InsuranceFormData } from "@/types/insurance";
-import { ArrowLeft, ArrowRight, Shield, Loader2 } from "lucide-react";
 import { toast } from "sonner"; 
+
+// ON RETIRE LES IMPORTS D'ICÔNES
+// import { ArrowLeft, ArrowRight, Shield, Loader2 } from "lucide-react";
 
 const STEPS = ["Voyage", "Infos", "Voyageurs", "Options", "Récap"];
 
@@ -62,8 +64,8 @@ export const InsuranceForm = () => {
                     startDate: formData.departureDate,
                     endDate: formData.returnDate,
                     destinationRegion: 102, 
-                    tripCost: formData.tripPrice * (1 + (formData.additionalTravelers?.length || 0)),
-                    subscriber: { birthDate: formData.birthDate },
+                    tripCost: formData.tripPrice, 
+                    subscriber: { birthDate: formData.birthDate || "1990-01-01" },
                     companions: formData.additionalTravelers,
                     options: {} 
                 }
@@ -73,23 +75,22 @@ export const InsuranceForm = () => {
         if (response.ok && data.price) {
             setQuote({ premium: data.price });
         } else {
-            console.error(data);
+            toast.error("Erreur tarif. Vérifiez les dates.");
         }
     } catch (e) {
-        console.error(e);
-        toast.error("Impossible de calculer le tarif.");
+        toast.error("Problème de connexion.");
     } finally {
         setIsLoading(false);
     }
   };
 
   const handleNext = async () => {
-    // Validation simple pour l'exemple
-    if (currentStep === 1 && !formData.destination) {
-        setErrors({ destination: "Requis" });
-        return;
+    if (currentStep === 1) {
+        if (!formData.destination) { setErrors({ destination: "Requis" }); return; }
+        if (!formData.tripPrice) { setErrors({ tripPrice: "Requis" }); return; }
     }
-    
+    // Validation rapide étape 2 et 3 à ajouter ici si besoin...
+
     if (currentStep === 4) {
         await fetchQuote();
     }
@@ -99,7 +100,6 @@ export const InsuranceForm = () => {
         window.scrollTo(0, 0);
     } else {
         setIsSubmitted(true);
-        // Ici rediriger vers /api/insurance-checkout
         window.location.href = "/api/insurance-checkout"; 
     }
   };
@@ -121,20 +121,17 @@ export const InsuranceForm = () => {
 
         <div className="flex justify-between mt-8 pt-6 border-t border-gray-100">
             <Button variant="ghost" onClick={() => setCurrentStep(c => c - 1)} disabled={currentStep === 1}>
-                <ArrowLeft className="w-4 h-4 mr-2"/> Retour
+                {/* Flèche retirée */}
+                Retour
             </Button>
             
-            {/* MODIFICATION ICI : 
-               J'ai remplacé variant="gradient" par une className explicite 
-               qui utilise votre nouveau dégradé Lovable (bg-gradient-hero).
-            */}
             <Button 
                 onClick={handleNext} 
                 disabled={isLoading}
                 className="bg-gradient-hero text-white hover:opacity-90 shadow-lg transition-all px-8"
             >
-                {isLoading ? <Loader2 className="animate-spin"/> : (currentStep === 5 ? "Payer" : "Continuer")} 
-                {!isLoading && <ArrowRight className="w-4 h-4 ml-2"/>}
+                {isLoading ? "Chargement..." : (currentStep === 5 ? "Payer" : "Continuer")} 
+                {/* Flèche retirée */}
             </Button>
         </div>
       </CardContent>

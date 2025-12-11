@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { StepIndicator } from "./StepIndicator";
@@ -36,7 +36,7 @@ const initialFormData: InsuranceFormData = {
   acceptMarketing: false,
 };
 
-export default function InsuranceForm() {
+export const InsuranceForm = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<InsuranceFormData>(initialFormData);
   const [quote, setQuote] = useState<{ premium: number } | null>(null);
@@ -49,194 +49,115 @@ export default function InsuranceForm() {
     setErrors({});
   };
 
-  const fetchQuote = async () => {
-    setIsLoading(true);
+  // Fonction de calcul (utilisable à tout moment)
+  const fetchQuote = async (isBackground = false) => {
+    if (!isBackground) setIsLoading(true);
     try {
-      const response = await fetch("/api/get-quote", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          quoteData: {
-            productType: "ava_tourist_card",
-            startDate: formData.departureDate,
-            endDate: formData.returnDate,
-            destinationRegion: 102,
-            tripCost: formData.tripPrice,
-            subscriber: { birthDate: formData.birthDate || "1990-01-01" },
-            companions: formData.additionalTravelers,
-            options: {},
-          },
-        }),
-      });
-
-      const data = await response.json();
-      console.log("Réponse /api/get-quote :", data);
-
-      // accepte 0 si AVA renvoie 0
-      if (response.ok && typeof data.price === "number") {
-        setQuote({ premium: data.price });
-      } else {
-        toast.error(data.error || "Erreur tarif. Vérifiez les dates.");
-      }
+        const response = await fetch('/api/get-quote', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                quoteData: {
+                    productType: "ava_tourist_card",
+                    startDate: formData.departureDate,
+                    endDate: formData.returnDate,
+                    destinationRegion: 102, 
+                    tripCost: formData.tripPrice, 
+                    // On envoie la date de naissance si dispo, sinon une par défaut pour le devis
+                    subscriber: { birthDate: formData.birthDate || "1990-01-01" },
+                    companions: formData.additionalTravelers,
+                    options: formData.selectedOptions 
+                }
+            })
+        });
+        const data = await response.json();
+        
+        if (response.ok && data.price) {
+            setQuote({ premium: data.price });
+            if (!isBackground) toast.success(`Tarif mis à jour : ${data.price} €`);
+        } else {
+            console.error("Erreur tarif:", data);
+        }
     } catch (e) {
-      console.error(e);
-      toast.error("Problème de connexion.");
+        console.error(e);
     } finally {
-      setIsLoading(false);
+        if (!isBackground) setIsLoading(false);
     }
   };
 
-  const startCheckout = async () => {
-    if (!quote) {
-      toast.error("Tarif manquant, impossible de lancer le paiement.");
-      return;
-    }
-    if (!formData.email) {
-      toast.error("Email requis pour le paiement.");
-      return;
-    }
-
-    try {
-      const response = await fetch("/api/insurance-checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          quoteData: {
-            productType: "ava_tourist_card",
-            startDate: formData.departureDate,
-            endDate: formData.returnDate,
-            tripCost: formData.tripPrice,
-            subscriber: {
-              firstName: formData.firstName,
-              lastName: formData.lastName,
-              birthDate: formData.birthDate,
-            },
-            additionalTravelers: formData.additionalTravelers,
-          },
-          userEmail: formData.email,
-          amount: quote.premium, // montant AVA déjà calculé
-        }),
-      });
-
-      const data = await response.json();
-      console.log("Réponse /api/insurance-checkout :", data);
-
-      if (response.ok && data.url) {
-        window.location.href = data.url; // redirection vers Stripe
-      } else {
-        console.error("checkout error:", data);
-        toast.error(data.error || "Erreur création du paiement.");
+  // Recalcul automatique si on change les options à l'étape 4
+  useEffect(() => {
+      if (currentStep === 4 && quote) {
+          fetchQuote(true); // Calcul silencieux
       }
-    } catch (e) {
-      console.error(e);
-      toast.error("Problème de connexion lors du paiement.");
-    }
-  };
+  }, [formData.selectedOptions]);
 
   const handleNext = async () => {
-    // validations simples
+    // --- ÉTAPE 1 : VOYAGE ---
     if (currentStep === 1) {
-      if (!formData.destination) {
-        setErrors({ destination: "Requis" });
-        return;
-      }
-      if (!formData.tripPrice) {
-        setErrors({ tripPrice: "Requis" });
-        return;
-      }
+        if (!formData.destination) { setErrors({ destination: "Requis" }); return; }
+        if (!formData.tripPrice) { setErrors({ tripPrice: "Requis" }); return; }
+        
+        // 🔥 C'EST ICI LE CHANGEMENT : On calcule le prix dès maintenant !
+        await fetchQuote(); 
     }
 
-    // tu pourras ajouter d'autres validations pour les étapes 2 / 3 ici
-
-    if (currentStep === 4) {
-      await fetchQuote();
+    // --- ÉTAPE 2 : INFOS ---
+    if (currentStep === 2) {
+        if (!formData.firstName || !formData.lastName) {
+             toast.error("Veuillez remplir vos informations");
+             return;
+        }
     }
 
+    // --- NAVIGATION ---
     if (currentStep < 5) {
-      setCurrentStep((prev) => prev + 1);
-      window.scrollTo(0, 0);
+        setCurrentStep(prev => prev + 1);
+        window.scrollTo(0, 0);
     } else {
-      // dernière étape : paiement Stripe
-      await startCheckout();
+        setIsSubmitted(true);
+        window.location.href = "/api/insurance-checkout"; 
     }
   };
 
-  if (isSubmitted) {
-    return (
-      <ConfirmationStep
-        formData={formData}
-        onReset={() => window.location.reload()}
-      />
-    );
-  }
+  if (isSubmitted) return <ConfirmationStep formData={formData} onReset={() => window.location.reload()} />;
 
   return (
-    <Card className="w-full max-w-4xl mx-auto shadow-elevated border-none">
-      <CardContent className="p-6 md:p-8">
+    <Card className="w-full max-w-4xl mx-auto shadow-elevated border-none relative overflow-hidden">
+      
+      {/* BANDEAU PRIX (Apparaît dès qu'on a un tarif) */}
+      {quote && currentStep > 1 && currentStep < 5 && (
+          <div className="absolute top-0 right-0 bg-primary text-white px-6 py-2 rounded-bl-xl shadow-md z-20 font-bold animate-in slide-in-from-right">
+              {quote.premium} €
+              <span className="text-xs font-normal opacity-80 block text-right">Total estimé</span>
+          </div>
+      )}
+
+      <CardContent className="p-6 md:p-8 pt-12"> {/* pt-12 pour laisser place au bandeau prix */}
         <StepIndicator currentStep={currentStep} totalSteps={5} steps={STEPS} />
 
         <div className="mt-8 min-h-[300px]">
-          {currentStep === 1 && (
-            <TripDetailsStep
-              formData={formData}
-              updateFormData={updateFormData}
-              errors={errors}
-            />
-          )}
-          {currentStep === 2 && (
-            <PersonalInfoStep
-              formData={formData}
-              updateFormData={updateFormData}
-              errors={errors}
-            />
-          )}
-          {currentStep === 3 && (
-            <TravelersStep
-              formData={formData}
-              updateFormData={updateFormData}
-              errors={errors}
-            />
-          )}
-          {currentStep === 4 && (
-            <OptionsStep
-              formData={formData}
-              updateFormData={updateFormData}
-              errors={errors}
-            />
-          )}
-          {currentStep === 5 && (
-            <SummaryStep
-              formData={formData}
-              updateFormData={updateFormData}
-              errors={errors}
-              quote={quote}
-              isLoadingQuote={isLoading}
-            />
-          )}
+            {currentStep === 1 && <TripDetailsStep formData={formData} updateFormData={updateFormData} errors={errors} />}
+            {currentStep === 2 && <PersonalInfoStep formData={formData} updateFormData={updateFormData} errors={errors} />}
+            {currentStep === 3 && <TravelersStep formData={formData} updateFormData={updateFormData} errors={errors} />}
+            {currentStep === 4 && <OptionsStep formData={formData} updateFormData={updateFormData} errors={errors} />}
+            {currentStep === 5 && <SummaryStep formData={formData} updateFormData={updateFormData} errors={errors} quote={quote} isLoadingQuote={isLoading} />}
         </div>
 
         <div className="flex justify-between mt-8 pt-6 border-t border-gray-100">
-          <Button
-            variant="ghost"
-            onClick={() => setCurrentStep((c) => (c > 1 ? c - 1 : 1))}
-            disabled={currentStep === 1}
-          >
-            Retour
-          </Button>
-
-          <Button
-            onClick={handleNext}
-            disabled={isLoading}
-            className="bg-gradient-hero text-white hover:opacity-90 shadow-lg transition-all px-8"
-          >
-            {isLoading
-              ? "Chargement..."
-              : currentStep === 5
-              ? "Payer"
-              : "Continuer"}
-          </Button>
+            <Button variant="ghost" onClick={() => setCurrentStep(c => c - 1)} disabled={currentStep === 1}>
+                Retour
+            </Button>
+            
+            <Button 
+                onClick={handleNext} 
+                disabled={isLoading}
+                className="bg-gradient-hero text-white px-8 shadow-lg transition-transform hover:scale-[1.02]"
+            >
+                {isLoading ? "Calcul du tarif..." : (currentStep === 5 ? "Payer" : "Continuer")} 
+            </Button>
         </div>
       </CardContent>
     </Card>
   );
-}
+};

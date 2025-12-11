@@ -2,6 +2,10 @@ import { useEffect, useState } from "react";
 import { InsuranceFormData } from "@/types/insurance";
 import { COUNTRIES } from "@/lib/countries";
 
+// On n'importe PLUS de composants externes pour éviter le crash #130
+// import { Input } from "@/components/ui/input"; 
+// import { MapPin, Calendar, Euro, Globe, ChevronDown } from "lucide-react";
+
 interface TripDetailsStepProps {
   formData: InsuranceFormData;
   updateFormData: (data: Partial<InsuranceFormData>) => void;
@@ -12,14 +16,13 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
   const [today, setToday] = useState("");
 
   useEffect(() => {
-    // Calcul de la date uniquement côté client
     setToday(new Date().toISOString().split('T')[0]);
   }, []);
 
-  // Sécurité : Liste vide par défaut
-  const countryList = COUNTRIES || [];
+  // Sécurité : Si COUNTRIES est vide ou mal chargé, on utilise une liste vide pour ne pas crasher
+  const countryList = Array.isArray(COUNTRIES) ? COUNTRIES : [];
 
-  // Styles CSS (Tailwind) pour imiter le design sans utiliser de composants React
+  // Styles CSS (Tailwind) pour garder le design propre
   const labelClass = "block text-sm font-semibold mb-2 text-gray-700";
   const inputClass = "flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50";
   const selectClass = "flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent appearance-none";

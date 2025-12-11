@@ -1,13 +1,13 @@
+// src/lib/ava.ts
 import axios from 'axios';
 import { format, isValid } from 'date-fns';
+import { AVA_TOURIST_OPTIONS } from './ava_options'; // Import nécessaire pour le mapping
 
 const AVA_API_URL = process.env.AVA_API_URL || "https://api-ava.fr/api";
 const PARTNER_ID = process.env.AVA_PARTNER_ID;
 const PASSWORD = process.env.AVA_PASSWORD;
-// Force 'false' pour le mode Test
 const IS_PROD = process.env.AVA_ENV === 'prod' ? 'true' : 'false';
-
-const CODE_PRODUIT = "ava_tourist_card"; 
+const CODE_PRODUIT = "ava_tourist_card";
 
 function assertEnvVar(name: string, value: string | undefined) {
   if (!value) throw new Error(`Variable ${name} manquante`);
@@ -46,10 +46,6 @@ const toFrDate = (d: string | undefined | null) => {
     return isValid(date) ? format(date, 'dd/MM/yyyy') : undefined;
 };
 
-/**
- * Construit le payload pour AVA.
- * CORRECTION : Envoi systématique des champs option et companionsInfos (même vides)
- */
 function buildTarificationPayload(data: any): URLSearchParams {
   const companions = data.companions || data.additionalTravelers || [];
   const totalTravelers = 1 + companions.length;
@@ -59,11 +55,11 @@ function buildTarificationPayload(data: any): URLSearchParams {
 
   const journeyStartDate = toFrDate(data.startDate);
   const journeyEndDate = toFrDate(data.endDate);
-  const subscriberBirth = toFrDate(data.subscriber?.birthDate) || "01/01/1990"; // Date par défaut (35 ans)
+  
+  // À l'étape 4, le souscripteur EST rempli, mais on garde une sécu
+  const subscriberBirth = toFrDate(data.subscriber?.birthDate) || "01/01/1980";
 
-  if (!journeyStartDate || !journeyEndDate) {
-      throw new Error("Dates invalides");
-  }
+  if (!journeyStartDate || !journeyEndDate) throw new Error("Dates invalides");
 
   const params = new URLSearchParams();
 
@@ -71,33 +67,30 @@ function buildTarificationPayload(data: any): URLSearchParams {
   params.append('productType', CODE_PRODUIT);
   params.append('journeyStartDate', journeyStartDate);
   params.append('journeyEndDate', journeyEndDate);
-  // AVA attend le coût PAR PERSONNE
-  params.append('journeyAmount', String(costPerPerson));
+  params.append('journeyAmount', String(costPerPerson)); // Coût par personne
   params.append('journeyRegion', String(data.destinationRegion || "102"));
   
   params.append('numberAdultCompanions', String(companions.length));
   params.append('numberChildrenCompanions', "0");
   params.append('numberCompanions', String(companions.length));
 
-  // --- SUBSCRIBER INFOS (OBLIGATOIRE) ---
+  // --- SUBSCRIBER ---
   const sub = data.subscriber || {};
   const subscriberInfos = {
       subscriberCountry: data.subscriberCountry || "FR",
       birthdate: subscriberBirth,
-      // Champs obligatoires remplis par défaut pour le devis
       firstName: sub.firstName || "Prénom",
       lastName: sub.lastName || "Nom",
-      subscriberEmail: sub.email || "devis@fenuasim.com",
+      subscriberEmail: sub.email || "client@email.com",
       address: {
-          street: sub.address || "Rue Test",
-          zip: sub.postalCode || "75000",
-          city: sub.city || "Paris"
+          street: sub.address || "Adresse",
+          zip: sub.postalCode || "00000",
+          city: sub.city || "Ville"
       }
   };
   params.append('subscriberInfos', JSON.stringify(subscriberInfos));
 
-  // --- COMPANIONS INFOS (OBLIGATOIRE MEME VIDE) ---
-  // L'API exige ce champ. Si vide, on envoie un tableau vide "[]"
+  // --- COMPANIONS ---
   const companionsInfos = companions.map((c: any) => ({
       firstName: c.firstName || "Accompagnant",
       lastName: c.lastName || "Inconnu",
@@ -106,16 +99,31 @@ function buildTarificationPayload(data: any): URLSearchParams {
   }));
   params.append('companionsInfos', JSON.stringify(companionsInfos));
 
-  // --- OPTIONS (OBLIGATOIRE MEME VIDE) ---
-  // L'API exige ce champ. Si vide, on envoie un objet vide "{}"
+  // --- OPTIONS (MAPPING INTELLIGENT) ---
   const optionsJson: any = {};
+  
   if (data.options && Array.isArray(data.options)) {
-      data.options.forEach((optId: string) => {
-          optionsJson[optId] = { "0": optId }; 
+      data.options.forEach((selectedId: string) => {
+          // On cherche l'option parente dans notre config pour avoir le bon ID de groupe
+          const parentOption = AVA_TOURIST_OPTIONS.find((opt: any) => 
+              opt.id === selectedId || 
+              opt.defaultSubOptionId === selectedId || 
+              opt.subOptions?.some((sub: any) => sub.id === selectedId)
+          );
+
+          if (parentOption) {
+              const parentId = parentOption.id;
+              if (!optionsJson[parentId]) optionsJson[parentId] = {};
+
+              // On applique l'option à TOUS les voyageurs (0 = Souscripteur, 1..N = Compagnons)
+              for (let i = 0; i < totalTravelers; i++) {
+                  optionsJson[parentId][String(i)] = selectedId;
+              }
+          }
       });
   }
+  
   params.append('option', JSON.stringify(optionsJson));
-
   params.append('prod', IS_PROD);
 
   return params;
@@ -127,7 +135,7 @@ export async function getAvaPrice(data: any) {
     const token = await getAvaToken();
     const params = buildTarificationPayload(data);
 
-    console.log(`📤 Tarif AVA (${params.get('journeyAmount')}€/pax, ${params.get('journeyStartDate')}-${params.get('journeyEndDate')})`);
+    console.log(`📤 Tarif AVA (${params.get('journeyAmount')}€/pax)`);
 
     const response = await axios.post(
       `${AVA_API_URL}/assurance/tarification/demandeTarif.php`,
@@ -143,17 +151,11 @@ export async function getAvaPrice(data: any) {
         price = d["Prix total avec options (en €)"] ?? d.montant_total ?? d.tarif_total ?? d.tarif;
     }
 
-    if (price == null) {
-        // Log de l'erreur pour le debug serveur
-        if (d.erreur || d.message) console.error("⚠️ AVA Retour:", d);
-        return 0;
-    }
-
+    if (price == null) return 0;
     return parseFloat(String(price));
 
   } catch (error: any) {
     console.error("❌ Erreur API AVA:", error.response?.data || error.message);
-    // On retourne 0 pour que le front affiche "Tarif non dispo" proprement
     return 0;
   }
 }
@@ -161,8 +163,6 @@ export async function getAvaPrice(data: any) {
 /* --- 3. CRÉATION ADHÉSION --- */
 export async function createAvaAdhesion(data: any) {
     const token = await getAvaToken();
-    // On doit s'assurer que les données réelles sont bien remplies ici (pas de dummy data)
-    // Mais pour l'instant on réutilise le builder qui est sécurisé
     const params = buildTarificationPayload(data); 
 
     console.log("📤 Création Adhésion AVA...");
@@ -194,7 +194,4 @@ export async function createAvaAdhesion(data: any) {
     }
 }
 
-/* --- 4. VALIDATION --- */
-export async function validateAvaAdhesion(adhesionNumber: string) {
-    return true; 
-}
+export async function validateAvaAdhesion(adhesionNumber: string) { return true; }

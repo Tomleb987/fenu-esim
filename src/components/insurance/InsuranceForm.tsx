@@ -80,7 +80,7 @@ export default function InsuranceForm() {
         
         if (response.ok && data.price) {
             setQuote({ premium: data.price });
-            if (!isBackground) toast.success(`Nouveau tarif : ${data.price} €`);
+            if (!isBackground) toast.success(`Tarif calculé : ${data.price} €`);
         } else {
             console.error("Info tarif:", data);
         }
@@ -91,7 +91,7 @@ export default function InsuranceForm() {
     }
   };
 
-  // Recalcul si on change les options à l'étape 4
+  // Recalcul auto si on change les options à l'étape 4
   useEffect(() => {
       if (currentStep === 4 && quote) {
           fetchQuote(true);
@@ -103,6 +103,7 @@ export default function InsuranceForm() {
     if (currentStep === 1) {
         if (!formData.destination) { setErrors({ destination: "Requis" }); return; }
         if (!formData.tripPrice) { setErrors({ tripPrice: "Requis" }); return; }
+        // ON RETIRE LE CALCUL ICI POUR ATTENDRE LA FIN
     }
 
     // --- ÉTAPE 2 : INFOS ---
@@ -115,7 +116,6 @@ export default function InsuranceForm() {
 
     // --- ÉTAPE 3 : VOYAGEURS ---
     if (currentStep === 3) {
-        // Validation basique des voyageurs
         const invalid = formData.additionalTravelers.some(t => !t.firstName || !t.birthDate);
         if (invalid) {
             toast.error("Veuillez compléter les infos des voyageurs");
@@ -126,6 +126,7 @@ export default function InsuranceForm() {
     // --- ÉTAPE 4 : OPTIONS ---
     if (currentStep === 4) {
         // C'EST ICI QU'ON LANCE LE PREMIER VRAI CALCUL
+        // Avec toutes les données (dates, âges, options)
         await fetchQuote(); 
     }
 

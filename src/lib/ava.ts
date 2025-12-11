@@ -6,6 +6,7 @@ import { AVA_TOURIST_OPTIONS } from './ava_options';
 const AVA_API_URL = process.env.AVA_API_URL || "https://api-ava.fr/api";
 const PARTNER_ID = process.env.AVA_PARTNER_ID;
 const PASSWORD = process.env.AVA_PASSWORD;
+// Force le mode 'false' (Test) sauf si la variable d'env est explicitement 'prod'
 const IS_PROD = process.env.AVA_ENV === 'prod' ? 'true' : 'false';
 const CODE_PRODUIT = "ava_tourist_card";
 
@@ -28,6 +29,7 @@ export async function getAvaToken() {
     });
 
     const d = response.data;
+    // Gestion robuste des différents formats de retour du token
     if (d && d.Token) return d.Token;
     if (d && d.token) return d.token;
     if (typeof d === 'string' && d.length > 20) return d;
@@ -59,8 +61,8 @@ function buildTarificationPayload(data: any): URLSearchParams {
   const journeyStartDate = toFrDate(data.startDate);
   const journeyEndDate = toFrDate(data.endDate);
   
-  // À ce stade (fin de tunnel), on a la vraie date de naissance
-  const subscriberBirth = toFrDate(data.subscriber?.birthDate) || "01/01/1980";
+  // Date de naissance par défaut pour le devis si non renseignée (35 ans)
+  const subscriberBirth = toFrDate(data.subscriber?.birthDate) || "01/01/1990";
 
   if (!journeyStartDate || !journeyEndDate) throw new Error("Dates invalides");
 
@@ -70,6 +72,7 @@ function buildTarificationPayload(data: any): URLSearchParams {
   params.append('productType', CODE_PRODUIT);
   params.append('journeyStartDate', journeyStartDate);
   params.append('journeyEndDate', journeyEndDate);
+  // AVA attend le coût PAR PERSONNE pour calculer la prime d'annulation
   params.append('journeyAmount', String(costPerPerson)); 
   params.append('journeyRegion', String(data.destinationRegion || "102"));
   
@@ -78,37 +81,38 @@ function buildTarificationPayload(data: any): URLSearchParams {
   params.append('numberCompanions', String(companions.length));
 
   // --- SUBSCRIBER INFOS (JSON) ---
+  // On remplit les champs obligatoires avec des placeholders si c'est juste un devis
   const sub = data.subscriber || {};
   const subscriberInfos = {
       subscriberCountry: data.subscriberCountry || "FR",
       birthdate: subscriberBirth,
       firstName: sub.firstName || "Prénom",
       lastName: sub.lastName || "Nom",
-      subscriberEmail: sub.email || "client@email.com",
+      subscriberEmail: sub.email || "devis@fenuasim.com",
       address: {
-          street: sub.address || "Adresse",
-          zip: sub.postalCode || "00000",
-          city: sub.city || "Ville"
+          street: sub.address || "Rue Test",
+          zip: sub.postalCode || "75000",
+          city: sub.city || "Paris"
       }
   };
   params.append('subscriberInfos', JSON.stringify(subscriberInfos));
 
   // --- COMPANIONS INFOS (JSON) ---
-  // On mappe les accompagnants
   const companionsInfos = companions.map((c: any) => ({
       firstName: c.firstName || "Accompagnant",
       lastName: c.lastName || "Inconnu",
       birthdate: toFrDate(c.birthDate) || "01/01/1990",
-      parental_link: "13" // 13 = Sans parenté (ou mappez si vous avez l'info)
+      parental_link: "13" // 13 = Sans parenté par défaut
   }));
   params.append('companionsInfos', JSON.stringify(companionsInfos));
 
   // --- OPTIONS (LE GROS MORCEAU) ---
   const optionsJson: any = {};
   
+  // 'data.options' contient la liste des IDs sélectionnés (ex: ["338", "989"])
   if (data.options && Array.isArray(data.options)) {
       data.options.forEach((selectedId: string) => {
-          // 1. On trouve l'option parente dans notre config (ex: 335 est parent de 338)
+          // 1. On retrouve l'option parente dans notre config pour avoir le bon ID de groupe
           const parentOption = AVA_TOURIST_OPTIONS.find((opt: any) => 
               opt.id === selectedId || 
               opt.defaultSubOptionId === selectedId || 
@@ -118,10 +122,11 @@ function buildTarificationPayload(data: any): URLSearchParams {
           if (parentOption) {
               const parentId = parentOption.id; // Ex: "335"
               
+              // On initialise l'objet pour ce parent s'il n'existe pas
               if (!optionsJson[parentId]) optionsJson[parentId] = {};
 
               // 2. On applique l'option à TOUS les voyageurs (0 = Souscripteur, 1..N = Compagnons)
-              // AVA demande : {"335": {"0": "338", "1": "338"}}
+              // Format attendu : {"335": {"0": "338", "1": "338"}}
               for (let i = 0; i < totalTravelers; i++) {
                   optionsJson[parentId][String(i)] = selectedId;
               }
@@ -154,10 +159,15 @@ export async function getAvaPrice(data: any) {
 
     let price = null;
     if (d) {
+        // L'API peut renvoyer le prix sous plusieurs clés
         price = d["Prix total avec options (en €)"] ?? d.montant_total ?? d.tarif_total ?? d.tarif;
     }
 
-    if (price == null) return 0;
+    if (price == null) {
+        if (d.erreur || d.message) console.warn("⚠️ Message AVA:", d.erreur || d.message);
+        return 0;
+    }
+
     return parseFloat(String(price));
 
   } catch (error: any) {
@@ -200,4 +210,7 @@ export async function createAvaAdhesion(data: any) {
     }
 }
 
-export async function validateAvaAdhesion(adhesionNumber: string) { return true; }
+/* --- 4. VALIDATION --- */
+export async function validateAvaAdhesion(adhesionNumber: string) {
+    return true; 
+}

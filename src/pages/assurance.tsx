@@ -4,7 +4,7 @@ import Head from "next/head";
 import InsuranceForm from "@/components/insurance/InsuranceForm";
 
 export default function AssurancePage() {
-  
+
   useEffect(() => {
     document.body.classList.add("assurance-mode");
     return () => {

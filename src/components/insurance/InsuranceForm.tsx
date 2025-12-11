@@ -13,9 +13,6 @@ import { ConfirmationStep } from "./ConfirmationStep";
 import { InsuranceFormData } from "@/types/insurance";
 import { toast } from "sonner";
 
-// ON RETIRE LES IMPORTS D'ICÔNES
-// import { ArrowLeft, ArrowRight, Shield, Loader2 } from "lucide-react";
-
 const STEPS = ["Voyage", "Infos", "Voyageurs", "Options", "Récap"];
 
 const initialFormData: InsuranceFormData = {
@@ -73,13 +70,16 @@ export default function InsuranceForm() {
       });
 
       const data = await response.json();
+      console.log("Réponse /api/get-quote :", data);
 
-      if (response.ok && data.price) {
+      // ✅ on accepte 0 comme prix valide
+      if (response.ok && typeof data.price === "number") {
         setQuote({ premium: data.price });
       } else {
-        toast.error("Erreur tarif. Vérifiez les dates.");
+        toast.error(data.error || "Erreur tarif. Vérifiez les dates.");
       }
     } catch (e) {
+      console.error(e);
       toast.error("Problème de connexion.");
     } finally {
       setIsLoading(false);
@@ -171,9 +171,7 @@ export default function InsuranceForm() {
         <div className="flex justify-between mt-8 pt-6 border-t border-gray-100">
           <Button
             variant="ghost"
-            onClick={() =>
-              setCurrentStep((c) => (c > 1 ? c - 1 : 1))
-            }
+            onClick={() => setCurrentStep((c) => (c > 1 ? c - 1 : 1))}
             disabled={currentStep === 1}
           >
             Retour

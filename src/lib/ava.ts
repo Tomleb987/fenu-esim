@@ -5,8 +5,10 @@ import { format, isValid } from 'date-fns';
 const AVA_API_URL = process.env.AVA_API_URL || "https://api-ava.fr/api";
 const PARTNER_ID = process.env.AVA_PARTNER_ID;
 const PASSWORD = process.env.AVA_PASSWORD;
+// On peut définir le mode via une variable d'env, sinon 'false' par sécurité (Mode Test)
+const IS_PROD = process.env.AVA_ENV === 'prod' ? 'true' : 'false';
 
-// --- 1. AUTHENTIFICATION (Celle qui fonctionne !) ---
+// --- 1. AUTHENTIFICATION ---
 export async function getAvaToken() {
   if (!PARTNER_ID || !PASSWORD) {
     throw new Error("Identifiants AVA manquants (.env)");
@@ -23,7 +25,6 @@ export async function getAvaToken() {
     });
 
     const d = response.data;
-    // On gère la Majuscule "Token" renvoyée par AVA
     if (d && d.Token) return d.Token;
     if (d && d.token) return d.token;
     if (typeof d === 'string' && d.length > 20) return d;
@@ -37,18 +38,17 @@ export async function getAvaToken() {
   }
 }
 
-// --- 2. CALCUL DU PRIX (Avec les bons paramètres PHP) ---
+// --- 2. CALCUL DU PRIX ---
 export async function getAvaPrice(data: any) {
   const token = await getAvaToken();
   
-  // 1. Calcul du nombre de personnes et du coût par tête
+  // Calculs préparatoires
   const companions = data.companions || [];
   const totalTravelers = 1 + companions.length;
   const totalTripCost = Number(data.tripCost) || 0;
-  // AVA demande souvent le capital PAR personne pour l'option annulation
   const costPerPerson = totalTravelers > 0 ? Math.ceil(totalTripCost / totalTravelers) : 0;
 
-  // 2. Formatage des dates (dd/mm/yyyy)
+  // Formatage des dates
   const safeDate = (d: string) => {
     if (!d) return "";
     const date = new Date(d);
@@ -60,28 +60,26 @@ export async function getAvaPrice(data: any) {
   const dBirth = safeDate(data.subscriber.birthDate);
 
   if (!dStart || !dEnd || !dBirth) {
-      console.warn("⚠️ Dates manquantes pour AVA, impossible de coter.");
+      console.warn("⚠️ Dates manquantes pour AVA.");
       return 0;
   }
 
-  // 3. Mapping du code produit
-  // Si le front envoie "ava_tourist_card", on doit envoyer "30" (ou le code de votre contrat)
-  let codeProduit = "30"; 
-  if (data.productType === "ava_tourist_card") codeProduit = "30";
-  // Ajoutez d'autres cas si nécessaire
-
-  // 4. Construction des paramètres (Format Français attendu par PHP)
+  // Construction des paramètres
   const params = new URLSearchParams();
-  params.append('produit', codeProduit);
+  
+  // --- LE FIX EST ICI : On ajoute le paramètre 'prod' ---
+  params.append('prod', IS_PROD); 
+  
+  params.append('produit', "30"); // Code Tourist Card
   params.append('date_depart', dStart);
   params.append('date_retour', dEnd);
   params.append('destination', String(data.destinationRegion || "102")); 
 
-  // Souscripteur (Toujours l'index 1)
+  // Souscripteur
   params.append('date_naissance_1', dBirth);
   params.append('capital_1', costPerPerson.toString());
 
-  // Compagnons (Index 2, 3...)
+  // Compagnons
   companions.forEach((comp: any, index: number) => {
     const avaIndex = index + 2;
     const cBirth = safeDate(comp.birthDate);
@@ -91,16 +89,15 @@ export async function getAvaPrice(data: any) {
     }
   });
 
-  // Options (Ex: opt_335=1)
+  // Options
   if (data.options && typeof data.options === 'object') {
-      // Si options est un tableau d'IDs ou un objet
       const opts = Array.isArray(data.options) ? data.options : Object.keys(data.options);
       opts.forEach((optId: string) => {
           params.append(`opt_${optId}`, '1');
       });
   }
 
-  console.log(`📤 Envoi Tarif AVA (Produit: ${codeProduit}, Pax: ${totalTravelers})`);
+  console.log(`📤 Envoi Tarif AVA (Produit: 30, Pax: ${totalTravelers}, Prod: ${IS_PROD})`);
 
   try {
     const response = await axios.post(
@@ -118,7 +115,6 @@ export async function getAvaPrice(data: any) {
 
     // Extraction du prix
     if (response.data) {
-        // L'API peut renvoyer le prix sous plusieurs clés
         const p = response.data.tarif_total 
                ?? response.data.tarif 
                ?? response.data.montant_total 
@@ -131,7 +127,6 @@ export async function getAvaPrice(data: any) {
 
   } catch (error: any) {
     console.error("❌ Erreur calcul AVA:", error.response?.data || error.message);
-    // On renvoie l'erreur détaillée pour comprendre le 400 si ça se reproduit
     throw new Error(JSON.stringify(error.response?.data || error.message));
   }
 }
@@ -139,10 +134,4 @@ export async function getAvaPrice(data: any) {
 // --- 3. VALIDATION (Stub) ---
 export async function validateAvaAdhesion(adhesionNumber: string) {
     return true; 
-}
-
-// --- 4. CREATION ADHESION (Stub si nécessaire) ---
-export async function createAvaAdhesion(data: any) {
-    // À adapter comme getAvaPrice quand le tarif fonctionnera
-    return { adhesion_number: "SIMU-000", contract_link: null };
 }

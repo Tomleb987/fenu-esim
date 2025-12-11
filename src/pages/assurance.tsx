@@ -1,6 +1,6 @@
 import React, { useEffect } from "react";
 import Head from "next/head";
-// CORRECTION : Import par défaut (sans les accolades { })
+// CORRECTION : Import SANS les accolades
 import InsuranceForm from "@/components/insurance/InsuranceForm";
 
 export default function AssurancePage() {

@@ -1,109 +1,128 @@
-import axios from 'axios';
-import { format } from 'date-fns';
+import axios from "axios";
+import { format } from "date-fns";
 
 const AVA_API_URL = process.env.AVA_API_URL || "https://api-ava.fr/api";
 const PARTNER_ID = process.env.AVA_PARTNER_ID;
 const PASSWORD = process.env.AVA_PASSWORD;
 
-// Authentification (inchangée)
-export async function getAvaToken() {
-  const params = new URLSearchParams();
-  params.append('login', PARTNER_ID!);
-  params.append('motDePasse', PASSWORD!);
+// --- Helpers internes ---
 
-  const response = await axios.post(`${AVA_API_URL}/authentification/connexion.php`, params, {
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-  });
-  return response.data.token;
+function assertEnvVar(name: string, value: string | undefined) {
+  if (!value) {
+    throw new Error(`La variable d'environnement ${name} est manquante`);
+  }
 }
 
-// --- C'EST ICI QUE LA CORRECTION SE FAIT ---
+// Authentification
+export async function getAvaToken() {
+  assertEnvVar("AVA_PARTNER_ID", PARTNER_ID);
+  assertEnvVar("AVA_PASSWORD", PASSWORD);
+
+  const params = new URLSearchParams();
+  params.append("login", PARTNER_ID!);
+  params.append("motDePasse", PASSWORD!);
+
+  const response = await axios.post(
+    `${AVA_API_URL}/authentification/connexion.php`,
+    params,
+    {
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    }
+  );
+
+  if (!response.data?.token) {
+    throw new Error("Token AVA manquant dans la réponse");
+  }
+
+  return response.data.token as string;
+}
+
+// --- Calcul de tarif ---
 export async function getAvaPrice(data: any) {
   const token = await getAvaToken();
-  
-  // 1. Calcul du nombre total de personnes
+
   const companions = data.companions || [];
   const totalTravelers = 1 + companions.length;
 
-  // 2. Gestion du Prix du Voyage (Capital Assuré)
-  // AVA demande souvent le capital PAR PERSONNE.
-  // Si tripCost est le total (ex: 2000€ pour 2), on divise.
   const totalTripCost = Number(data.tripCost) || 0;
-  const costPerPerson = totalTravelers > 0 ? Math.ceil(totalTripCost / totalTravelers) : 0;
+  const costPerPerson =
+    totalTravelers > 0 ? Math.ceil(totalTripCost / totalTravelers) : 0;
 
-  // 3. Construction des paramètres API
-  // On utilise URLSearchParams pour gérer proprement l'encodage
   const params = new URLSearchParams();
 
-  // Paramètres communs
-  params.append('produit', "30"); // Code 30 = Tourist Card (Vérifiez ce code selon votre contrat !)
-  params.append('date_depart', format(new Date(data.startDate), 'dd/MM/yyyy'));
-  params.append('date_retour', format(new Date(data.endDate), 'dd/MM/yyyy'));
-  params.append('destination', data.destinationRegion || "102"); // 102 = Monde
+  // Produit / dates / destination
+  params.append("produit", "30"); // Tourist Card (à confirmer côté contrat)
+  params.append(
+    "date_depart",
+    format(new Date(data.startDate), "dd/MM/yyyy")
+  );
+  params.append(
+    "date_retour",
+    format(new Date(data.endDate), "dd/MM/yyyy")
+  );
+  params.append("destination", data.destinationRegion || "102"); // Monde par défaut
 
-  // --- BOUCLE SUR LES VOYAGEURS ---
-  
-  // A. Le Souscripteur (Toujours l'index 1)
-  // Format attendu par AVA : date_naissance_1, capital_1
-  params.append('date_naissance_1', format(new Date(data.subscriber.birthDate), 'dd/MM/yyyy'));
-  params.append('capital_1', costPerPerson.toString());
+  // Souscripteur (index 1)
+  params.append(
+    "date_naissance_1",
+    format(new Date(data.subscriber.birthDate), "dd/MM/yyyy")
+  );
+  params.append("capital_1", costPerPerson.toString());
 
-  // B. Les Accompagnants (Index 2, 3, 4...)
+  // Accompagnants (index 2, 3, 4...)
   companions.forEach((comp: any, index: number) => {
-    const avaIndex = index + 2; // On commence à 2 car le souscripteur est le 1
-    
+    const avaIndex = index + 2;
+
     if (comp.birthDate) {
-        params.append(`date_naissance_${avaIndex}`, format(new Date(comp.birthDate), 'dd/MM/yyyy'));
-        params.append(`capital_${avaIndex}`, costPerPerson.toString());
+      params.append(
+        `date_naissance_${avaIndex}`,
+        format(new Date(comp.birthDate), "dd/MM/yyyy")
+      );
+      params.append(`capital_${avaIndex}`, costPerPerson.toString());
     }
   });
-
-  // Gestion des options (Si vous en avez)
-  // Exemple : if (data.options.annulation) params.append('opt_335', '1');
 
   console.log("📤 Envoi à AVA :", params.toString());
 
   try {
     const response = await axios.post(
-      `${AVA_API_URL}/assurance/tarification/demandeTarif.php`, // Utilisez demandeTarif pour gérer options/multi-pax
-      params, 
+      `${AVA_API_URL}/assurance/tarification/demandeTarif.php`,
+      params,
       {
-        headers: { 
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/x-www-form-urlencoded'
-        }
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
       }
     );
 
     console.log("📥 Réponse AVA :", response.data);
 
-    // L'API renvoie souvent le tarif total dans un champ 'tarif_total' ou 'montant'
-    // Adaptez selon la réponse réelle vue dans Postman
-    if (response.data && response.data.tarif_total) {
-        return parseFloat(response.data.tarif_total);
-    } 
-    // Fallback si la structure est différente
-    else if (response.data && response.data.tarif) {
-        return parseFloat(response.data.tarif);
-    }
-    
-    throw new Error("Pas de tarif dans la réponse AVA");
+    const d = response.data;
 
+    if (d?.tarif_total) {
+      return parseFloat(d.tarif_total);
+    }
+    if (d?.tarif) {
+      return parseFloat(d.tarif);
+    }
+
+    throw new Error("Pas de tarif exploitable dans la réponse AVA");
   } catch (error: any) {
     console.error("Erreur calcul AVA:", error.response?.data || error.message);
     throw new Error("Erreur lors du calcul AVA");
   }
 }
 
-// Fonction de validation (inchangée mais nécessaire)
+// Validation (stub pour l’instant)
 export async function validateAvaAdhesion(adhesionNumber: string) {
-    // ... votre code de validation existant ...
-    return true; 
+  // TODO: implémenter l'appel réel à AVA pour valider l'adhésion
+  return true;
 }
 
-// Fonction de création (nécessaire pour insurance-checkout.ts)
+// Création d'adhésion (stub pour insurance-checkout)
 export async function createAvaAdhesion(data: any) {
-    // ... Logique similaire à getAvaPrice mais vers /creationAdhesion.php ...
-    // Pensez à réutiliser la même logique de boucle (date_naissance_X) ici aussi !
-    return { adhesion_number: "SIMU-12345", contract_link: null }; // Mock pour l'instant
+  // TODO: adapter avec la vraie route AVA de création d’adhésion
+  // réutiliser la logique de mapping (date_naissance_X, capital_X, etc.)
+  return { adhesion_number: "SIMU-12345", contract_link: null };
 }

@@ -22,7 +22,7 @@ export default async function handler(
 
     console.log("💰 [API] Calcul Tarif AVA avec :", quoteData);
 
-    // ⚠️ getAvaPrice renvoie déjà un nombre
+    // getAvaPrice doit renvoyer un nombre (tarif total)
     const price = await getAvaPrice(quoteData);
 
     if (typeof price !== "number" || Number.isNaN(price)) {

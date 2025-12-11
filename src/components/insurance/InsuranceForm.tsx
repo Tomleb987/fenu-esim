@@ -80,30 +80,37 @@ export default function InsuranceForm() {
         
         if (response.ok && data.price) {
             setQuote({ premium: data.price });
-            if (!isBackground) toast.success(`Tarif calculé : ${data.price} €`);
+            if (!isBackground) toast.success(`Nouveau tarif : ${data.price} €`);
         } else {
             console.error("Info tarif:", data);
+            if (!isBackground) toast.error("Impossible de calculer le tarif pour ces dates.");
         }
     } catch (e) {
         console.error(e);
+        if (!isBackground) toast.error("Erreur de connexion au serveur.");
     } finally {
         if (!isBackground) setIsLoading(false);
     }
   };
 
-  // Recalcul auto si on change les options à l'étape 4
+  // Recalcul automatique si on change les options à l'étape 4
   useEffect(() => {
-      if (currentStep === 4 && quote) {
-          fetchQuote(true);
+      // On ne lance le calcul auto que si on est à l'étape 4 ou plus
+      if (currentStep >= 4) {
+          // Petit délai pour éviter de spammer l'API si l'utilisateur clique vite
+          const timer = setTimeout(() => {
+              fetchQuote(true);
+          }, 500);
+          return () => clearTimeout(timer);
       }
-  }, [formData.selectedOptions]);
+  }, [formData.selectedOptions, currentStep]);
 
   const handleNext = async () => {
     // --- ÉTAPE 1 : VOYAGE ---
     if (currentStep === 1) {
         if (!formData.destination) { setErrors({ destination: "Requis" }); return; }
         if (!formData.tripPrice) { setErrors({ tripPrice: "Requis" }); return; }
-        // ON RETIRE LE CALCUL ICI POUR ATTENDRE LA FIN
+        // ON NE CALCULE PAS ENCORE LE PRIX ICI
     }
 
     // --- ÉTAPE 2 : INFOS ---
@@ -125,8 +132,7 @@ export default function InsuranceForm() {
 
     // --- ÉTAPE 4 : OPTIONS ---
     if (currentStep === 4) {
-        // C'EST ICI QU'ON LANCE LE PREMIER VRAI CALCUL
-        // Avec toutes les données (dates, âges, options)
+        // C'EST LE MOMENT DE VÉRITÉ : CALCUL DU PRIX FINAL
         await fetchQuote(); 
     }
 
@@ -145,6 +151,7 @@ export default function InsuranceForm() {
   return (
     <Card className="w-full max-w-4xl mx-auto shadow-elevated border-none relative overflow-hidden">
       
+      {/* Le prix s'affiche dès l'étape 4 */}
       {quote && currentStep >= 4 && (
           <div className="absolute top-0 right-0 bg-primary text-white px-6 py-2 rounded-bl-xl shadow-md z-20 font-bold animate-in slide-in-from-right">
               {quote.premium} €

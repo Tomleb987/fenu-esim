@@ -6,13 +6,15 @@ const AVA_API_URL = process.env.AVA_API_URL || "https://api-ava.fr/api";
 const PARTNER_ID = process.env.AVA_PARTNER_ID;
 const PASSWORD = process.env.AVA_PASSWORD;
 
-// --- AUTHENTIFICATION ---
+// --- 1. AUTHENTIFICATION (Celle qui fonctionne !) ---
 export async function getAvaToken() {
-  if (!PARTNER_ID || !PASSWORD) throw new Error("Identifiants AVA manquants (.env)");
+  if (!PARTNER_ID || !PASSWORD) {
+    throw new Error("Identifiants AVA manquants (.env)");
+  }
 
   const params = new URLSearchParams();
-  params.append('partnerId', PARTNER_ID); 
-  params.append('password', PASSWORD);    
+  params.append('partnerId', PARTNER_ID);
+  params.append('password', PASSWORD);
 
   try {
     console.log("🔑 Connexion AVA...");
@@ -20,87 +22,127 @@ export async function getAvaToken() {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
     });
 
-    // 👇 C'EST ICI QUE JE CORRIGE : On gère la Majuscule "Token"
-    if (response.data) {
-        if (response.data.token) return response.data.token; // Cas standard
-        if (response.data.Token) return response.data.Token; // Cas AVA actuel (Majuscule)
-        if (response.data.accessToken) return response.data.accessToken;
-    }
-    
-    // Si c'est juste une string brute
-    if (typeof response.data === 'string' && response.data.length > 10) return response.data;
-    
-    console.error("❌ Réponse Auth inattendue (Format inconnu):", response.data);
-    throw new Error("Pas de token reçu dans la réponse AVA");
+    const d = response.data;
+    // On gère la Majuscule "Token" renvoyée par AVA
+    if (d && d.Token) return d.Token;
+    if (d && d.token) return d.token;
+    if (typeof d === 'string' && d.length > 20) return d;
+
+    console.error("❌ Réponse Auth inattendue:", d);
+    throw new Error("Pas de token valide reçu");
 
   } catch (error: any) {
-    console.error("❌ Erreur Connexion:", error.response?.data || error.message);
+    console.error("❌ Erreur Auth:", error.response?.data || error.message);
     throw error;
   }
 }
 
-// --- CALCUL DU PRIX ---
+// --- 2. CALCUL DU PRIX (Avec les bons paramètres PHP) ---
 export async function getAvaPrice(data: any) {
-  // On récupère le token (maintenant ça va marcher)
   const token = await getAvaToken();
   
-  const totalTravelers = 1 + (data.companions?.length || 0);
-  const costPerPerson = totalTravelers > 0 ? Math.ceil((Number(data.tripCost) || 0) / totalTravelers) : 0;
+  // 1. Calcul du nombre de personnes et du coût par tête
+  const companions = data.companions || [];
+  const totalTravelers = 1 + companions.length;
+  const totalTripCost = Number(data.tripCost) || 0;
+  // AVA demande souvent le capital PAR personne pour l'option annulation
+  const costPerPerson = totalTravelers > 0 ? Math.ceil(totalTripCost / totalTravelers) : 0;
 
-  const safeDate = (d: string) => isValid(new Date(d)) ? format(new Date(d), 'dd/MM/yyyy') : "";
+  // 2. Formatage des dates (dd/mm/yyyy)
+  const safeDate = (d: string) => {
+    if (!d) return "";
+    const date = new Date(d);
+    return isValid(date) ? format(date, 'dd/MM/yyyy') : "";
+  };
+
   const dStart = safeDate(data.startDate);
   const dEnd = safeDate(data.endDate);
   const dBirth = safeDate(data.subscriber.birthDate);
 
   if (!dStart || !dEnd || !dBirth) {
-      console.warn("⚠️ Date manquante pour AVA, retour 0€");
+      console.warn("⚠️ Dates manquantes pour AVA, impossible de coter.");
       return 0;
   }
 
+  // 3. Mapping du code produit
+  // Si le front envoie "ava_tourist_card", on doit envoyer "30" (ou le code de votre contrat)
+  let codeProduit = "30"; 
+  if (data.productType === "ava_tourist_card") codeProduit = "30";
+  // Ajoutez d'autres cas si nécessaire
+
+  // 4. Construction des paramètres (Format Français attendu par PHP)
   const params = new URLSearchParams();
-  params.append('produit', "30"); 
+  params.append('produit', codeProduit);
   params.append('date_depart', dStart);
   params.append('date_retour', dEnd);
-  params.append('destination', data.destinationRegion || "102"); 
-  
+  params.append('destination', String(data.destinationRegion || "102")); 
+
+  // Souscripteur (Toujours l'index 1)
   params.append('date_naissance_1', dBirth);
   params.append('capital_1', costPerPerson.toString());
 
-  data.companions?.forEach((c: any, i: number) => {
-      const date = safeDate(c.birthDate);
-      if (date) {
-          params.append(`date_naissance_${i + 2}`, date);
-          params.append(`capital_${i + 2}`, costPerPerson.toString());
-      }
+  // Compagnons (Index 2, 3...)
+  companions.forEach((comp: any, index: number) => {
+    const avaIndex = index + 2;
+    const cBirth = safeDate(comp.birthDate);
+    if (cBirth) {
+        params.append(`date_naissance_${avaIndex}`, cBirth);
+        params.append(`capital_${avaIndex}`, costPerPerson.toString());
+    }
   });
 
+  // Options (Ex: opt_335=1)
+  if (data.options && typeof data.options === 'object') {
+      // Si options est un tableau d'IDs ou un objet
+      const opts = Array.isArray(data.options) ? data.options : Object.keys(data.options);
+      opts.forEach((optId: string) => {
+          params.append(`opt_${optId}`, '1');
+      });
+  }
+
+  console.log(`📤 Envoi Tarif AVA (Produit: ${codeProduit}, Pax: ${totalTravelers})`);
+
   try {
-    console.log(`📤 Demande Tarif AVA (${totalTravelers} pers)...`);
     const response = await axios.post(
       `${AVA_API_URL}/assurance/tarification/demandeTarif.php`,
       params, 
-      { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/x-www-form-urlencoded' } }
+      {
+        headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      }
     );
 
-    console.log("📥 Réponse AVA (Tarif):", response.data);
+    console.log("📥 Réponse AVA:", response.data);
 
+    // Extraction du prix
     if (response.data) {
-        if (typeof response.data === 'number') return response.data;
-        // Gestion des différents formats de prix possibles
-        const possiblePrice = 
-            response.data.tarif_total ??
-            response.data.tarif ??
-            response.data.montant_total ??
-            response.data["Prix total avec options (en €)"];
-            
-        if (possiblePrice) return parseFloat(possiblePrice);
+        // L'API peut renvoyer le prix sous plusieurs clés
+        const p = response.data.tarif_total 
+               ?? response.data.tarif 
+               ?? response.data.montant_total 
+               ?? response.data["Prix total avec options (en €)"];
+        
+        if (p) return parseFloat(p);
     }
     
     return 0;
+
   } catch (error: any) {
-    console.error("❌ Erreur Tarif:", error.message);
-    return 0;
+    console.error("❌ Erreur calcul AVA:", error.response?.data || error.message);
+    // On renvoie l'erreur détaillée pour comprendre le 400 si ça se reproduit
+    throw new Error(JSON.stringify(error.response?.data || error.message));
   }
 }
 
-export async function validateAvaAdhesion(adhesionNumber: string) { return true; }
+// --- 3. VALIDATION (Stub) ---
+export async function validateAvaAdhesion(adhesionNumber: string) {
+    return true; 
+}
+
+// --- 4. CREATION ADHESION (Stub si nécessaire) ---
+export async function createAvaAdhesion(data: any) {
+    // À adapter comme getAvaPrice quand le tarif fonctionnera
+    return { adhesion_number: "SIMU-000", contract_link: null };
+}

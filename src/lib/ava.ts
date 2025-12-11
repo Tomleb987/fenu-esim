@@ -1,7 +1,7 @@
 // src/lib/ava.ts
 import axios from 'axios';
 import { format, isValid } from 'date-fns';
-import { AVA_TOURIST_OPTIONS } from './ava_options'; // Import nécessaire pour le mapping
+import { AVA_TOURIST_OPTIONS } from './ava_options';
 
 const AVA_API_URL = process.env.AVA_API_URL || "https://api-ava.fr/api";
 const PARTNER_ID = process.env.AVA_PARTNER_ID;
@@ -46,6 +46,9 @@ const toFrDate = (d: string | undefined | null) => {
     return isValid(date) ? format(date, 'dd/MM/yyyy') : undefined;
 };
 
+/**
+ * Construit le payload complexe JSON pour AVA
+ */
 function buildTarificationPayload(data: any): URLSearchParams {
   const companions = data.companions || data.additionalTravelers || [];
   const totalTravelers = 1 + companions.length;
@@ -56,7 +59,7 @@ function buildTarificationPayload(data: any): URLSearchParams {
   const journeyStartDate = toFrDate(data.startDate);
   const journeyEndDate = toFrDate(data.endDate);
   
-  // À l'étape 4, le souscripteur EST rempli, mais on garde une sécu
+  // À ce stade (fin de tunnel), on a la vraie date de naissance
   const subscriberBirth = toFrDate(data.subscriber?.birthDate) || "01/01/1980";
 
   if (!journeyStartDate || !journeyEndDate) throw new Error("Dates invalides");
@@ -67,14 +70,14 @@ function buildTarificationPayload(data: any): URLSearchParams {
   params.append('productType', CODE_PRODUIT);
   params.append('journeyStartDate', journeyStartDate);
   params.append('journeyEndDate', journeyEndDate);
-  params.append('journeyAmount', String(costPerPerson)); // Coût par personne
+  params.append('journeyAmount', String(costPerPerson)); 
   params.append('journeyRegion', String(data.destinationRegion || "102"));
   
   params.append('numberAdultCompanions', String(companions.length));
   params.append('numberChildrenCompanions', "0");
   params.append('numberCompanions', String(companions.length));
 
-  // --- SUBSCRIBER ---
+  // --- SUBSCRIBER INFOS (JSON) ---
   const sub = data.subscriber || {};
   const subscriberInfos = {
       subscriberCountry: data.subscriberCountry || "FR",
@@ -90,21 +93,22 @@ function buildTarificationPayload(data: any): URLSearchParams {
   };
   params.append('subscriberInfos', JSON.stringify(subscriberInfos));
 
-  // --- COMPANIONS ---
+  // --- COMPANIONS INFOS (JSON) ---
+  // On mappe les accompagnants
   const companionsInfos = companions.map((c: any) => ({
       firstName: c.firstName || "Accompagnant",
       lastName: c.lastName || "Inconnu",
       birthdate: toFrDate(c.birthDate) || "01/01/1990",
-      parental_link: "13"
+      parental_link: "13" // 13 = Sans parenté (ou mappez si vous avez l'info)
   }));
   params.append('companionsInfos', JSON.stringify(companionsInfos));
 
-  // --- OPTIONS (MAPPING INTELLIGENT) ---
+  // --- OPTIONS (LE GROS MORCEAU) ---
   const optionsJson: any = {};
   
   if (data.options && Array.isArray(data.options)) {
       data.options.forEach((selectedId: string) => {
-          // On cherche l'option parente dans notre config pour avoir le bon ID de groupe
+          // 1. On trouve l'option parente dans notre config (ex: 335 est parent de 338)
           const parentOption = AVA_TOURIST_OPTIONS.find((opt: any) => 
               opt.id === selectedId || 
               opt.defaultSubOptionId === selectedId || 
@@ -112,10 +116,12 @@ function buildTarificationPayload(data: any): URLSearchParams {
           );
 
           if (parentOption) {
-              const parentId = parentOption.id;
+              const parentId = parentOption.id; // Ex: "335"
+              
               if (!optionsJson[parentId]) optionsJson[parentId] = {};
 
-              // On applique l'option à TOUS les voyageurs (0 = Souscripteur, 1..N = Compagnons)
+              // 2. On applique l'option à TOUS les voyageurs (0 = Souscripteur, 1..N = Compagnons)
+              // AVA demande : {"335": {"0": "338", "1": "338"}}
               for (let i = 0; i < totalTravelers; i++) {
                   optionsJson[parentId][String(i)] = selectedId;
               }

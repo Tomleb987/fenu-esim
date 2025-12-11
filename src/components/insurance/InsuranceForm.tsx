@@ -72,7 +72,7 @@ export default function InsuranceForm() {
       const data = await response.json();
       console.log("Réponse /api/get-quote :", data);
 
-      // ✅ on accepte 0 comme prix valide
+      // accepte 0 si AVA renvoie 0
       if (response.ok && typeof data.price === "number") {
         setQuote({ premium: data.price });
       } else {
@@ -83,6 +83,53 @@ export default function InsuranceForm() {
       toast.error("Problème de connexion.");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const startCheckout = async () => {
+    if (!quote) {
+      toast.error("Tarif manquant, impossible de lancer le paiement.");
+      return;
+    }
+    if (!formData.email) {
+      toast.error("Email requis pour le paiement.");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/insurance-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          quoteData: {
+            productType: "ava_tourist_card",
+            startDate: formData.departureDate,
+            endDate: formData.returnDate,
+            tripCost: formData.tripPrice,
+            subscriber: {
+              firstName: formData.firstName,
+              lastName: formData.lastName,
+              birthDate: formData.birthDate,
+            },
+            additionalTravelers: formData.additionalTravelers,
+          },
+          userEmail: formData.email,
+          amount: quote.premium, // montant AVA déjà calculé
+        }),
+      });
+
+      const data = await response.json();
+      console.log("Réponse /api/insurance-checkout :", data);
+
+      if (response.ok && data.url) {
+        window.location.href = data.url; // redirection vers Stripe
+      } else {
+        console.error("checkout error:", data);
+        toast.error(data.error || "Erreur création du paiement.");
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Problème de connexion lors du paiement.");
     }
   };
 
@@ -109,8 +156,8 @@ export default function InsuranceForm() {
       setCurrentStep((prev) => prev + 1);
       window.scrollTo(0, 0);
     } else {
-      setIsSubmitted(true);
-      window.location.href = "/api/insurance-checkout";
+      // dernière étape : paiement Stripe
+      await startCheckout();
     }
   };
 

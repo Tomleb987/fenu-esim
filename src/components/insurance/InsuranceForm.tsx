@@ -36,7 +36,8 @@ const initialFormData: InsuranceFormData = {
   acceptMarketing: false,
 };
 
-export const InsuranceForm = () => {
+// CORRECTION : Export Default ici
+export default function InsuranceForm() {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<InsuranceFormData>(initialFormData);
   const [quote, setQuote] = useState<{ premium: number } | null>(null);
@@ -49,7 +50,6 @@ export const InsuranceForm = () => {
     setErrors({});
   };
 
-  // Fonction de calcul (utilisable à tout moment)
   const fetchQuote = async (isBackground = false) => {
     if (!isBackground) setIsLoading(true);
     try {
@@ -63,7 +63,6 @@ export const InsuranceForm = () => {
                     endDate: formData.returnDate,
                     destinationRegion: 102, 
                     tripCost: formData.tripPrice, 
-                    // On envoie la date de naissance si dispo, sinon une par défaut pour le devis
                     subscriber: { birthDate: formData.birthDate || "1990-01-01" },
                     companions: formData.additionalTravelers,
                     options: formData.selectedOptions 
@@ -76,7 +75,7 @@ export const InsuranceForm = () => {
             setQuote({ premium: data.price });
             if (!isBackground) toast.success(`Tarif mis à jour : ${data.price} €`);
         } else {
-            console.error("Erreur tarif:", data);
+            console.error("Info tarif:", data);
         }
     } catch (e) {
         console.error(e);
@@ -85,24 +84,19 @@ export const InsuranceForm = () => {
     }
   };
 
-  // Recalcul automatique si on change les options à l'étape 4
   useEffect(() => {
       if (currentStep === 4 && quote) {
-          fetchQuote(true); // Calcul silencieux
+          fetchQuote(true);
       }
   }, [formData.selectedOptions]);
 
   const handleNext = async () => {
-    // --- ÉTAPE 1 : VOYAGE ---
     if (currentStep === 1) {
         if (!formData.destination) { setErrors({ destination: "Requis" }); return; }
         if (!formData.tripPrice) { setErrors({ tripPrice: "Requis" }); return; }
-        
-        // 🔥 C'EST ICI LE CHANGEMENT : On calcule le prix dès maintenant !
         await fetchQuote(); 
     }
 
-    // --- ÉTAPE 2 : INFOS ---
     if (currentStep === 2) {
         if (!formData.firstName || !formData.lastName) {
              toast.error("Veuillez remplir vos informations");
@@ -110,7 +104,6 @@ export const InsuranceForm = () => {
         }
     }
 
-    // --- NAVIGATION ---
     if (currentStep < 5) {
         setCurrentStep(prev => prev + 1);
         window.scrollTo(0, 0);
@@ -124,8 +117,6 @@ export const InsuranceForm = () => {
 
   return (
     <Card className="w-full max-w-4xl mx-auto shadow-elevated border-none relative overflow-hidden">
-      
-      {/* BANDEAU PRIX (Apparaît dès qu'on a un tarif) */}
       {quote && currentStep > 1 && currentStep < 5 && (
           <div className="absolute top-0 right-0 bg-primary text-white px-6 py-2 rounded-bl-xl shadow-md z-20 font-bold animate-in slide-in-from-right">
               {quote.premium} €
@@ -133,7 +124,7 @@ export const InsuranceForm = () => {
           </div>
       )}
 
-      <CardContent className="p-6 md:p-8 pt-12"> {/* pt-12 pour laisser place au bandeau prix */}
+      <CardContent className="p-6 md:p-8 pt-12">
         <StepIndicator currentStep={currentStep} totalSteps={5} steps={STEPS} />
 
         <div className="mt-8 min-h-[300px]">
@@ -154,7 +145,7 @@ export const InsuranceForm = () => {
                 disabled={isLoading}
                 className="bg-gradient-hero text-white px-8 shadow-lg transition-transform hover:scale-[1.02]"
             >
-                {isLoading ? "Calcul du tarif..." : (currentStep === 5 ? "Payer" : "Continuer")} 
+                {isLoading ? "Calcul..." : (currentStep === 5 ? "Payer" : "Continuer")} 
             </Button>
         </div>
       </CardContent>

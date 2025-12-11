@@ -1,45 +1,48 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
-import { getAvaPrice } from '@/lib/ava';
+import type { NextApiRequest, NextApiResponse } from "next";
+import { getAvaPrice } from "@/lib/ava";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ message: 'Method not allowed' });
+type Data =
+  | { price: number; currency: string }
+  | { error: string; details?: unknown };
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse<Data>
+) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
   }
 
   try {
     const { quoteData } = req.body;
 
-    console.log("💰 [API] Calcul Tarif AVA...");
+    if (!quoteData) {
+      return res.status(400).json({ error: "Missing quoteData" });
+    }
 
-    const avaResult = await getAvaPrice(quoteData);
+    console.log("💰 [API] Calcul Tarif AVA avec :", quoteData);
 
-    console.log("[DEBUG] Réponse AVA brute :", avaResult);
+    // ⚠️ getAvaPrice renvoie déjà un nombre
+    const price = await getAvaPrice(quoteData);
 
-    if (!avaResult || avaResult.error) {
-      console.error("❌ Erreur Devis:", avaResult);
-      return res.status(400).json({
-        error: "Impossible de calculer le tarif",
-        details: avaResult,
+    if (typeof price !== "number" || Number.isNaN(price)) {
+      return res.status(500).json({
+        error: "Tarif AVA invalide",
+        details: price,
       });
     }
 
-    // ✅ Extraction du tarif : clé principale + fallback
-    const price =
-      avaResult["Prix total avec options (en €)"] ??
-      avaResult.montant_total ??
-      avaResult.prime_totale ??
-      avaResult.tarif ??
-      0;
-
-    console.log("[DEBUG] Prix extrait :", price);
+    console.log("[DEBUG] Prix final renvoyé au front :", price);
 
     return res.status(200).json({
       price,
       currency: "EUR",
     });
-
   } catch (error: any) {
-    console.error("💥 Erreur Serveur:", error);
-    return res.status(500).json({ error: error.message });
+    console.error("💥 Erreur Serveur /api/get-quote:", error);
+    return res.status(500).json({
+      error: "Erreur lors du calcul de tarif",
+      details: error?.message ?? error,
+    });
   }
 }

@@ -1,9 +1,6 @@
-"use client"; // sans danger même si tu es dans /pages, c’est juste une string
-
 import React, { useEffect } from "react";
 import Head from "next/head";
-import InsuranceForm from "@/components/insurance/InsuranceForm"; 
-// ⚠️ Assure-toi que dans InsuranceForm.tsx tu as bien: `export default function InsuranceForm() { ... }` 
+import InsuranceForm from "@/components/insurance/InsuranceForm";
 
 export default function AssurancePage() {
   useEffect(() => {
@@ -24,7 +21,6 @@ export default function AssurancePage() {
       </Head>
 
       <div className="min-h-screen bg-background pb-20 font-sans text-foreground">
-        {/* Header */}
         <section className="relative overflow-hidden bg-gradient-hero text-primary-foreground pt-16 pb-32 px-6">
           <div className="relative max-w-4xl mx-auto text-center z-10">
             <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-1.5 mb-6 border border-white/20 shadow-sm">
@@ -38,7 +34,8 @@ export default function AssurancePage() {
             </h1>
 
             <p className="text-lg md:text-xl opacity-90 max-w-2xl mx-auto font-light leading-relaxed">
-              Protection complète : Annulation, Rapatriement et Frais médicaux.
+              Protection complète : Annulation, Rapatriement et Frais
+              médicaux.
               <br className="hidden md:block" /> Souscription immédiate en
               quelques clics.
             </p>

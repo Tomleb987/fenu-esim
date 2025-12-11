@@ -19,8 +19,10 @@ export async function getAvaToken() {
   assertEnvVar("AVA_PARTNER_ID", PARTNER_ID);
   assertEnvVar("AVA_PASSWORD", PASSWORD);
 
-  // Équivalent du curl officiel :
-  // curl --form 'partnerId=xxx' --form 'password=xxx'
+  // Équivalent du curl officiel AVA :
+  // curl --location 'https://api-ava.fr/api/authentification/connexion.php' \
+  //   --form 'partnerId="<id partenaire>"' \
+  //   --form 'password="<mot de passe partenaire>"'
   const params = new URLSearchParams();
   params.append("partnerId", PARTNER_ID!);
   params.append("password", PASSWORD!);
@@ -29,26 +31,45 @@ export async function getAvaToken() {
     `${AVA_API_URL}/authentification/connexion.php`,
     params,
     {
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
     }
   );
 
-  console.log("AVA auth response:", response.data);
+  console.log("🔑 Réponse AVA auth brute :", response.data);
 
-  // La doc dit : "renvoi du token avec date d'expiration" :contentReference[oaicite:1]{index=1}
-  // Adapte ici si AVA renvoie par ex. { accessToken: "..."} au lieu de { token: "..."}
-  if (!response.data?.token) {
-    throw new Error("Token AVA manquant dans la réponse d'authentification");
+  const data = response.data;
+
+  // La réponse peut être :
+  // - une simple string = token
+  // - un objet { token: "..."} ou { accessToken: "..." }
+  let token: string | undefined;
+
+  if (typeof data === "string") {
+    token = data.trim() || undefined;
+  } else if (data && typeof data === "object") {
+    token =
+      (data.token as string | undefined) ||
+      (data.accessToken as string | undefined) ||
+      (data.Token as string | undefined);
   }
 
-  return response.data.token as string;
+  if (!token) {
+    console.error("❌ Auth AVA : format de réponse inattendu :", data);
+    throw new Error("Impossible de récupérer le token AVA");
+  }
+
+  return token;
 }
 
 /* -------------------------------------------------------------------------- */
 /* Helpers de formatage                                                       */
 /* -------------------------------------------------------------------------- */
 
-function toFrDate(dateStr: string | Date | undefined): string | undefined {
+function toFrDate(
+  dateStr: string | Date | undefined | null
+): string | undefined {
   if (!dateStr) return undefined;
   const d = typeof dateStr === "string" ? new Date(dateStr) : dateStr;
   if (Number.isNaN(d.getTime())) return undefined;
@@ -56,11 +77,11 @@ function toFrDate(dateStr: string | Date | undefined): string | undefined {
 }
 
 /**
- * Transforme notre objet "quoteData" côté app
- * en payload conforme à la tarification complexe AVA. :contentReference[oaicite:2]{index=2}
+ * Construit le payload pour la tarification complexe / création adhésion
+ * à partir de la structure `quoteData` que tu envoies depuis le front.
  */
 function buildTarificationPayload(data: any): URLSearchParams {
-  const companions = data.companions || [];
+  const companions = data.companions || data.additionalTravelers || [];
   const totalTravelers = 1 + companions.length;
 
   const totalTripCost = Number(data.tripCost) || 0;
@@ -77,21 +98,26 @@ function buildTarificationPayload(data: any): URLSearchParams {
 
   const params = new URLSearchParams();
 
+  // Champs principaux (doc AVA tarification complexe / création adhésion)
   params.append("productType", data.productType || "ava_tourist_card");
   params.append("journeyStartDate", journeyStartDate);
   params.append("journeyEndDate", journeyEndDate);
   params.append("journeyAmount", String(journeyAmount));
-  params.append("journeyRegion", String(data.destinationRegion || 102));
 
-  // on considère tous les accompagnants comme "adultes" par défaut
+  // Si tu as une zone/destination, tu peux l'envoyer ici (optionnel selon contrat)
+  if (data.destinationRegion != null) {
+    params.append("journeyRegion", String(data.destinationRegion));
+  }
+
+  // Compagnons
   const numberAdultCompanions = companions.length;
-  const numberChildrenCompanions = 0;
+  const numberChildrenCompanions = 0; // à adapter si tu gères les enfants à part
 
   params.append("numberAdultCompanions", String(numberAdultCompanions));
   params.append("numberChildrenCompanions", String(numberChildrenCompanions));
   params.append("numberCompanions", String(companions.length));
 
-  // subscriberInfos (JSON)
+  // Infos souscripteur
   const subscriber = data.subscriber || {};
   const subscriberInfos: any = {
     subscriberCountry: data.subscriberCountry || "FR",
@@ -103,34 +129,34 @@ function buildTarificationPayload(data: any): URLSearchParams {
   if (subscriber.lastName) subscriberInfos.lastName = subscriber.lastName;
   if (subscriber.email) subscriberInfos.subscriberEmail = subscriber.email;
 
-  if (subscriber.address || subscriber.zip || subscriber.city) {
+  if (subscriber.address || subscriber.postalCode || subscriber.city) {
     subscriberInfos.address = {
       street: subscriber.address || "",
-      zip: subscriber.zip || subscriber.postalCode || "",
+      zip: subscriber.postalCode || subscriber.zip || "",
       city: subscriber.city || "",
     };
   }
 
   params.append("subscriberInfos", JSON.stringify(subscriberInfos));
 
-  // companionsInfos (JSON)
+  // Infos compagnons
   if (companions.length > 0) {
     const companionsInfos = companions.map((c: any) => ({
       firstName: c.firstName,
       lastName: c.lastName,
       birthdate: c.birthDate ? toFrDate(c.birthDate) : undefined,
-      // 13 = "Sans parenté" dans la doc AVA :contentReference[oaicite:3]{index=3}
+      // 13 = "Sans parenté" par défaut (à adapter si tu veux gérer le lien)
       parental_link: c.parental_link || "13",
     }));
     params.append("companionsInfos", JSON.stringify(companionsInfos));
   }
 
-  // options (JSON) — pour l’instant tu peux laisser {} si tu ne gères pas encore les options
+  // Options (JSON) – peut rester vide si tu ne gères pas encore
   if (data.options && Object.keys(data.options).length > 0) {
     params.append("option", JSON.stringify(data.options));
   }
 
-  // prod : false = mode test
+  // prod : false = test, true = production
   params.append("prod", data.prod === true ? "true" : "false");
 
   if (data.internalReference) {
@@ -141,7 +167,7 @@ function buildTarificationPayload(data: any): URLSearchParams {
 }
 
 /* -------------------------------------------------------------------------- */
-/* 2️⃣ TARIFICATION COMPLEXE AVA (demandeTarif.php)                           */
+/* 2️⃣ TARIFICATION AVA – demandeTarif.php                                    */
 /* -------------------------------------------------------------------------- */
 
 export async function getAvaPrice(data: any) {
@@ -165,9 +191,9 @@ export async function getAvaPrice(data: any) {
     console.log("📥 Réponse AVA (tarif) :", response.data);
     const d: any = response.data;
 
-    // La doc dit "renvoi du prix avec options" mais ne donne pas le nom exact,
-    // on gère donc les cas les plus probables + celui vu sur ta capture :
-    // "Prix total avec options (en €)" :contentReference[oaicite:4]{index=4}
+    // Plusieurs possibilités selon le contrat / format,
+    // plus le cas vu sur ta capture :
+    // "Prix total avec options (en €)": 450
     let price: any = null;
 
     if (d && typeof d === "number") {
@@ -205,14 +231,18 @@ export async function getAvaPrice(data: any) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* 3️⃣ CRÉATION D’ADHÉSION AVA (creationAdhesion.php)                         */
+/* 3️⃣ CRÉATION D’ADHÉSION – creationAdhesion.php                              */
 /* -------------------------------------------------------------------------- */
 
 export async function createAvaAdhesion(data: any) {
   const token = await getAvaToken();
 
-  // même payload que la tarification complexe + internalReference :contentReference[oaicite:5]{index=5}
-  const params = buildTarificationPayload(data);
+  // même payload que la tarification complexe,
+  // mais on force prod=true par défaut pour réellement créer le contrat
+  const params = buildTarificationPayload({
+    ...data,
+    prod: data.prod ?? true,
+  });
 
   console.log("📤 Envoi à AVA (adhésion) :", params.toString());
 
@@ -231,7 +261,7 @@ export async function createAvaAdhesion(data: any) {
     console.log("📥 Réponse AVA (adhésion) :", response.data);
     const d: any = response.data;
 
-    // Exemple de réponse dans ta doc / capture :
+    // Exemple de réponse (d’après ta capture) :
     // {
     //   "Numéro IN": "IN/24-367828",
     //   "Numéro AD": "AD/24-274582",
@@ -241,6 +271,7 @@ export async function createAvaAdhesion(data: any) {
     //   "IPID": "https://...",
     //   "FICP": "https://..."
     // }
+
     const adhesionNumber =
       d?.["Numéro AD"] || d?.numeroAD || d?.adhesion_number;
     const contractNumber =
@@ -258,12 +289,10 @@ export async function createAvaAdhesion(data: any) {
       );
     }
 
-    const totalPrice = totalPriceRaw != null
-      ? parseFloat(String(totalPriceRaw))
-      : null;
+    const totalPrice =
+      totalPriceRaw != null ? parseFloat(String(totalPriceRaw)) : null;
 
     return {
-      // pour ton backend (/api/insurance-checkout)
       adhesion_number: adhesionNumber,
       contract_number: contractNumber || null,
       montant_total: totalPrice,
@@ -275,8 +304,7 @@ export async function createAvaAdhesion(data: any) {
       cg_link: d?.CG || null,
       ipid_link: d?.IPID || null,
       ficp_link: d?.FICP || null,
-      // on garde la réponse brute au cas où
-      raw: d,
+      raw: d, // réponse brute pour debug/archivage
     };
   } catch (error: any) {
     console.error(
@@ -292,8 +320,8 @@ export async function createAvaAdhesion(data: any) {
 /* -------------------------------------------------------------------------- */
 
 export async function validateAvaAdhesion(adhesionNumber: string) {
-  // La doc a une route "Validation d'adhésion", mais on ne l'utilise pas encore. :contentReference[oaicite:6]{index=6}
-  // Tu pourras l’implémenter plus tard si tu veux vérifier le statut d’un contrat.
+  // La doc AVA prévoit une route de validation,
+  // tu pourras l’implémenter ici si tu veux vérifier le statut du contrat.
   console.log("validateAvaAdhesion non implémentée, adhésion :", adhesionNumber);
   return true;
 }

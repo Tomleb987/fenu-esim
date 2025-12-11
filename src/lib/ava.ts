@@ -19,7 +19,7 @@ export async function getAvaToken() {
   assertEnvVar("AVA_PARTNER_ID", PARTNER_ID);
   assertEnvVar("AVA_PASSWORD", PASSWORD);
 
-  // Équivalent du curl officiel AVA :
+  // Équivalent du curl AVA :
   // curl --location 'https://api-ava.fr/api/authentification/connexion.php' \
   //   --form 'partnerId="<id partenaire>"' \
   //   --form 'password="<mot de passe partenaire>"'
@@ -37,27 +37,67 @@ export async function getAvaToken() {
     }
   );
 
-  console.log("🔑 Réponse AVA auth brute :", response.data);
+  console.log("🔑 Réponse AVA auth brute :", {
+    data: response.data,
+    headers: response.headers,
+    status: response.status,
+  });
 
   const data = response.data;
-
-  // La réponse peut être :
-  // - une simple string = token
-  // - un objet { token: "..."} ou { accessToken: "..." }
   let token: string | undefined;
 
-  if (typeof data === "string") {
-    token = data.trim() || undefined;
-  } else if (data && typeof data === "object") {
-    token =
+  // 1) Body = string → on prend la chaîne telle quelle
+  if (typeof data === "string" && data.trim()) {
+    token = data.trim();
+  }
+
+  // 2) Body = objet JSON → on cherche token / accessToken / Token
+  if (!token && data && typeof data === "object") {
+    const maybeToken =
       (data.token as string | undefined) ||
       (data.accessToken as string | undefined) ||
       (data.Token as string | undefined);
+    if (maybeToken && String(maybeToken).trim()) {
+      token = String(maybeToken).trim();
+    }
+  }
+
+  // 3) Header Authorization: Bearer xxx
+  if (!token && response.headers) {
+    const authHeader =
+      (response.headers["authorization"] as string | undefined) ||
+      (response.headers["Authorization"] as string | undefined);
+
+    if (authHeader && authHeader.trim()) {
+      const match = authHeader.match(/Bearer\s+(.+)/i);
+      if (match && match[1]) {
+        token = match[1].trim();
+      } else {
+        token = authHeader.trim();
+      }
+    }
+  }
+
+  // 4) Autre header contenant "token" (ex: X-Auth-Token, Token, etc.)
+  if (!token && response.headers) {
+    const headerKey = Object.keys(response.headers).find((k) =>
+      k.toLowerCase().includes("token")
+    );
+    if (headerKey) {
+      const headerVal = response.headers[headerKey] as string | string[] | undefined;
+      if (Array.isArray(headerVal)) {
+        token = headerVal[0]?.trim();
+      } else if (typeof headerVal === "string" && headerVal.trim()) {
+        token = headerVal.trim();
+      }
+    }
   }
 
   if (!token) {
-    console.error("❌ Auth AVA : format de réponse inattendu :", data);
-    throw new Error("Impossible de récupérer le token AVA");
+    // ➜ C'est cette erreur que tu voyais dans /api/get-quote
+    throw new Error(
+      "Token AVA manquant dans la réponse d'authentification"
+    );
   }
 
   return token;
@@ -78,14 +118,14 @@ function toFrDate(
 
 /**
  * Construit le payload pour la tarification complexe / création adhésion
- * à partir de la structure `quoteData` que tu envoies depuis le front.
+ * à partir de la structure `quoteData` envoyée depuis le front.
  */
 function buildTarificationPayload(data: any): URLSearchParams {
   const companions = data.companions || data.additionalTravelers || [];
   const totalTravelers = 1 + companions.length;
 
   const totalTripCost = Number(data.tripCost) || 0;
-  // AVA attend journeyAmount = prix par personne
+  // journeyAmount = prix de voyage par personne (doc AVA)
   const journeyAmount =
     totalTravelers > 0 ? Math.ceil(totalTripCost / totalTravelers) : 0;
 
@@ -98,26 +138,21 @@ function buildTarificationPayload(data: any): URLSearchParams {
 
   const params = new URLSearchParams();
 
-  // Champs principaux (doc AVA tarification complexe / création adhésion)
   params.append("productType", data.productType || "ava_tourist_card");
   params.append("journeyStartDate", journeyStartDate);
   params.append("journeyEndDate", journeyEndDate);
   params.append("journeyAmount", String(journeyAmount));
 
-  // Si tu as une zone/destination, tu peux l'envoyer ici (optionnel selon contrat)
   if (data.destinationRegion != null) {
     params.append("journeyRegion", String(data.destinationRegion));
   }
 
-  // Compagnons
-  const numberAdultCompanions = companions.length;
-  const numberChildrenCompanions = 0; // à adapter si tu gères les enfants à part
+  const companionsArr = companions || [];
+  params.append("numberAdultCompanions", String(companionsArr.length));
+  params.append("numberChildrenCompanions", "0");
+  params.append("numberCompanions", String(companionsArr.length));
 
-  params.append("numberAdultCompanions", String(numberAdultCompanions));
-  params.append("numberChildrenCompanions", String(numberChildrenCompanions));
-  params.append("numberCompanions", String(companions.length));
-
-  // Infos souscripteur
+  // Souscripteur
   const subscriber = data.subscriber || {};
   const subscriberInfos: any = {
     subscriberCountry: data.subscriberCountry || "FR",
@@ -139,24 +174,24 @@ function buildTarificationPayload(data: any): URLSearchParams {
 
   params.append("subscriberInfos", JSON.stringify(subscriberInfos));
 
-  // Infos compagnons
-  if (companions.length > 0) {
-    const companionsInfos = companions.map((c: any) => ({
+  // Compagnons
+  if (companionsArr.length > 0) {
+    const companionsInfos = companionsArr.map((c: any) => ({
       firstName: c.firstName,
       lastName: c.lastName,
       birthdate: c.birthDate ? toFrDate(c.birthDate) : undefined,
-      // 13 = "Sans parenté" par défaut (à adapter si tu veux gérer le lien)
+      // 13 = "Sans parenté" par défaut
       parental_link: c.parental_link || "13",
     }));
     params.append("companionsInfos", JSON.stringify(companionsInfos));
   }
 
-  // Options (JSON) – peut rester vide si tu ne gères pas encore
+  // Options (facultatif)
   if (data.options && Object.keys(data.options).length > 0) {
     params.append("option", JSON.stringify(data.options));
   }
 
-  // prod : false = test, true = production
+  // prod : false = test, true = prod
   params.append("prod", data.prod === true ? "true" : "false");
 
   if (data.internalReference) {
@@ -191,9 +226,6 @@ export async function getAvaPrice(data: any) {
     console.log("📥 Réponse AVA (tarif) :", response.data);
     const d: any = response.data;
 
-    // Plusieurs possibilités selon le contrat / format,
-    // plus le cas vu sur ta capture :
-    // "Prix total avec options (en €)": 450
     let price: any = null;
 
     if (d && typeof d === "number") {
@@ -237,11 +269,9 @@ export async function getAvaPrice(data: any) {
 export async function createAvaAdhesion(data: any) {
   const token = await getAvaToken();
 
-  // même payload que la tarification complexe,
-  // mais on force prod=true par défaut pour réellement créer le contrat
   const params = buildTarificationPayload({
     ...data,
-    prod: data.prod ?? true,
+    prod: data.prod ?? true, // pour créer un vrai contrat par défaut
   });
 
   console.log("📤 Envoi à AVA (adhésion) :", params.toString());
@@ -260,17 +290,6 @@ export async function createAvaAdhesion(data: any) {
 
     console.log("📥 Réponse AVA (adhésion) :", response.data);
     const d: any = response.data;
-
-    // Exemple de réponse (d’après ta capture) :
-    // {
-    //   "Numéro IN": "IN/24-367828",
-    //   "Numéro AD": "AD/24-274582",
-    //   "Prix total avec options (en €)": 450,
-    //   "Certificat de garantie": "https://...",
-    //   "CG": "https://...",
-    //   "IPID": "https://...",
-    //   "FICP": "https://..."
-    // }
 
     const adhesionNumber =
       d?.["Numéro AD"] || d?.numeroAD || d?.adhesion_number;
@@ -304,7 +323,7 @@ export async function createAvaAdhesion(data: any) {
       cg_link: d?.CG || null,
       ipid_link: d?.IPID || null,
       ficp_link: d?.FICP || null,
-      raw: d, // réponse brute pour debug/archivage
+      raw: d,
     };
   } catch (error: any) {
     console.error(
@@ -316,12 +335,10 @@ export async function createAvaAdhesion(data: any) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* 4️⃣ (optionnel) Validation d’adhésion                                      */
+/* 4️⃣ Validation d’adhésion (stub pour plus tard)                            */
 /* -------------------------------------------------------------------------- */
 
 export async function validateAvaAdhesion(adhesionNumber: string) {
-  // La doc AVA prévoit une route de validation,
-  // tu pourras l’implémenter ici si tu veux vérifier le statut du contrat.
   console.log("validateAvaAdhesion non implémentée, adhésion :", adhesionNumber);
   return true;
 }

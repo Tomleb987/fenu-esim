@@ -11,8 +11,8 @@ export async function getAvaToken() {
   if (!PARTNER_ID || !PASSWORD) throw new Error("Identifiants AVA manquants (.env)");
 
   const params = new URLSearchParams();
-  params.append('partnerId', PARTNER_ID); // ✅ Nom correct selon doc
-  params.append('password', PASSWORD);    // ✅ Nom correct selon doc
+  params.append('partnerId', PARTNER_ID); 
+  params.append('password', PASSWORD);    
 
   try {
     console.log("🔑 Connexion AVA...");
@@ -20,12 +20,19 @@ export async function getAvaToken() {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
     });
 
-    // Gestion robuste des différents formats de réponse possibles
-    if (response.data && response.data.token) return response.data.token;
-    if (typeof response.data === 'string' && response.data.length > 5) return response.data;
+    // 👇 C'EST ICI QUE JE CORRIGE : On gère la Majuscule "Token"
+    if (response.data) {
+        if (response.data.token) return response.data.token; // Cas standard
+        if (response.data.Token) return response.data.Token; // Cas AVA actuel (Majuscule)
+        if (response.data.accessToken) return response.data.accessToken;
+    }
     
-    console.error("❌ Réponse Auth inattendue:", response.data);
-    throw new Error("Pas de token reçu");
+    // Si c'est juste une string brute
+    if (typeof response.data === 'string' && response.data.length > 10) return response.data;
+    
+    console.error("❌ Réponse Auth inattendue (Format inconnu):", response.data);
+    throw new Error("Pas de token reçu dans la réponse AVA");
+
   } catch (error: any) {
     console.error("❌ Erreur Connexion:", error.response?.data || error.message);
     throw error;
@@ -34,32 +41,31 @@ export async function getAvaToken() {
 
 // --- CALCUL DU PRIX ---
 export async function getAvaPrice(data: any) {
+  // On récupère le token (maintenant ça va marcher)
   const token = await getAvaToken();
   
-  // Calculs préparatoires
   const totalTravelers = 1 + (data.companions?.length || 0);
   const costPerPerson = totalTravelers > 0 ? Math.ceil((Number(data.tripCost) || 0) / totalTravelers) : 0;
 
-  // Formatage date
   const safeDate = (d: string) => isValid(new Date(d)) ? format(new Date(d), 'dd/MM/yyyy') : "";
   const dStart = safeDate(data.startDate);
   const dEnd = safeDate(data.endDate);
   const dBirth = safeDate(data.subscriber.birthDate);
 
-  if (!dStart || !dEnd || !dBirth) return 0;
+  if (!dStart || !dEnd || !dBirth) {
+      console.warn("⚠️ Date manquante pour AVA, retour 0€");
+      return 0;
+  }
 
-  // Construction requête
   const params = new URLSearchParams();
-  params.append('produit', "30"); // Tourist Card
+  params.append('produit', "30"); 
   params.append('date_depart', dStart);
   params.append('date_retour', dEnd);
-  params.append('destination', data.destinationRegion || "102"); // Monde
+  params.append('destination', data.destinationRegion || "102"); 
   
-  // Souscripteur
   params.append('date_naissance_1', dBirth);
   params.append('capital_1', costPerPerson.toString());
 
-  // Voyageurs supp
   data.companions?.forEach((c: any, i: number) => {
       const date = safeDate(c.birthDate);
       if (date) {
@@ -76,16 +82,18 @@ export async function getAvaPrice(data: any) {
       { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
 
-    console.log("📥 Réponse AVA:", response.data);
+    console.log("📥 Réponse AVA (Tarif):", response.data);
 
-    // Extraction du prix (Number)
     if (response.data) {
         if (typeof response.data === 'number') return response.data;
-        if (response.data.tarif_total) return parseFloat(response.data.tarif_total);
-        if (response.data.tarif) return parseFloat(response.data.tarif);
-        if (response.data.montant_total) return parseFloat(response.data.montant_total);
-        // Cas spécifique JSON mal formé parfois renvoyé
-        if (response.data["Prix total avec options (en €)"]) return parseFloat(response.data["Prix total avec options (en €)"]);
+        // Gestion des différents formats de prix possibles
+        const possiblePrice = 
+            response.data.tarif_total ??
+            response.data.tarif ??
+            response.data.montant_total ??
+            response.data["Prix total avec options (en €)"];
+            
+        if (possiblePrice) return parseFloat(possiblePrice);
     }
     
     return 0;

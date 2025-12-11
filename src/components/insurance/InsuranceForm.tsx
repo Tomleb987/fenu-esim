@@ -36,7 +36,6 @@ const initialFormData: InsuranceFormData = {
   acceptMarketing: false,
 };
 
-// CORRECTION : Export Default ici
 export default function InsuranceForm() {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<InsuranceFormData>(initialFormData);
@@ -63,7 +62,15 @@ export default function InsuranceForm() {
                     endDate: formData.returnDate,
                     destinationRegion: 102, 
                     tripCost: formData.tripPrice, 
-                    subscriber: { birthDate: formData.birthDate || "1990-01-01" },
+                    subscriber: { 
+                        firstName: formData.firstName,
+                        lastName: formData.lastName,
+                        birthDate: formData.birthDate,
+                        email: formData.email,
+                        address: formData.address,
+                        postalCode: formData.postalCode,
+                        city: formData.city
+                    },
                     companions: formData.additionalTravelers,
                     options: formData.selectedOptions 
                 }
@@ -73,7 +80,7 @@ export default function InsuranceForm() {
         
         if (response.ok && data.price) {
             setQuote({ premium: data.price });
-            if (!isBackground) toast.success(`Tarif mis à jour : ${data.price} €`);
+            if (!isBackground) toast.success(`Nouveau tarif : ${data.price} €`);
         } else {
             console.error("Info tarif:", data);
         }
@@ -84,6 +91,7 @@ export default function InsuranceForm() {
     }
   };
 
+  // Recalcul si on change les options à l'étape 4
   useEffect(() => {
       if (currentStep === 4 && quote) {
           fetchQuote(true);
@@ -91,19 +99,37 @@ export default function InsuranceForm() {
   }, [formData.selectedOptions]);
 
   const handleNext = async () => {
+    // --- ÉTAPE 1 : VOYAGE ---
     if (currentStep === 1) {
         if (!formData.destination) { setErrors({ destination: "Requis" }); return; }
         if (!formData.tripPrice) { setErrors({ tripPrice: "Requis" }); return; }
-        await fetchQuote(); 
     }
 
+    // --- ÉTAPE 2 : INFOS ---
     if (currentStep === 2) {
-        if (!formData.firstName || !formData.lastName) {
-             toast.error("Veuillez remplir vos informations");
+        if (!formData.firstName || !formData.lastName || !formData.birthDate) {
+             toast.error("Veuillez remplir vos informations complètes");
              return;
         }
     }
 
+    // --- ÉTAPE 3 : VOYAGEURS ---
+    if (currentStep === 3) {
+        // Validation basique des voyageurs
+        const invalid = formData.additionalTravelers.some(t => !t.firstName || !t.birthDate);
+        if (invalid) {
+            toast.error("Veuillez compléter les infos des voyageurs");
+            return;
+        }
+    }
+
+    // --- ÉTAPE 4 : OPTIONS ---
+    if (currentStep === 4) {
+        // C'EST ICI QU'ON LANCE LE PREMIER VRAI CALCUL
+        await fetchQuote(); 
+    }
+
+    // --- NAVIGATION ---
     if (currentStep < 5) {
         setCurrentStep(prev => prev + 1);
         window.scrollTo(0, 0);
@@ -117,10 +143,11 @@ export default function InsuranceForm() {
 
   return (
     <Card className="w-full max-w-4xl mx-auto shadow-elevated border-none relative overflow-hidden">
-      {quote && currentStep > 1 && currentStep < 5 && (
+      
+      {quote && currentStep >= 4 && (
           <div className="absolute top-0 right-0 bg-primary text-white px-6 py-2 rounded-bl-xl shadow-md z-20 font-bold animate-in slide-in-from-right">
               {quote.premium} €
-              <span className="text-xs font-normal opacity-80 block text-right">Total estimé</span>
+              <span className="text-xs font-normal opacity-80 block text-right">Total</span>
           </div>
       )}
 
@@ -145,7 +172,7 @@ export default function InsuranceForm() {
                 disabled={isLoading}
                 className="bg-gradient-hero text-white px-8 shadow-lg transition-transform hover:scale-[1.02]"
             >
-                {isLoading ? "Calcul..." : (currentStep === 5 ? "Payer" : "Continuer")} 
+                {isLoading ? "Calcul du tarif..." : (currentStep === 5 ? "Payer" : "Continuer")} 
             </Button>
         </div>
       </CardContent>

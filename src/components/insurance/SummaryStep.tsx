@@ -24,10 +24,18 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProp
   };
 
   const destinationName = getDestinationLabel(formData.destination);
-  const formatDate = (d: string) => d ? format(new Date(d), 'dd MMM yyyy', { locale: fr }) : "--";
+  
+  // Helper pour formater les dates proprement
+  const formatDate = (d: string) => {
+      if (!d) return "--";
+      try {
+          return format(new Date(d), 'dd MMM yyyy', { locale: fr });
+      } catch (e) {
+          return d;
+      }
+  };
 
-  // Liens vers vos fichiers PDF (à placer dans le dossier public/documents/)
-  // Vous pouvez ajuster les noms de fichiers ici
+  // Documents (Vérifiez que les fichiers sont bien dans public/documents/)
   const docs = [
       { name: "IPID - Document d'Information (Tourist Card)", file: "/documents/ipid-ava-tourist-card.pdf", icon: "📄" },
       { name: "Conditions Générales de Vente (CG)", file: "/documents/cg-ava-tourist-card.pdf", icon: "📄" },
@@ -59,22 +67,44 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProp
             </div>
         </div>
 
-        {/* LIGNE 2 : ASSURÉ */}
+        {/* LIGNE 2 : ASSURÉ & VOYAGEURS */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4 border-b border-gray-200">
+            {/* Assuré Principal */}
             <div>
-                <span className="block text-xs text-gray-500 uppercase font-semibold">Assuré principal</span>
-                <span className="text-gray-900 font-medium">
+                <span className="block text-xs text-gray-500 uppercase font-semibold mb-1">Assuré principal</span>
+                <div className="text-gray-900 font-medium">
                     {formData.firstName} {formData.lastName}
-                </span>
-                <span className="block text-xs text-gray-400">Né(e) le {formatDate(formData.birthDate)}</span>
+                </div>
+                <div className="text-xs text-gray-500">
+                    Né(e) le {formatDate(formData.birthDate)}
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                    {formData.email}
+                </div>
             </div>
+
+            {/* Voyageurs Supplémentaires (Liste détaillée) */}
             <div>
-                <span className="block text-xs text-gray-500 uppercase font-semibold">Voyageurs supp.</span>
-                <span className="text-gray-900 font-medium">
-                    {formData.additionalTravelers.length > 0 
-                        ? `${formData.additionalTravelers.length} personne(s)` 
-                        : "Aucun"}
+                <span className="block text-xs text-gray-500 uppercase font-semibold mb-1">
+                    Voyageurs supp. ({formData.additionalTravelers.length})
                 </span>
+                
+                {formData.additionalTravelers.length > 0 ? (
+                    <div className="flex flex-col gap-2 mt-1">
+                        {formData.additionalTravelers.map((t, index) => (
+                            <div key={index} className="pl-3 border-l-2 border-primary/20 text-sm">
+                                <span className="font-medium text-gray-900">
+                                    {t.firstName} {t.lastName}
+                                </span>
+                                <span className="block text-xs text-gray-500">
+                                    Né(e) le {formatDate(t.birthDate)}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <span className="text-gray-400 text-sm italic">Aucun</span>
+                )}
             </div>
         </div>
 
@@ -94,7 +124,7 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProp
             )}
         </div>
 
-        {/* LIGNE 4 : DOCUMENTS À TÉLÉCHARGER (NOUVEAU) */}
+        {/* LIGNE 4 : DOCUMENTS */}
         <div className="pb-2">
             <span className="block text-xs text-gray-500 uppercase font-semibold mb-2">Documents contractuels</span>
             <div className="flex flex-col gap-2">

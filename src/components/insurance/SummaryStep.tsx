@@ -10,19 +10,21 @@ interface SummaryStepProps {
   isLoadingQuote: boolean;
 }
 
-// Dictionnaire pour traduire les codes techniques en noms lisibles
-const DESTINATION_LABELS: Record<string, string> = {
-  "102": "Monde Entier (Hors USA/Canada) 🌍",
-  "58": "USA & Canada 🇺🇸 🇨🇦",
-  "53": "Europe (Schengen) 🇪🇺"
-};
-
 export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProps) => {
   
-  // Fonction pour afficher le nom propre au lieu du code
-  const destinationName = DESTINATION_LABELS[formData.destination] || formData.destination;
+  // Fonction de traduction "blindée" (Gère "58" texte et 58 nombre)
+  const getDestinationLabel = (code: string | number) => {
+      const codeStr = String(code).trim(); // Force en texte et retire les espaces
+      
+      switch (codeStr) {
+          case "102": return "Monde Entier (Hors USA/Canada) 🌍";
+          case "58":  return "USA & Canada 🇺🇸 🇨🇦";
+          case "53":  return "Europe (Schengen) 🇪🇺";
+          default:    return codeStr; // Affiche le code si inconnu (ex: "FR")
+      }
+  };
 
-  // Formatage des dates pour faire joli (ex: 15 déc. 2025)
+  const destinationName = getDestinationLabel(formData.destination);
   const formatDate = (d: string) => d ? format(new Date(d), 'dd MMM yyyy', { locale: fr }) : "--";
 
   return (
@@ -40,8 +42,8 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProp
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4 border-b border-gray-200">
             <div>
                 <span className="block text-xs text-gray-500 uppercase font-semibold">Destination</span>
-                {/* ICI LA CORRECTION : on affiche le nom traduit */}
-                <span className="text-gray-900 font-medium">{destinationName}</span>
+                {/* On force l'affichage du nom traduit */}
+                <span className="text-gray-900 font-medium text-lg">{destinationName}</span>
             </div>
             <div>
                 <span className="block text-xs text-gray-500 uppercase font-semibold">Dates</span>

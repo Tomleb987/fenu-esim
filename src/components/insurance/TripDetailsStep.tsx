@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { InsuranceFormData } from "@/types/insurance";
-import { COUNTRIES } from "@/lib/countries"; // On garde ça UNIQUEMENT pour le pays de résidence
+import { COUNTRIES } from "@/lib/countries"; 
 
 interface TripDetailsStepProps {
   formData: InsuranceFormData;
@@ -15,13 +15,28 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
     setToday(new Date().toISOString().split('T')[0]);
   }, []);
 
-  // Sécurité pour la liste de résidence
   const countryList = Array.isArray(COUNTRIES) ? COUNTRIES : [];
 
-  // Styles CSS (Tailwind)
+  // Styles CSS
   const labelClass = "block text-sm font-semibold mb-2 text-gray-700";
   const selectClass = "flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent appearance-none";
   const inputClass = "flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50";
+
+  // --- LOGIQUE DE GESTION DES DATES ---
+  const handleDepartureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newStart = e.target.value;
+    const currentEnd = formData.returnDate;
+
+    // 1. On met à jour le départ
+    let updates: Partial<InsuranceFormData> = { departureDate: newStart };
+
+    // 2. Si la date de retour existe et est AVANT le nouveau départ, on la corrige
+    if (currentEnd && newStart > currentEnd) {
+        updates.returnDate = newStart; // On force le retour à la même date que le départ
+    }
+
+    updateFormData(updates);
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in">
@@ -32,7 +47,7 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
 
       <div className="space-y-4">
         
-        {/* PAYS RÉSIDENCE (Reste la liste complète des pays) */}
+        {/* PAYS DE RÉSIDENCE */}
         <div>
           <label className={labelClass}>Votre pays de résidence *</label>
           <div className="relative">
@@ -51,7 +66,7 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
           </div>
         </div>
 
-        {/* DESTINATION (MODIFIÉ : LES 3 ZONES AVA UNIQUEMENT) */}
+        {/* DESTINATION */}
         <div>
           <label className={labelClass}>Zone de destination *</label>
           <div className="relative">
@@ -61,13 +76,9 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
               onChange={(e) => updateFormData({ destination: e.target.value })}
             >
               <option value="" disabled>Sélectionnez votre zone...</option>
-              
-              {/* --- C'EST ICI QUE CA CHANGE --- */}
               <option value="102">Monde Entier (Hors USA/Canada) 🌍</option>
               <option value="58">USA & Canada 🇺🇸 🇨🇦</option>
-              <option value="53">Europe (Union Européenne / Schengen) 🇪🇺</option>
-              {/* ------------------------------- */}
-
+              <option value="53">Europe (Schengen) 🇪🇺</option>
             </select>
           </div>
           {errors.destination && <p className="text-red-500 text-xs mt-1">{errors.destination}</p>}
@@ -81,7 +92,7 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
               type="date"
               className={inputClass}
               value={formData.departureDate}
-              onChange={(e) => updateFormData({ departureDate: e.target.value })}
+              onChange={handleDepartureChange} // Utilisation du nouveau handler
               min={today}
             />
           </div>
@@ -93,6 +104,7 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
               className={inputClass}
               value={formData.returnDate}
               onChange={(e) => updateFormData({ returnDate: e.target.value })}
+              // L'attribut min bloque la sélection dans le calendrier
               min={formData.departureDate || today}
             />
           </div>

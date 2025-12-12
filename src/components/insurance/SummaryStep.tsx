@@ -35,11 +35,11 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProp
       }
   };
 
-  // Documents (Vérifiez que les fichiers sont bien dans public/documents/)
+  // ✅ CORRECTION ICI : Noms exacts de vos fichiers PDF
   const docs = [
-      { name: "IPID - Document d'Information (Tourist Card)", file: "/documents/ipid-ava-tourist-card.pdf", icon: "📄" },
-      { name: "Conditions Générales de Vente (CG)", file: "/documents/cg-ava-tourist-card.pdf", icon: "📄" },
-      { name: "Formulaire Équipement Multimédia", file: "/documents/formulaire-multimedia.pdf", icon: "📱" },
+      { name: "IPID - Document d'Information", file: "/documents/IPID-TOURIST-CARD.pdf", icon: "📄" },
+      { name: "Conditions Générales (CG)", file: "/documents/CG-AVA-TOURIST-CARD.pdf", icon: "📄" },
+      { name: "Notice AVA TECH+ (Multimédia)", file: "/documents/NI-AVA-TECH-PLUS-1.pdf", icon: "📱" },
   ];
 
   return (
@@ -124,7 +124,7 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProp
             )}
         </div>
 
-        {/* LIGNE 4 : DOCUMENTS */}
+        {/* LIGNE 4 : DOCUMENTS TÉLÉCHARGEABLES */}
         <div className="pb-2">
             <span className="block text-xs text-gray-500 uppercase font-semibold mb-2">Documents contractuels</span>
             <div className="flex flex-col gap-2">

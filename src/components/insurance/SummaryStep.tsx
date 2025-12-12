@@ -12,20 +12,27 @@ interface SummaryStepProps {
 
 export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProps) => {
   
-  // Fonction de traduction "blindée" (Gère "58" texte et 58 nombre)
+  // Fonction de traduction "blindée"
   const getDestinationLabel = (code: string | number) => {
-      const codeStr = String(code).trim(); // Force en texte et retire les espaces
-      
+      const codeStr = String(code).trim();
       switch (codeStr) {
           case "102": return "Monde Entier (Hors USA/Canada) 🌍";
           case "58":  return "USA & Canada 🇺🇸 🇨🇦";
           case "53":  return "Europe (Schengen) 🇪🇺";
-          default:    return codeStr; // Affiche le code si inconnu (ex: "FR")
+          default:    return codeStr;
       }
   };
 
   const destinationName = getDestinationLabel(formData.destination);
   const formatDate = (d: string) => d ? format(new Date(d), 'dd MMM yyyy', { locale: fr }) : "--";
+
+  // Liens vers vos fichiers PDF (à placer dans le dossier public/documents/)
+  // Vous pouvez ajuster les noms de fichiers ici
+  const docs = [
+      { name: "IPID - Document d'Information (Tourist Card)", file: "/documents/ipid-ava-tourist-card.pdf", icon: "📄" },
+      { name: "Conditions Générales de Vente (CG)", file: "/documents/cg-ava-tourist-card.pdf", icon: "📄" },
+      { name: "Formulaire Équipement Multimédia", file: "/documents/formulaire-multimedia.pdf", icon: "📱" },
+  ];
 
   return (
     <div className="space-y-6 animate-in fade-in">
@@ -42,7 +49,6 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProp
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4 border-b border-gray-200">
             <div>
                 <span className="block text-xs text-gray-500 uppercase font-semibold">Destination</span>
-                {/* On force l'affichage du nom traduit */}
                 <span className="text-gray-900 font-medium text-lg">{destinationName}</span>
             </div>
             <div>
@@ -73,7 +79,7 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProp
         </div>
 
         {/* LIGNE 3 : OPTIONS */}
-        <div>
+        <div className="pb-4 border-b border-gray-200">
             <span className="block text-xs text-gray-500 uppercase font-semibold mb-1">Options choisies</span>
             {formData.selectedOptions && formData.selectedOptions.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
@@ -88,8 +94,28 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProp
             )}
         </div>
 
+        {/* LIGNE 4 : DOCUMENTS À TÉLÉCHARGER (NOUVEAU) */}
+        <div className="pb-2">
+            <span className="block text-xs text-gray-500 uppercase font-semibold mb-2">Documents contractuels</span>
+            <div className="flex flex-col gap-2">
+                {docs.map((doc, idx) => (
+                    <a 
+                        key={idx} 
+                        href={doc.file} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex items-center text-sm text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+                    >
+                        <span className="mr-2 text-lg">{doc.icon}</span>
+                        {doc.name}
+                        <span className="ml-1 text-xs text-gray-400 no-underline">(PDF)</span>
+                    </a>
+                ))}
+            </div>
+        </div>
+
         {/* TOTAL */}
-        <div className="flex justify-between items-center pt-4 mt-2 border-t border-gray-200">
+        <div className="flex justify-between items-center pt-4 mt-2 border-t border-gray-200 bg-white p-4 rounded-lg shadow-sm">
             <span className="font-bold text-lg text-gray-900">Total à payer</span>
             <div className="text-right">
                 {isLoadingQuote ? (
@@ -105,7 +131,7 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProp
       </div>
       
       <p className="text-center text-xs text-gray-400 px-4">
-        En cliquant sur "Payer", vous acceptez les conditions générales de vente et confirmez l'exactitude des informations.
+        En cliquant sur "Payer", vous reconnaissez avoir lu les documents d'information (IPID) et les conditions générales.
       </p>
     </div>
   );

@@ -1,8 +1,8 @@
 import type { GetStaticPaths, GetStaticProps } from "next";
 import Head from "next/head";
 import Link from "next/link";
-import BlogCta from "@/components/BlogCta";
-import { getAllSlugs, getPostBySlug, BlogFrontmatter } from "@/lib/blog";
+import BlogCta from "../../components/BlogCta";
+import { getAllSlugs, getPostBySlug, BlogFrontmatter } from "../../lib/blog";
 
 type Props = {
   slug: string;

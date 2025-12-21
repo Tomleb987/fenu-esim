@@ -6,21 +6,26 @@ category: "Destinations"
 ---
 
 ## La réponse rapide
-Pour un séjour classique, **20 Go / 30 jours** est souvent le meilleur équilibre.  
-Si vous utilisez beaucoup la vidéo, la visio ou le partage de connexion : **illimité**.
+- **10 Go** : séjour court / usage léger (Maps, WhatsApp, mails)
+- **20 Go** : le meilleur équilibre pour la plupart des voyages
+- **Illimité** : vidéo, visio, hotspot, usage intensif
 
-👉 Voir les forfaits Australie : **/shop/australie**
+👉 Une fois sur le site, allez dans **Nos eSIM** et sélectionnez **Australie** (ou utilisez la recherche).
 
-## Recommandations par profil
-- **Usage léger** : 10 Go  
-- **Usage standard** : 20 Go  
-- **Usage intensif / hotspot** : illimité  
+## Combien de data pour l’Australie ?
+- **7 jours** : 5–10 Go  
+- **10–15 jours** : 10–20 Go  
+- **30 jours** : 20 Go ou illimité  
 
-## Installation (3 minutes)
+## Installation (simple)
 1) Vérifiez la compatibilité eSIM  
-2) Installez en Wi-Fi  
-3) Activez la ligne eSIM à l’arrivée  
+2) Installez **en Wi‑Fi**  
+3) Activez la ligne eSIM à l’arrivée
 
-## FAQ
-**Je garde WhatsApp ?** Oui.  
-**Et si je bloque ?** Support en français : on vous guide.
+## Les erreurs à éviter
+- Installer au dernier moment sans Wi‑Fi
+- Oublier d’activer les **données mobiles** sur la ligne eSIM
+- Laisser le **roaming** actif sur la ligne principale (si vous voulez éviter toute surprise)
+
+## Besoin d’aide ?
+Notre support en français vous guide étape par étape.

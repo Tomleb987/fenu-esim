@@ -69,6 +69,7 @@ export default function Navbar() {
         <ul className="hidden md:flex items-center gap-6 font-medium text-gray-700">
           <li><Link href="/" className="nav-link">Accueil</Link></li>
           <li><Link href="/shop" className="nav-link">Nos eSIM</Link></li>
+          <li><Link href="/blog" className="nav-link">Blog</Link></li>
           <li><Link href="/compatibilite" className="nav-link">Compatibilité</Link></li>
           <li><Link href="/faq" className="nav-link">FAQ</Link></li>
           <li><Link href="/contact" className="nav-link">Contact</Link></li>
@@ -149,6 +150,7 @@ export default function Navbar() {
           </button>
           <Link href="/" onClick={() => setMenuOpen(false)}>Accueil</Link>
           <Link href="/shop" onClick={() => setMenuOpen(false)}>Nos eSIM</Link>
+          <Link href="/blog" onClick={() => setMenuOpen(false)}>Blog</Link>
           <Link href="/compatibilite" onClick={() => setMenuOpen(false)}>Compatibilité</Link>
           <Link href="/faq" onClick={() => setMenuOpen(false)}>FAQ</Link>
           <Link href="/contact" onClick={() => setMenuOpen(false)}>Contact</Link>

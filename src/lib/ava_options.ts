@@ -1,78 +1,85 @@
 // src/lib/ava_options.ts
 
 export interface AvaOption {
-  id: string;
+  id: string; // L'ID "Parent" (ex: 335 pour Annulation)
   label: string;
   type: 'boolean' | 'select';
+  description?: string;
   subOptions?: { id: string; label: string }[];
-  defaultSubOptionId?: string;
+  defaultSubOptionId?: string; // L'ID "Enfant" par défaut si c'est un boolean (ex: 338)
 }
 
-// --- 1. CONFIGURATION PRODUIT UNIQUE ---
-export const AVA_PRODUCTS = [
-  { 
-    id: "ava_tourist_card", 
-    title: "Tourist Card", 
-    subtitle: "Vacances (- 3 mois)", 
-    icon: "🏖️", 
-    desc: "L'essentiel pour voyager serein : Frais médicaux, Rapatriement & Bagages.", 
-    color: "border-blue-200 bg-blue-50 hover:border-blue-500" 
-  }
-];
-
-// --- 2. OPTIONS TOURIST CARD ---
 export const AVA_TOURIST_OPTIONS: AvaOption[] = [
+  // --- ANNULATION ---
   { 
     id: "335", 
-    label: "Extension Annulation (Tous motifs)", 
+    label: "Extension Garantie Annulation", 
     type: "boolean", 
-    defaultSubOptionId: "338" 
+    description: "Couverture dès l'inscription (Tous motifs)",
+    defaultSubOptionId: "338" // ID technique envoyé
   },
   { 
     id: "339", 
-    label: "Augmenter le plafond Annulation (Base 6.000€)", 
+    label: "Augmenter Plafond Annulation", 
     type: "select", 
+    description: "Plafond par assuré (au lieu de 6.000€)",
     subOptions: [
       { id: "340", label: "Plafond 8.000 €" },
       { id: "341", label: "Plafond 10.000 €" },
       { id: "342", label: "Plafond 12.000 €" }
     ] 
   },
+
+  // --- BAGAGES ---
   { 
     id: "343", 
-    label: "Augmenter la garantie Bagages (Base 1.500€)", 
+    label: "Augmenter Garantie Bagages", 
     type: "select", 
+    description: "Plafond par assuré (au lieu de 1.500€)",
     subOptions: [
       { id: "344", label: "Plafond 2.000 €" },
       { id: "345", label: "Plafond 2.500 €" },
       { id: "346", label: "Plafond 3.000 €" }
     ] 
   },
+
+  // --- VÉHICULE ---
+  // Mappé vers 458 selon votre tableau (ID parent 728 pour l'affichage, mais envoie 458)
   { 
     id: "728", 
     label: "Rachat de franchise Véhicule (CDW)", 
     type: "boolean", 
-    defaultSubOptionId: "458"
+    description: "Couverture dommages jusqu'à 150.000€",
+    defaultSubOptionId: "458" 
   },
+
+  // --- ACCIDENT ---
   { 
     id: "347", 
-    label: "Augmenter Capital Accident (Base 8.000€)", 
+    label: "Augmenter Capital Accident", 
     type: "select", 
+    description: "Capital décès/invalidité (au lieu de 8.000€)",
     subOptions: [
       { id: "459", label: "Capital 50.000 €" },
       { id: "457", label: "Capital 100.000 €" }
     ] 
   },
+
+  // --- SPORTS ---
   { 
     id: "828", 
-    label: "AVA SPORT+ (Sports extrêmes)", 
+    label: "AVA SPORT+", 
     type: "boolean", 
+    description: "Sports extrêmes & Frais de recherche (25k€)",
     defaultSubOptionId: "828" 
   },
+
+  // --- TECH ---
   { 
     id: "990", 
     label: "AVA TECH+ (Appareils Nomades)", 
     type: "select", 
+    description: "Vol ou casse (Smartphone, Tablette...)",
     subOptions: [
       { id: "989", label: "Couverture 1.500 €" },
       { id: "988", label: "Couverture 3.000 €" }
@@ -80,11 +87,6 @@ export const AVA_TOURIST_OPTIONS: AvaOption[] = [
   }
 ];
 
-// --- 3. SÉLECTEUR SIMPLIFIÉ ---
 export function getOptionsForProduct(productType: string): AvaOption[] {
-  // On ne gère plus que la Tourist Card
-  if (productType === 'ava_tourist_card') {
-    return AVA_TOURIST_OPTIONS;
-  }
-  return [];
+  return AVA_TOURIST_OPTIONS;
 }

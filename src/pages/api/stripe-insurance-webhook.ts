@@ -1,87 +1,96 @@
-// src/pages/api/stripe-insurance-webhook.ts
-
+import { buffer } from "micro"; // Nécessaire pour Stripe
 import type { NextApiRequest, NextApiResponse } from "next";
 import Stripe from "stripe";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { validateAvaAdhesion } from "@/lib/ava";
+// 👇 Import du service dédié (aucun risque de conflit avec eSIM)
+import { sendInsuranceEmail } from "@/utils/sendInsuranceEmail"; 
 
-// Stripe v2025-04-30.basil (imposé par ton compte)
+// Configuration Next.js pour ne pas parser le body (Stripe le veut brut)
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-04-30.basil",
+  apiVersion: '2023-10-16',
 });
 
-// ⚠️ Stripe requiert le body brut → désactiver le parsing automatique
-export const config = { api: { bodyParser: false } };
+const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET_INSURANCE!;
 
-// 🔄 Convertir le body en Buffer
-async function buffer(stream: any) {
-  const chunks: any[] = [];
-  for await (const chunk of stream) {
-    chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
-  }
-  return Buffer.concat(chunks);
-}
-
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
   if (req.method !== "POST") {
     return res.status(405).json({ message: "Method not allowed" });
   }
 
-  // 🔐 Lecture & validation de l’événement Stripe
-  const rawBody = await buffer(req);
-  const signature = req.headers["stripe-signature"] as string;
-
   let event: Stripe.Event;
 
   try {
-    event = stripe.webhooks.constructEvent(
-      rawBody,
-      signature,
-      process.env.STRIPE_INSURANCE_WEBHOOK_SECRET! // ➕ Clé secrète du webhook AVA
-    );
+    const buf = await buffer(req);
+    const sig = req.headers["stripe-signature"]!;
+    event = stripe.webhooks.constructEvent(buf, sig, webhookSecret);
   } catch (err: any) {
-    console.error("❌ Erreur de signature Stripe:", err.message);
+    console.error(`❌ Erreur Signature Webhook: ${err.message}`);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  // ▶️ On traite uniquement les paiements réussis
+  // Filtrage : On ne traite que les succès de paiement
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
-    const metadata = session.metadata || {};
+    
+    // 🛡️ SÉCURITÉ : On vérifie que c'est bien une ASSURANCE
+    // Si c'est une eSIM, ce code l'ignore totalement -> Pas de conflit.
+    if (session.metadata?.type !== 'insurance_ava') {
+        console.log("Ignoré par le webhook assurance (Type incorrect)");
+        return res.json({ received: true, ignored: true });
+    }
 
-    if (metadata.type === "insurance_ava" && metadata.adhesion_number) {
-      const adhesionNumber = metadata.adhesion_number;
+    const adhesionNumber = session.metadata.adhesion_number;
+    const userEmail = session.customer_email || session.metadata.user_email;
 
-      console.log(`🟦 Stripe webhook → Validation AVA pour #${adhesionNumber}`);
+    console.log(`💰 Paiement Assurance validé pour ${adhesionNumber}`);
 
-      try {
-        // 1️⃣ Appel AVA → Validation du contrat
-        await validateAvaAdhesion(adhesionNumber, true); // true = prod
+    try {
+      // 1. Mettre à jour la base de données (Passage en 'paid')
+      await supabaseAdmin
+        .from("insurances")
+        .update({ 
+            status: "paid", 
+            stripe_payment_intent: session.payment_intent as string 
+        })
+        .eq("adhesion_number", adhesionNumber);
 
-        // 2️⃣ Mise à jour Supabase
-        const { error: supaError } = await supabaseAdmin
-          .from("insurances")
-          .update({
-            status: "validated",
-            stripe_session_id: session.id,
-          })
-          .eq("adhesion_number", adhesionNumber);
-
-        if (supaError) {
-          console.error("❌ Supabase update error:", supaError);
-          return res.status(500).json({ error: "Supabase update error" });
-        }
-
-        console.log(`✅ AVA validée pour ${adhesionNumber}`);
-        return res.status(200).json({ received: true, processed: true });
-
-      } catch (err) {
-        console.error("❌ Erreur lors de la validation AVA:", err);
-        return res.status(500).json({ error: "AVA validation error" });
+      // 2. Valider le contrat chez l'assureur (AVA)
+      // C'est ici que le "brouillon" devient un vrai contrat
+      await validateAvaAdhesion(adhesionNumber);
+      
+      // 3. Envoyer l'email de confirmation (Via le canal dédié Assurance)
+      if (userEmail) {
+          await sendInsuranceEmail({
+            to: userEmail,
+            subject: "Confirmation de votre Assurance Voyage FENUASIM",
+            html: `
+              <div style="font-family: sans-serif; color: #333;">
+                <h1 style="color: #A020F0;">Merci pour votre confiance !</h1>
+                <p>Votre souscription est confirmée.</p>
+                <p><strong>Numéro d'adhésion :</strong> ${adhesionNumber}</p>
+                <p>Vous êtes désormais couvert par AVA Assurances via FENUASIM.</p>
+                <p><em>Conservez cet email comme preuve de paiement.</em></p>
+              </div>
+            `,
+          });
       }
+
+    } catch (err) {
+      console.error("❌ Erreur traitement post-paiement :", err);
+      // On retourne 200 pour éviter que Stripe ne réessaie en boucle si c'est une erreur logique
+      return res.json({ received: true, error: "Processing failed" });
     }
   }
 
-  // Tous les autres événements Stripe sont ignorés
-  return res.status(200).json({ received: true, ignored: true });
+  res.json({ received: true });
 }

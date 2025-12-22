@@ -1,88 +1,177 @@
-import { useState, useRef } from 'react'
-import { useRouter } from 'next/navigation'
-import Image from 'next/image'
+"use client";
+
+import { useChat } from "ai/react";
+import { useState, useRef, useEffect } from "react";
+import { MessageCircle, X, Send, Bot } from "lucide-react";
 
 export default function ChatWidget() {
-  const [open, setOpen] = useState(false)
-  const [messages, setMessages] = useState<any[]>([{
-    role: 'assistant',
-    content: 'Bonjour ! Je suis votre assistant eSIM. Pour quelle destination souhaitez-vous une eSIM ?'
-  }])
-  const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
-  const router = useRouter()
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const [isOpen, setIsOpen] = useState(false);
+  const [showPrompt, setShowPrompt] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  async function sendMessage(e?: React.FormEvent) {
-    if (e) e.preventDefault()
-    if (!input.trim()) return
-    setLoading(true)
-    const newMessages = [...messages, { role: 'user', content: input }]
-    setMessages(newMessages)
-    setInput('')
-    try {
-      const res = await fetch('/api/assistant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newMessages }),
-      })
-      const data = await res.json()
-      const reply = data.reply && data.reply.trim() ? data.reply : "Je n'ai pas compris votre demande.";
-      setMessages([...newMessages, { role: 'assistant', content: reply }])
-    } catch (err) {
-      setMessages([...newMessages, { role: 'assistant', content: "Désolé, une erreur est survenue." }])
-    } finally {
-      setLoading(false)
-      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
+  // --- CONFIGURATION DU CHAT ---
+  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
+    api: "/api/assistant",
+    onError: (err) => console.error("Erreur Chat:", err),
+    
+    // ✅ MESSAGE D'ACCUEIL PERSONNALISÉ
+    initialMessages: [
+      {
+        id: "welcome-message",
+        role: "assistant",
+        content: "Ia ora na ! 👋<br>Je suis l'assistant FenuaSIM.<br><b>Comment t'aider aujourd'hui ?</b>"
+      }
+    ]
+  });
+
+  // 1. Déclenchement de la bulle d'accroche (Prompt) après 3 secondes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      // Si le chat n'est pas ouvert, on affiche la petite bulle d'invitation
+      if (!isOpen) {
+        setShowPrompt(true);
+      }
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [isOpen]);
+
+  // 2. Auto-scroll vers le bas à chaque nouveau message
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }
+  }, [messages, isOpen]);
+
+  // Fonction pour ouvrir/fermer le chat
+  const toggleChat = () => {
+    setIsOpen(!isOpen);
+    // Si on ouvre le chat, on cache définitivement la bulle d'accroche
+    if (!isOpen) setShowPrompt(false);
+  };
 
   return (
-    <>
-      {/* Bouton flottant logo Fenua SIM */}
-      {!open && (
-        <button
-          onClick={() => setOpen(true)}
-          className="fixed bottom-4 right-4 z-50 bg-white rounded-full shadow-lg p-2 border border-gray-200 flex items-center justify-center w-16 h-16 sm:w-14 sm:h-14"
-          aria-label="Ouvrir le chat Fenua SIM"
-        >
-          <Image src="/images/ai_assist.jpg" alt="Fenua SIM" width={48} height={48} />
-        </button>
-      )}
-      {/* Fenêtre de chat */}
-      {open && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 w-full max-w-md mx-auto bg-white rounded-t-xl shadow-2xl border border-gray-200 flex flex-col h-[60vh] sm:bottom-4 sm:right-4 sm:left-auto sm:w-full sm:max-w-sm sm:rounded-xl animate-fade-in">
-          <div className="flex items-center justify-between p-2 border-b bg-fenua-coral rounded-t-xl">
-            <span className="ml-3 text-gray-400 font-bold text-lg">Assistant eSIM</span>
-            <button onClick={() => setOpen(false)} className="text-gray-600 text-2xl px-2" aria-label="Fermer le chat">×</button>
+    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end font-sans gap-4">
+      
+      {/* --- BULLE D'ACCROCHE (PROMPT) --- */}
+      {showPrompt && !isOpen && (
+        <div className="animate-in slide-in-from-bottom-2 fade-in duration-500 max-w-[250px]">
+          <div className="bg-white p-4 rounded-2xl rounded-br-none shadow-xl border border-gray-100 relative">
+            {/* Bouton pour fermer juste la bulle */}
+            <button 
+              onClick={(e) => { e.stopPropagation(); setShowPrompt(false); }}
+              className="absolute -top-2 -right-2 bg-gray-200 rounded-full p-1 hover:bg-gray-300 transition"
+            >
+              <X className="w-3 h-3 text-gray-600" />
+            </button>
+            
+            <div className="flex items-start gap-3">
+              <div className="bg-purple-100 p-1.5 rounded-full flex-shrink-0">
+                <span className="text-xl">👋</span>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-800">
+                  Besoin d'un conseil pour votre voyage ?
+                </p>
+                <button 
+                  onClick={toggleChat}
+                  className="text-xs text-purple-600 font-bold mt-2 hover:underline"
+                >
+                  Discuter maintenant →
+                </button>
+              </div>
+            </div>
           </div>
-          <div className="flex-1 overflow-y-auto p-4">
-            {messages.map((msg, i) => (
-              <div key={i} className={`mb-2 ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
-                <span className={`inline-block px-3 py-2 rounded-lg ${msg.role === 'user' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-900'}`}>{msg.content}</span>
+        </div>
+      )}
+
+      {/* --- FENÊTRE DE CHAT --- */}
+      {isOpen && (
+        <div className="bg-white w-[350px] h-[500px] rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 duration-300 mb-2">
+          
+          {/* Header */}
+          <div className="bg-gradient-to-r from-purple-600 to-orange-500 p-4 flex justify-between items-center text-white">
+            <div className="flex items-center gap-2">
+              <div className="bg-white/20 p-1.5 rounded-full">
+                <Bot className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-sm">Assistant FenuaSIM</h3>
+                <p className="text-xs text-white/80">Réponse instantanée</p>
+              </div>
+            </div>
+            <button onClick={toggleChat} className="hover:bg-white/20 p-1 rounded transition">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Zone de messages */}
+          <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+            {messages.map((m) => (
+              <div
+                key={m.id}
+                className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
+              >
+                <div
+                  className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm shadow-sm ${
+                    m.role === "user"
+                      ? "bg-purple-600 text-white rounded-br-none"
+                      : "bg-white text-gray-800 border border-gray-100 rounded-bl-none"
+                  }`}
+                >
+                  {/* Affichage du HTML (gras, liens...) */}
+                  <div dangerouslySetInnerHTML={{ __html: m.content }} />
+                </div>
               </div>
             ))}
-            <div ref={bottomRef} />
+            
+            {/* Indicateur de chargement (...) */}
+            {isLoading && (
+              <div className="flex justify-start">
+                <div className="bg-white p-3 rounded-2xl rounded-bl-none shadow-sm border border-gray-100">
+                  <div className="flex gap-1">
+                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></span>
+                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-75"></span>
+                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-150"></span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-          <form onSubmit={sendMessage} className="p-4 border-t flex gap-2 bg-white">
+
+          {/* Zone de saisie */}
+          <form onSubmit={handleSubmit} className="p-3 bg-white border-t border-gray-100 flex gap-2">
             <input
-              type="text"
-              className="flex-1 border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-fenua-coral"
-              placeholder="Votre message..."
+              className="flex-1 bg-gray-100 text-gray-900 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
               value={input}
-              onChange={e => setInput(e.target.value)}
-              disabled={loading}
+              onChange={handleInputChange}
+              placeholder="Ex: Japon, USA, prix..."
             />
             <button
               type="submit"
-              className="bg-fenua-coral bg-gray-600 text-white active:bg-slate-800 px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
-              disabled={loading || !input.trim()}
+              disabled={isLoading || !input.trim()}
+              className="bg-purple-600 text-white p-2 rounded-full hover:bg-purple-700 disabled:opacity-50 transition-colors"
             >
-              Envoyer
+              <Send className="w-5 h-5" />
             </button>
           </form>
         </div>
       )}
-    </>
-  )
-} 
+
+      {/* --- BOUTON PRINCIPAL FLOTTANT --- */}
+      <button
+        onClick={toggleChat}
+        className="group flex items-center justify-center w-14 h-14 bg-purple-600 text-white rounded-full shadow-lg hover:bg-purple-700 hover:scale-110 transition-all duration-300 relative"
+      >
+        {/* Badge rouge de notification */}
+        {showPrompt && !isOpen && (
+          <span className="absolute top-0 right-0 flex h-4 w-4">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500"></span>
+          </span>
+        )}
+        
+        {isOpen ? <X className="w-6 h-6" /> : <MessageCircle className="w-7 h-7" />}
+      </button>
+    </div>
+  );
+}

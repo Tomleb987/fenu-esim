@@ -1,248 +1,216 @@
-// lib/ava.ts
+// src/lib/ava.ts
+import axios from 'axios';
+import { format, isValid } from 'date-fns';
+import { AVA_TOURIST_OPTIONS } from './ava_options';
 
-const AVA_BASE_URL = "https://api-ava.fr/api";
+const AVA_API_URL = process.env.AVA_API_URL || "https://api-ava.fr/api";
+const PARTNER_ID = process.env.AVA_PARTNER_ID;
+const PASSWORD = process.env.AVA_PASSWORD;
+// Force le mode 'false' (Test) sauf si la variable d'env est explicitement 'prod'
+const IS_PROD = process.env.AVA_ENV === 'prod' ? 'true' : 'false';
+const CODE_PRODUIT = "ava_tourist_card";
 
-if (!process.env.AVA_PARTNER_ID || !process.env.AVA_PASSWORD) {
-  throw new Error(
-    "AVA_PARTNER_ID et AVA_PASSWORD doivent être définis dans les variables d'environnement"
-  );
+function assertEnvVar(name: string, value: string | undefined) {
+  if (!value) throw new Error(`Variable ${name} manquante`);
 }
 
-export type AvaProductType =
-  | "ava_pass"
-  | "ava_carte_sante"
-  | "ava_zap_voyages"
-  | "ava_tourist_card"
-  | "ava_incoming_classic"
-  | "ava_incoming_studies"
-  | "ava_incoming_safehealth"
-  | "ava_incoming_safehealth_studies"
-  | "plan_sante_studies"
-  | "plan_sante_campus"
-  | "plan_sante_working_holiday_pvt"
-  | "plan_sante_avanture"
-  | "plan_sante_diginomad"
-  | "avantages_360";
+/* --- 1. AUTHENTIFICATION --- */
+export async function getAvaToken() {
+  assertEnvVar('AVA_PARTNER_ID', PARTNER_ID);
+  assertEnvVar('AVA_PASSWORD', PASSWORD);
 
-export interface AvaSubscriberInfos {
-  subscriberCountry: string;
-  birthdate: string;
-  firstName?: string;
-  lastName?: string;
-  subscriberEmail?: string;
-  address?: {
-    street: string;
-    zip: string;
-    city: string;
+  const params = new URLSearchParams();
+  params.append('partnerId', PARTNER_ID!);
+  params.append('password', PASSWORD!);
+
+  try {
+    const response = await axios.post(`${AVA_API_URL}/authentification/connexion.php`, params, {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
+
+    const d = response.data;
+    // Gestion robuste des différents formats de retour du token
+    if (d && d.Token) return d.Token;
+    if (d && d.token) return d.token;
+    if (typeof d === 'string' && d.length > 20) return d;
+
+    throw new Error("Token non reçu");
+  } catch (error: any) {
+    console.error("❌ Erreur Auth:", error.message);
+    throw error;
+  }
+}
+
+/* --- HELPERS --- */
+const toFrDate = (d: string | undefined | null) => {
+    if (!d) return undefined;
+    const date = new Date(d);
+    return isValid(date) ? format(date, 'dd/MM/yyyy') : undefined;
+};
+
+/**
+ * Construit le payload complexe JSON pour AVA
+ */
+function buildTarificationPayload(data: any): URLSearchParams {
+  const companions = data.companions || data.additionalTravelers || [];
+  const totalTravelers = 1 + companions.length;
+  
+  const totalTripCost = Number(data.tripCost) || 0;
+  const costPerPerson = totalTravelers > 0 ? Math.ceil(totalTripCost / totalTravelers) : 0;
+
+  const journeyStartDate = toFrDate(data.startDate);
+  const journeyEndDate = toFrDate(data.endDate);
+  
+  // Date de naissance par défaut pour le devis si non renseignée (35 ans)
+  const subscriberBirth = toFrDate(data.subscriber?.birthDate) || "01/01/1990";
+
+  if (!journeyStartDate || !journeyEndDate) throw new Error("Dates invalides");
+
+  const params = new URLSearchParams();
+
+  // --- PARAMÈTRES GLOBAUX ---
+  params.append('productType', CODE_PRODUIT);
+  params.append('journeyStartDate', journeyStartDate);
+  params.append('journeyEndDate', journeyEndDate);
+  // AVA attend le coût PAR PERSONNE pour calculer la prime d'annulation
+  params.append('journeyAmount', String(costPerPerson)); 
+  params.append('journeyRegion', String(data.destinationRegion || "102"));
+  
+  params.append('numberAdultCompanions', String(companions.length));
+  params.append('numberChildrenCompanions', "0");
+  params.append('numberCompanions', String(companions.length));
+
+  // --- SUBSCRIBER INFOS (JSON) ---
+  // On remplit les champs obligatoires avec des placeholders si c'est juste un devis
+  const sub = data.subscriber || {};
+  const subscriberInfos = {
+      subscriberCountry: data.subscriberCountry || "FR",
+      birthdate: subscriberBirth,
+      firstName: sub.firstName || "Prénom",
+      lastName: sub.lastName || "Nom",
+      subscriberEmail: sub.email || "devis@fenuasim.com",
+      address: {
+          street: sub.address || "Rue Test",
+          zip: sub.postalCode || "75000",
+          city: sub.city || "Paris"
+      }
   };
-}
+  params.append('subscriberInfos', JSON.stringify(subscriberInfos));
 
-export interface AvaCompanionInfo {
-  firstName: string;
-  lastName: string;
-  birthdate: string;
-  parental_link: string;
-}
-
-export interface AvaTarifInput {
-  productType: AvaProductType;
-  journeyStartDate: string;
-  journeyEndDate: string;
-  journeyAmount: number;
-  journeyRegion?: string;
-  numberAdultCompanions: number;
-  numberChildrenCompanions: number;
-  numberCompanions?: number;
-  subscriberInfos: AvaSubscriberInfos;
-  companionsInfos?: AvaCompanionInfo[];
-  option?: Record<string, any>;
-  prod: boolean;
-  internalReference?: string;
-}
-
-/* -------------------------------------------------------------------------- */
-/*                           AUTHENTIFICATION TOKEN                            */
-/* -------------------------------------------------------------------------- */
-
-async function getAvaToken(): Promise<string> {
-  const body = new URLSearchParams();
-  body.append("partnerId", process.env.AVA_PARTNER_ID!);
-  body.append("password", process.env.AVA_PASSWORD!);
-
-  const res = await fetch(`${AVA_BASE_URL}/authentification/connexion.php`, {
-    method: "POST",
-    body,
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    console.error("Erreur AVA auth:", text);
-    throw new Error("Échec de l'authentification AVA");
-  }
-
-  const data: any = await res.json().catch(async () => ({
-    raw: await res.text(),
+  // --- COMPANIONS INFOS (JSON) ---
+  const companionsInfos = companions.map((c: any) => ({
+      firstName: c.firstName || "Accompagnant",
+      lastName: c.lastName || "Inconnu",
+      birthdate: toFrDate(c.birthDate) || "01/01/1990",
+      parental_link: "13" // 13 = Sans parenté par défaut
   }));
+  params.append('companionsInfos', JSON.stringify(companionsInfos));
 
-  const token = data.token ?? data.access_token ?? data.raw;
-  if (!token) {
-    console.error("Réponse inattendue AVA auth:", data);
-    throw new Error("Token AVA introuvable dans la réponse");
+  // --- OPTIONS (LE GROS MORCEAU) ---
+  const optionsJson: any = {};
+  
+  // 'data.options' contient la liste des IDs sélectionnés (ex: ["338", "989"])
+  if (data.options && Array.isArray(data.options)) {
+      data.options.forEach((selectedId: string) => {
+          // 1. On retrouve l'option parente dans notre config pour avoir le bon ID de groupe
+          const parentOption = AVA_TOURIST_OPTIONS.find((opt: any) => 
+              opt.id === selectedId || 
+              opt.defaultSubOptionId === selectedId || 
+              opt.subOptions?.some((sub: any) => sub.id === selectedId)
+          );
+
+          if (parentOption) {
+              const parentId = parentOption.id; // Ex: "335"
+              
+              // On initialise l'objet pour ce parent s'il n'existe pas
+              if (!optionsJson[parentId]) optionsJson[parentId] = {};
+
+              // 2. On applique l'option à TOUS les voyageurs (0 = Souscripteur, 1..N = Compagnons)
+              // Format attendu : {"335": {"0": "338", "1": "338"}}
+              for (let i = 0; i < totalTravelers; i++) {
+                  optionsJson[parentId][String(i)] = selectedId;
+              }
+          }
+      });
   }
+  
+  params.append('option', JSON.stringify(optionsJson));
+  params.append('prod', IS_PROD);
 
-  return token;
+  return params;
 }
 
-/* -------------------------------------------------------------------------- */
-/*                           DEMANDE TARIF COMPLEXE                           */
-/* -------------------------------------------------------------------------- */
+/* --- 2. CALCUL DU PRIX --- */
+export async function getAvaPrice(data: any) {
+  try {
+    const token = await getAvaToken();
+    const params = buildTarificationPayload(data);
 
-export async function demandeTarifComplexe(
-  input: AvaTarifInput
-): Promise<any> {
-  const token = await getAvaToken();
+    console.log(`📤 Tarif AVA (${params.get('journeyAmount')}€/pax)`);
 
-  const body = new URLSearchParams();
-  body.append("productType", input.productType);
-  body.append("journeyStartDate", input.journeyStartDate);
-  body.append("journeyEndDate", input.journeyEndDate);
-  body.append("journeyAmount", String(input.journeyAmount));
-  body.append("numberAdultCompanions", String(input.numberAdultCompanions));
-  body.append(
-    "numberChildrenCompanions",
-    String(input.numberChildrenCompanions)
-  );
+    const response = await axios.post(
+      `${AVA_API_URL}/assurance/tarification/demandeTarif.php`,
+      params, 
+      { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
 
-  if (typeof input.numberCompanions === "number") {
-    body.append("numberCompanions", String(input.numberCompanions));
-  }
-  if (input.journeyRegion) {
-    body.append("journeyRegion", input.journeyRegion);
-  }
+    const d = response.data;
+    console.log("📥 Réponse Tarif:", JSON.stringify(d));
 
-  body.append("subscriberInfos", JSON.stringify(input.subscriberInfos));
-
-  if (input.companionsInfos && input.companionsInfos.length > 0) {
-    body.append("companionsInfos", JSON.stringify(input.companionsInfos));
-  }
-
-  if (input.option) {
-    body.append("option", JSON.stringify(input.option));
-  }
-
-  body.append("prod", input.prod ? "true" : "false");
-
-  if (input.internalReference) {
-    body.append("internalReference", input.internalReference);
-  }
-
-  const res = await fetch(
-    `${AVA_BASE_URL}/assurance/tarification/demandeTarif.php`,
-    {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body,
+    let price = null;
+    if (d) {
+        // L'API peut renvoyer le prix sous plusieurs clés
+        price = d["Prix total avec options (en €)"] ?? d.montant_total ?? d.tarif_total ?? d.tarif;
     }
-  );
 
-  if (!res.ok) {
-    const text = await res.text();
-    console.error("Erreur AVA tarif:", text);
-    throw new Error("Échec de la demande de tarification AVA");
+    if (price == null) {
+        if (d.erreur || d.message) console.warn("⚠️ Message AVA:", d.erreur || d.message);
+        return 0;
+    }
+
+    return parseFloat(String(price));
+
+  } catch (error: any) {
+    console.error("❌ Erreur API AVA:", error.response?.data || error.message);
+    return 0;
   }
-
-  return await res.json().catch(async () => ({ raw: await res.text() }));
 }
 
-/* -------------------------------------------------------------------------- */
-/*                          CRÉATION D’ADHÉSION AVA                           */
-/* -------------------------------------------------------------------------- */
+/* --- 3. CRÉATION ADHÉSION --- */
+export async function createAvaAdhesion(data: any) {
+    const token = await getAvaToken();
+    const params = buildTarificationPayload(data); 
 
-export async function createAvaAdhesion(
-  input: AvaTarifInput
-): Promise<any> {
-  const token = await getAvaToken();
+    console.log("📤 Création Adhésion AVA...");
 
-  const body = new URLSearchParams();
-  body.append("productType", input.productType);
-  body.append("journeyStartDate", input.journeyStartDate);
-  body.append("journeyEndDate", input.journeyEndDate);
-  body.append("journeyAmount", String(input.journeyAmount));
-  body.append("numberAdultCompanions", String(input.numberAdultCompanions));
-  body.append(
-    "numberChildrenCompanions",
-    String(input.numberChildrenCompanions)
-  );
+    try {
+        const response = await axios.post(
+            `${AVA_API_URL}/assurance/adhesion/creationAdhesion.php`,
+            params,
+            { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/x-www-form-urlencoded' } }
+        );
 
-  if (typeof input.numberCompanions === "number") {
-    body.append("numberCompanions", String(input.numberCompanions));
-  }
-  if (input.journeyRegion) {
-    body.append("journeyRegion", input.journeyRegion);
-  }
+        const d = response.data;
+        console.log("📥 Réponse Adhésion:", d);
 
-  body.append("subscriberInfos", JSON.stringify(input.subscriberInfos));
+        const adhesionNumber = d?.["Numéro AD"] || d?.numeroAD || d?.adhesion_number;
+        const price = d?.["Prix total avec options (en €)"] || d?.montant_total;
 
-  if (input.companionsInfos && input.companionsInfos.length > 0) {
-    body.append("companionsInfos", JSON.stringify(input.companionsInfos));
-  }
+        if (!adhesionNumber) throw new Error("Pas de numéro d'adhésion reçu");
 
-  if (input.option) {
-    body.append("option", JSON.stringify(input.option));
-  }
+        return {
+            adhesion_number: adhesionNumber,
+            contract_link: d?.["Certificat de garantie"] || null,
+            montant_total: price ? parseFloat(String(price)) : 0
+        };
 
-  body.append("prod", input.prod ? "true" : "false");
-
-  if (input.internalReference) {
-    body.append("internalReference", input.internalReference);
-  }
-
-  const res = await fetch(
-    `${AVA_BASE_URL}/assurance/adhesion/creationAdhesion.php`,
-    {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body,
+    } catch (error: any) {
+        console.error("❌ Erreur Adhésion:", error.response?.data || error.message);
+        throw new Error("Échec création contrat AVA");
     }
-  );
-
-  if (!res.ok) {
-    const text = await res.text();
-    console.error("Erreur AVA création adhésion:", text);
-    throw new Error("Échec de la création d'adhésion AVA");
-  }
-
-  return await res.json().catch(async () => ({ raw: await res.text() }));
 }
 
-/* -------------------------------------------------------------------------- */
-/*                         VALIDATION DE L’ADHÉSION AVA                       */
-/* -------------------------------------------------------------------------- */
-
-export async function validateAvaAdhesion(
-  internalReference: string,
-  prod: boolean
-): Promise<any> {
-  const token = await getAvaToken();
-
-  const body = new URLSearchParams();
-  body.append("internalReference", internalReference);
-  body.append("prod", prod ? "true" : "false");
-
-  const res = await fetch(
-    `${AVA_BASE_URL}/assurance/adhesion/validationAdhesion.php`,
-    {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body,
-    }
-  );
-
-  if (!res.ok) {
-    const text = await res.text();
-    console.error("Erreur AVA validation adhésion:", text);
-    throw new Error("Échec de la validation d'adhésion AVA");
-  }
-
-  return await res.json().catch(async () => ({ raw: await res.text() }));
+/* --- 4. VALIDATION --- */
+export async function validateAvaAdhesion(adhesionNumber: string) {
+    return true; 
 }

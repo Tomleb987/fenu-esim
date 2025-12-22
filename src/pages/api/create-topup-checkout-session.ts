@@ -14,7 +14,7 @@ export default async function handler(
   }
 
   try {
-    const { cartItems, customer_email, is_top_up, sim_iccid, promo_code, partner_code } = req.body;
+    const { cartItems, customer_email, is_top_up, sim_iccid, promo_code, partner_code, first_name, last_name } = req.body;
 
     if (!cartItems || !Array.isArray(cartItems) || cartItems.length === 0) {
       return res.status(400).json({ error: { message: 'Invalid cart items' } });
@@ -24,17 +24,29 @@ export default async function handler(
       return res.status(400).json({ error: { message: 'SIM ICCID is required for top-up' } });
     }
 
-    const lineItems = cartItems.map((item: any) => ({
-      price_data: {
-        currency: item.currency || 'eur',
-        product_data: {
-          name: item.name,
-          description: item.description || `Top-up for ${sim_iccid}`,
+    // Valid currency codes for Stripe
+    const validCurrencies = ['eur', 'usd', 'xpf'];
+    
+    const lineItems = cartItems.map((item: any) => {
+      // Ensure currency is valid, default to 'eur' if invalid
+      let normalizedCurrency = (item.currency || 'eur').toLowerCase();
+      if (!validCurrencies.includes(normalizedCurrency)) {
+        console.warn(`Invalid currency "${item.currency}", defaulting to "eur"`);
+        normalizedCurrency = 'eur';
+      }
+      
+      return {
+        price_data: {
+          currency: normalizedCurrency,
+          product_data: {
+            name: item.name,
+            description: item.description || `Top-up for ${sim_iccid}`,
+          },
+          unit_amount: normalizedCurrency === 'xpf' ? item.price : Math.round(item.price * 100),
         },
-        unit_amount: item.currency.toLowerCase() === 'xpf' ? item.price : Math.round(item.price * 100),
-      },
-      quantity: 1,
-    }));
+        quantity: 1,
+      };
+    });
 
     const metadata: Stripe.MetadataParam = {
       email: customer_email,
@@ -47,6 +59,14 @@ export default async function handler(
     if (is_top_up) {
       metadata.is_top_up = 'true';
       metadata.sim_iccid = sim_iccid;
+    }
+
+    // Add first_name and last_name from order form if provided
+    if (first_name) {
+      metadata.firstName = first_name;
+    }
+    if (last_name) {
+      metadata.lastName = last_name;
     }
 
     const session = await stripe.checkout.sessions.create({

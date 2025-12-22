@@ -333,6 +333,8 @@ const TopUpInlineSection: React.FC<TopUpInlineSectionProps> = ({ order }) => {
           sim_iccid: order.sim_iccid,
           promo_code: promoCodeToSave || undefined,
           partner_code: form.codePartenaire || undefined,
+          first_name: form.prenom, // Map prenom to first_name
+          last_name: form.nom, // Map nom to last_name
         }),
       });
 

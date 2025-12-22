@@ -20,20 +20,43 @@ export default async function handler(
       return res.status(400).json({ message: "Invalid cart items" });
     }
 
+    // Valid currency codes for Stripe
+    const validCurrencies = ['eur', 'usd', 'xpf'];
+    
     // Create checkout session with all necessary metadata
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
-      line_items: cartItems.map((item) => ({
-        price_data: {
-          currency: "eur",
-          product_data: {
-            name: item.name,
-            description: item.description || "No description provided",
+      line_items: cartItems.map((item: any) => {
+        // Normalize currency to lowercase for Stripe (required format)
+        // Ensure currency is valid, default to 'eur' if invalid
+        let normalizedCurrency = (item.currency || 'eur').toLowerCase();
+        if (!validCurrencies.includes(normalizedCurrency)) {
+          console.warn(`Invalid currency "${item.currency}", defaulting to "eur"`);
+          normalizedCurrency = 'eur';
+        }
+        
+        // Use the price in the selected currency, or fallback to EUR
+        let unitAmount = item.price || item.final_price_eur;
+        if (normalizedCurrency === 'xpf') {
+          // XPF doesn't need multiplication (already in smallest unit)
+          unitAmount = Math.round(unitAmount);
+        } else {
+          // EUR and USD need to be multiplied by 100 (cents)
+          unitAmount = Math.round(unitAmount * 100);
+        }
+        
+        return {
+          price_data: {
+            currency: normalizedCurrency,
+            product_data: {
+              name: item.name,
+              description: item.description || "No description provided",
+            },
+            unit_amount: unitAmount,
           },
-          unit_amount: Math.round(item.final_price_eur * 100),
-        },
-        quantity: 1,
-      })),
+          quantity: 1,
+        };
+      }),
       mode: "payment",
       success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/checkout/cancel`,

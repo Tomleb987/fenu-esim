@@ -60,6 +60,10 @@ export default async function handler(
         promo_code,
         partner_code,
       } = session.metadata || {};
+
+      // For top-ups, also check metadata for firstName/lastName (from order form)
+      const topUpFirstName = is_top_up === "true" ? (firstName || session.customer_details?.name?.split(" ")[0] || null) : null;
+      const topUpLastName = is_top_up === "true" ? (lastName || session.customer_details?.name?.split(" ").slice(1).join(" ") || null) : null;
       console.log("Package ID:", packageId);
       if (!packageId) {
         console.error(
@@ -145,7 +149,9 @@ export default async function handler(
             packageData.currency?.toUpperCase() ||
             "EUR",
           transaction_type: "topup",
-          nom: session.customer_details?.name || null,
+          first_name: topUpFirstName, // Use order form names (preferred)
+          last_name: topUpLastName,
+          nom: session.customer_details?.name || null, // Keep for backward compatibility
           prenom: session.customer_details?.name?.split(" ")[0] || null,
           promo_code: promo_code || null,
           partner_code: partner_code || null,

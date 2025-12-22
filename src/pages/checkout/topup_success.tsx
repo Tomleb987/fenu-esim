@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "@/lib/supabaseClient";
+import { getFrenchRegionName } from "@/lib/regionTranslations";
 import {
   User,
   UserPlus,
@@ -106,10 +107,19 @@ export default function SuccessPage() {
       const emailPayload = {
         email: orderDetails.email,
         customerName:
-          orderDetails.nom || orderDetails.prenom || "Client",
+          // Use first_name and last_name from order form (preferred)
+          (orderDetails.first_name || orderDetails.last_name)
+            ? `${orderDetails.first_name || ""} ${orderDetails.last_name || ""}`.trim()
+            // Fallback to nom/prenom (from Stripe payment form for older top-ups)
+            : (orderDetails.nom || orderDetails.prenom
+                ? `${orderDetails.prenom || ""} ${orderDetails.nom || ""}`.trim()
+                : "Client"),
         packageName: orderDetails.package_name,
-        destinationName: packageData?.region_fr || packageData?.region || "Destination",
-        dataUnit: orderDetails.data_unit || "GB",
+        destinationName: getFrenchRegionName(packageData?.region_fr, packageData?.region) || "Destination",
+        dataAmount: orderDetails.data_amount 
+          ? String(orderDetails.data_amount) 
+          : (packageData?.data_amount ? String(packageData.data_amount) : "3"),
+        dataUnit: orderDetails.data_unit || packageData?.data_unit || "GB",
         validityDays: orderDetails.validity,
       };
 

@@ -406,8 +406,16 @@ export default function RegionPage() {
 
     let promoCodeToSave = null; // <-- Add this line
 
-    // Validate promo code if provided
-    let finalPrice = selectedPackage.final_price_eur! * (1 + margin);
+    // Calculate price based on selected currency
+    let basePrice = selectedPackage.final_price_eur!;
+    if (currency === "USD") {
+      basePrice = selectedPackage.final_price_usd!;
+    } else if (currency === "XPF") {
+      basePrice = selectedPackage.final_price_xpf!;
+    }
+    
+    let finalPrice = basePrice * (1 + margin);
+    
     if (form.codePromo) {
       const promoResult = await validateAndApplyPromoCode(
         form.codePromo,
@@ -447,7 +455,11 @@ export default function RegionPage() {
               id: selectedPackage.id,
               name: selectedPackage.name,
               description: selectedPackage.description ?? "",
-              final_price_eur: finalPrice,
+              price: finalPrice,
+              currency: currency, // Send selected currency
+              final_price_eur: selectedPackage.final_price_eur! * (1 + margin),
+              final_price_usd: selectedPackage.final_price_usd! * (1 + margin),
+              final_price_xpf: selectedPackage.final_price_xpf! * (1 + margin),
               promo_code: promoCodeToSave || undefined,
               partner_code: form.codePartenaire || undefined,
             },
@@ -976,11 +988,36 @@ export default function RegionPage() {
                 </span>
               </div>
               <div className="text-xl font-bold text-gray-900 mb-2">
-                {(selectedPackage.final_price_eur! * (1 + margin)).toFixed(2)} €
+                {(() => {
+                  let price = selectedPackage.final_price_eur! * (1 + margin);
+                  let symbol = "€";
+                  if (currency === "USD") {
+                    price = selectedPackage.final_price_usd! * (1 + margin);
+                    symbol = "$";
+                  } else if (currency === "XPF") {
+                    price = selectedPackage.final_price_xpf! * (1 + margin);
+                    symbol = "₣";
+                  }
+                  return `${price.toFixed(2)} ${symbol}`;
+                })()}
               </div>
             </div>
             <form onSubmit={handleRecapSubmit} className="space-y-4">
               <div className="flex gap-2">
+                <input
+                  type="text"
+                  name="prenom"
+                  placeholder="Prénom *"
+                  value={form.prenom}
+                  onChange={handleFormChange}
+                  className="w-1/2 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-900 placeholder-gray-500 text-base"
+                  style={{
+                    WebkitTextFillColor: "#111827",
+                    opacity: 1,
+                    color: "#111827",
+                  }}
+                  required
+                />
                 <input
                   type="text"
                   name="nom"
@@ -994,20 +1031,6 @@ export default function RegionPage() {
                       color: "#111827",
                     } as React.CSSProperties
                   }
-                  required
-                />
-                <input
-                  type="text"
-                  name="prenom"
-                  placeholder="Prénom *"
-                  value={form.prenom}
-                  onChange={handleFormChange}
-                  className="w-1/2 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-900 placeholder-gray-500 text-base"
-                  style={{
-                    WebkitTextFillColor: "#111827",
-                    opacity: 1,
-                    color: "#111827",
-                  }}
                   required
                 />
               </div>

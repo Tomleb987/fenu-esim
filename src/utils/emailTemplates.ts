@@ -56,7 +56,7 @@ export function createEsimEmailHTML({
             </tr>
             <tr>
               <td style="padding: 8px 0; font-weight: bold; color: #4b5563;">📊 Données:</td>
-              <td style="padding: 8px 0; color: #111827;">${dataAmount} ${dataUnit}</td>
+              <td style="padding: 8px 0; color: #111827;">${dataAmount === "illimité" ? "illimité" : `${dataAmount} ${dataUnit}`}</td>
             </tr>
           </table>
         </div>

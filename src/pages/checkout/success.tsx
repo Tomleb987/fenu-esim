@@ -163,10 +163,39 @@ export default function SuccessPage() {
                 : "Client"),
         packageName: orderDetails.package_name,
         destinationName: getFrenchRegionName(packageData?.region_fr, packageData?.region) || "Destination",
-        dataAmount: orderDetails.data_amount 
-          ? String(orderDetails.data_amount) 
-          : (packageData?.data_amount ? String(packageData.data_amount) : "3"),
-        dataUnit: orderDetails.data_unit || packageData?.data_unit || "GB",
+        dataAmount: (() => {
+          // Check if package is unlimited
+          const packageName = orderDetails.package_name?.toLowerCase() || "";
+          const dataUnit = (orderDetails.data_unit || packageData?.data_unit || "").toLowerCase();
+          const isUnlimited = packageName.includes("illimité") || 
+                             packageName.includes("unlimited") || 
+                             dataUnit.includes("illimité") || 
+                             dataUnit.includes("unlimited");
+          
+          if (isUnlimited) {
+            return "illimité";
+          }
+          
+          // For regular plans, use the data amount
+          return orderDetails.data_amount 
+            ? String(orderDetails.data_amount) 
+            : (packageData?.data_amount ? String(packageData.data_amount) : "3");
+        })(),
+        dataUnit: (() => {
+          // Check if package is unlimited
+          const packageName = orderDetails.package_name?.toLowerCase() || "";
+          const dataUnit = (orderDetails.data_unit || packageData?.data_unit || "").toLowerCase();
+          const isUnlimited = packageName.includes("illimité") || 
+                             packageName.includes("unlimited") || 
+                             dataUnit.includes("illimité") || 
+                             dataUnit.includes("unlimited");
+          
+          if (isUnlimited) {
+            return ""; // Empty unit for unlimited
+          }
+          
+          return orderDetails.data_unit || packageData?.data_unit || "GB";
+        })(),
         validityDays: orderDetails.validity,
         qrCodeUrl: orderDetails.esim.qr_code_url,
         sharingLink: sharingLink,

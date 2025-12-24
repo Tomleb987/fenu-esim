@@ -128,6 +128,12 @@ export const REGION_TRANSLATIONS: Record<string, string> = {
   "Venezuela": "Venezuela",
   "Zambia": "Zambie",
   "Zimbabwe": "Zimbabwe",
+  "Faroe Islands": "Îles Féroé",
+  "Oceania": "Océanie",
+  "Northern Cyprus": "Chypre du Nord",
+  "North America": "Amérique du Nord",
+  "Middle East and North Africa": "Moyen-Orient et Afrique du Nord",
+  "MENA": "Moyen-Orient et Afrique du Nord",
 };
 
 /**

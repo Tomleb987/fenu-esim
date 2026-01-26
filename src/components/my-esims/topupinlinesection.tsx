@@ -261,6 +261,13 @@ const TopUpInlineSection: React.FC<TopUpInlineSectionProps> = ({ order }) => {
       setFormError("Aucun forfait de recharge sélectionné.");
       return;
     }
+    
+    // Validate that package ID exists to prevent webhook failures
+    if (!selectedTopUpPackage.id) {
+      console.error("Missing package ID for top-up - selectedTopUpPackage:", JSON.stringify(selectedTopUpPackage));
+      setFormError("Erreur: Données du forfait incomplètes. Veuillez rafraîchir la page et réessayer.");
+      return;
+    }
     setFormError(null);
     
     // Validate promo code if provided
@@ -338,7 +345,25 @@ const TopUpInlineSection: React.FC<TopUpInlineSectionProps> = ({ order }) => {
         }),
       });
 
-      const { sessionId } = await response.json();
+      const responseData = await response.json();
+      
+      // Check for API errors (including missing packageId)
+      if (!response.ok) {
+        console.error("Top-up checkout session creation failed:", responseData);
+        const errorMessage = responseData.error?.message || responseData.message;
+        if (responseData.error?.code === "MISSING_PACKAGE_ID") {
+          setFormError("Erreur: Données du forfait incomplètes. Veuillez rafraîchir la page et réessayer.");
+        } else {
+          setFormError(errorMessage || "Une erreur est survenue. Veuillez réessayer.");
+        }
+        return;
+      }
+      
+      const { sessionId } = responseData;
+      if (!sessionId) {
+        throw new Error("Session ID not returned from API");
+      }
+      
       const stripe = await stripePromise;
       if (!stripe) throw new Error("Stripe non initialisé");
       const { error } = await stripe.redirectToCheckout({ sessionId });
@@ -346,7 +371,7 @@ const TopUpInlineSection: React.FC<TopUpInlineSectionProps> = ({ order }) => {
     } catch (err) {
       console.error("Erreur lors de la redirection Stripe:", err);
       setFormError(
-        "Une erreur est survenue lors de la redirection vers le paiement. Veuillez réessayer."
+        "Une erreur est survenue lors de la redirection vers le paiement. Veuillez rafraîchir la page et réessayer."
       );
     }
   }

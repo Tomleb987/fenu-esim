@@ -20,6 +20,22 @@ export default async function handler(
       return res.status(400).json({ error: { message: 'Invalid cart items' } });
     }
 
+    // This prevents creating Stripe sessions with undefined packageId which causes webhook failures
+    const packageId = cartItems[0].id;
+    if (!packageId) {
+      console.error("Missing packageId in cartItems[0].id for top-up - this would cause webhook failure", {
+        cartItems: JSON.stringify(cartItems),
+        sim_iccid,
+        timestamp: new Date().toISOString(),
+      });
+      return res.status(400).json({ 
+        error: { 
+          message: "Package ID is required. Please refresh the page and try again.",
+          code: "MISSING_PACKAGE_ID"
+        }
+      });
+    }
+
     if (is_top_up && !sim_iccid) {
       return res.status(400).json({ error: { message: 'SIM ICCID is required for top-up' } });
     }

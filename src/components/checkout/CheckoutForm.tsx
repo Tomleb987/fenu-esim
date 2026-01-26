@@ -27,12 +27,12 @@ function PaymentForm({ pkg, email }: CheckoutFormProps) {
         },
         body: JSON.stringify({
           cartItems: [{
+            id: pkg.id,  //Include package ID for webhook processing
             name: pkg.name,
             description: pkg.description,
             final_price_eur: pkg.price_eur
           }],
-          email,
-          packageId: pkg.airalo_id
+          customer_email: email,
         }),
       })
 

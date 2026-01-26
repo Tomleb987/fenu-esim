@@ -20,6 +20,20 @@ export default async function handler(
       return res.status(400).json({ message: "Invalid cart items" });
     }
 
+
+    // This prevents creating Stripe sessions with undefined packageId which causes webhook failures
+    const packageId = cartItems[0].id;
+    if (!packageId) {
+      console.error("Missing packageId in cartItems[0].id - this would cause webhook failure", {
+        cartItems: JSON.stringify(cartItems),
+        timestamp: new Date().toISOString(),
+      });
+      return res.status(400).json({ 
+        message: "Package ID is required. Please refresh the page and try again.",
+        error: "MISSING_PACKAGE_ID"
+      });
+    }
+
     // Valid currency codes for Stripe
     const validCurrencies = ['eur', 'usd', 'xpf'];
     

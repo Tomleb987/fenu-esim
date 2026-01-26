@@ -402,6 +402,13 @@ export default function RegionPage() {
       setFormError("Aucun forfait sélectionné.");
       return;
     }
+    
+    // Validate that package ID exists to prevent webhook failures
+    if (!selectedPackage.id) {
+      console.error("Missing package ID - selectedPackage:", JSON.stringify(selectedPackage));
+      setFormError("Erreur: Données du forfait incomplètes. Veuillez rafraîchir la page et réessayer.");
+      return;
+    }
     setFormError(null);
 
     let promoCodeToSave = null; // <-- Add this line
@@ -467,7 +474,24 @@ export default function RegionPage() {
         }),
       });
 
-      const { sessionId } = await response.json();
+      const responseData = await response.json();
+      
+      // Check for API errors (including missing packageId)
+      if (!response.ok) {
+        console.error("Checkout session creation failed:", responseData);
+        if (responseData.error === "MISSING_PACKAGE_ID") {
+          setFormError("Erreur: Données du forfait incomplètes. Veuillez rafraîchir la page et réessayer.");
+        } else {
+          setFormError(responseData.message || "Une erreur est survenue. Veuillez réessayer.");
+        }
+        return;
+      }
+      
+      const { sessionId } = responseData;
+      if (!sessionId) {
+        throw new Error("Session ID not returned from API");
+      }
+      
       const stripe = await stripePromise;
       if (!stripe) throw new Error("Stripe non initialisé");
       const { error } = await stripe.redirectToCheckout({ sessionId });
@@ -475,7 +499,7 @@ export default function RegionPage() {
     } catch (err) {
       console.error("Erreur lors de la redirection Stripe:", err);
       setFormError(
-        "Une erreur est survenue lors de la redirection vers le paiement. Veuillez réessayer.",
+        "Une erreur est survenue lors de la redirection vers le paiement. Veuillez rafraîchir la page et réessayer.",
       );
     }
   }

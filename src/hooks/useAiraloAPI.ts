@@ -44,11 +44,28 @@ export const useAiraloAPI = () => {
 
       const result = await response.json();
 
+      // Debug logging
+      console.log('useAiraloAPI Full API response:', result);
+      console.log('useAiraloAPI Endpoint:', endpoint);
+
       if (!result.success) {
+        console.error('[useAiraloAPI] API request failed:', result.error);
         throw new Error(result.error || 'API request failed');
       }
 
-      return { data: result.data.data, error: null };
+      // Handle different response structures from Airalo API
+      // Airalo might return: { data: { data: {...} } } or { data: {...} }
+      let extractedData = result.data;
+      
+      // If result.data has a 'data' property, extract it
+      if (result.data && typeof result.data === 'object' && 'data' in result.data) {
+        extractedData = result.data.data;
+        console.log('[useAiraloAPI] Extracted nested data:', extractedData);
+      } else {
+        console.log('[useAiraloAPI] Using direct data:', extractedData);
+      }
+
+      return { data: extractedData, error: null };
     } catch (err) {
       const apiError: AiraloAPIError = {
         code: 'API_ERROR',

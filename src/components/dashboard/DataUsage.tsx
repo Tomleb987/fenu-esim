@@ -28,6 +28,7 @@ export default function DataUsage() {
 
   useEffect(() => {
     if (selectedSim) {
+      console.log(' Selected SIM changed:', selectedSim.iccid);
       fetchUsage(selectedSim.iccid);
     }
   }, [selectedSim, fetchUsage]);
@@ -69,7 +70,7 @@ export default function DataUsage() {
             <option value="" className="text-gray-500">Choisir une SIM</option>
             {sims.map((sim) => (
               <option key={sim.id} value={sim.iccid} className="text-gray-900">
-                {sim.name}
+                {sim.name} {sim.iccid ? `(${sim.iccid.slice(-8)})` : ''}
               </option>
             ))}
           </select>
@@ -102,6 +103,15 @@ export default function DataUsage() {
             </span>
           </div>
 
+          {usage?.status === "NOT_ACTIVE" && (
+            <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-sm text-yellow-800">
+                <strong>Note:</strong> Cette eSIM n'est pas encore activée. 
+                Une fois activée et utilisée, les données de consommation apparaîtront ici.
+                Le statut peut prendre quelques minutes à se mettre à jour après activation.
+              </p>
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 shadow-sm">
               <div className="flex items-center space-x-4">
@@ -116,11 +126,20 @@ export default function DataUsage() {
                     {usageLoading ? (
                       <div className="animate-pulse bg-purple-200 h-8 w-24 rounded"></div>
                     ) : usageError ? (
-                      <span className="text-red-500">Erreur</span>
-                    ) : (
+                      <span className="text-red-500">
+                        Erreur: {usageError.message || 'Erreur inconnue'}
+                      </span>
+                    ) : usage ? (
                       formatDataUsage(usage)
+                    ) : (
+                      <span className="text-gray-500">Aucune donnée</span>
                     )}
                   </p>
+                  {usage && usage.total === usage.remaining && usage.total > 0 && (
+                    <p className="text-xs text-purple-600 mt-1">
+                      Aucune donnée consommée pour le moment
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -137,9 +156,13 @@ export default function DataUsage() {
                     {usageLoading ? (
                       <div className="animate-pulse bg-teal-200 h-8 w-24 rounded"></div>
                     ) : usageError ? (
-                      <span className="text-red-500">Erreur</span>
-                    ) : (
+                      <span className="text-red-500">
+                        Erreur: {usageError.message || 'Erreur inconnue'}
+                      </span>
+                    ) : usage ? (
                       formatRemainingData(usage)
+                    ) : (
+                      <span className="text-gray-500">Aucune donnée</span>
                     )}
                   </p>
                 </div>

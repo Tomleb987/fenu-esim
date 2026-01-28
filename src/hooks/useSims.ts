@@ -32,6 +32,9 @@ export const useSims = () => {
 
       if (fetchError) throw fetchError;
 
+      console.log('[useSims] Loaded SIMs:', data);
+      console.log('[useSims] Number of SIMs:', data?.length || 0);
+      
       setSims(data || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors du chargement des SIMs');

@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import Stripe from "stripe";
-import { supabase } from "@/lib/supabaseClient";
+import { supabaseAdmin as supabase } from "@/lib/supabaseAdmin";
 import { AiraloTopup } from "@/types/airaloTopup";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {

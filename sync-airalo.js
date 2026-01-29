@@ -11,7 +11,7 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 // Taux de change par défaut (modifiable)
 const USD_TO_EUR = 0.84;
 const USD_TO_XPF = 100;
-const MARGE = 1.30; // 30%
+const MARGE = 1.12; // 12%
 
 if (!AIRALO_CLIENT_ID || !AIRALO_CLIENT_SECRET || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error('Missing environment variables');

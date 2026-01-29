@@ -80,17 +80,26 @@ export default function Account() {
 
   const checkUser = async () => {
     try {
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser();
-      if (error || !user) {
-        router.push("/login");
+      let { data: { session }, error } = await supabase.auth.getSession();
+      if (!error && session?.user) {
+        setUser(session.user as any);
         return;
       }
-      setUser(user as any);
-    } catch (error) {
-      console.error("Error:", error);
+      const hash = typeof window !== "undefined" ? window.location.hash : "";
+      const isMagicLinkCallback = /access_token|type=magiclink/.test(hash);
+      if (isMagicLinkCallback) {
+        await new Promise((r) => setTimeout(r, 1200));
+        const retry = await supabase.auth.getSession();
+        session = retry.data.session;
+        error = retry.error;
+        if (!error && session?.user) {
+          setUser(session.user as any);
+          return;
+        }
+      }
+      router.push("/login");
+    } catch (err) {
+      console.error("Error:", err);
       router.push("/login");
     } finally {
       setLoading(false);

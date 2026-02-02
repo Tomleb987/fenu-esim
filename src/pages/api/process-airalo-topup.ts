@@ -1,8 +1,6 @@
-import { AIRALO_API_URL } from '@/lib/airalo/config';
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getAiraloToken } from "@/lib/airalo";
-// Supabase client is not directly used here for inserts anymore, but getAiraloApiToken might use it if refactored
-// import { supabase } from "@/lib/supabaseClient"; 
+import { resilientFetch, generateIdempotencyKey } from "@/lib/apiResilience";
 
 interface AiraloAuthResponse {
   access_token: string;
@@ -54,53 +52,61 @@ async function callAiraloTopUpAPI(
   payload: AiraloTopUpPayload,
   token: string
 ): Promise<ProcessedAiraloTopUpResponse> {
-  console.log(
-    `Payload: ${payload}`
-  );
+  console.log(`Payload:`, JSON.stringify(payload));
   console.log(
     `Attempting Airalo top-up for ICCID: ${payload.iccid} with package: ${payload.package_id}`
   );
+  
   const AIRALO_API_URL = process.env.AIRALO_API_URL;
   const AIRALO_TOPUP_API_ENDPOINT = `${AIRALO_API_URL}/orders/topups`;
 
-  const response = await fetch(AIRALO_TOPUP_API_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
+  // Use resilient fetch with automatic retry on 5xx errors
+  const result = await resilientFetch<AiraloApiActualResponse>(
+    AIRALO_TOPUP_API_ENDPOINT,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+      body: JSON.stringify(payload),
     },
-    body: JSON.stringify(payload),
-  });
+    {
+      maxRetries: 3,
+      initialDelayMs: 1500,
+      maxDelayMs: 10000,
+      retryOn5xx: true,
+      retryOnNetworkError: true,
+      onRetry: (attempt, error, delayMs) => {
+        console.warn(`[Airalo Top-Up Retry ${attempt}] ${error}. Waiting ${Math.round(delayMs)}ms...`);
+      },
+    }
+  );
 
-  const responseBodyText = await response.text();
-
-  if (!response.ok) {
-    console.error(`Airalo Top-Up API Error: ${response.status} - ${responseBodyText}`);
+  if (!result.success || !result.data) {
+    console.error(`Airalo Top-Up API Error after ${result.attempts} attempts:`, result.error);
+    if (result.rawText) {
+      console.error("Raw response (truncated):", result.rawText);
+    }
     throw new Error(
-      `Airalo Top-Up API request failed: ${response.status} - ${responseBodyText}`
+      `Airalo Top-Up API request failed after ${result.attempts} attempts: ${result.error}`
     );
   }
 
-  try {
-    const data: AiraloApiActualResponse = JSON.parse(responseBodyText);
-    console.log("Airalo Top-Up API Response:", data);
+  const data = result.data;
+  console.log("Airalo Top-Up API Response:", data);
 
-    const success = data.meta?.message === "success" || (response.status >= 200 && response.status < 300);
-    // Prefer data.id as the primary top-up ID, fallback to data.code
-    const airaloTopupId = data.data?.id?.toString() || data.data?.code;
+  const success = data.meta?.message === "success" || (result.lastStatus !== undefined && result.lastStatus >= 200 && result.lastStatus < 300);
+  // Prefer data.id as the primary top-up ID, fallback to data.code
+  const airaloTopupId = data.data?.id?.toString() || data.data?.code;
 
-    return {
-      success: success,
-      airalo_topup_id: airaloTopupId,
-      message: data.meta?.message || (success ? "Top-up successful" : "Top-up failed"),
-      airalo_response_data: data.data,
-    };
-  } catch (parseError) {
-    console.error("Failed to parse Airalo Top-Up API Response:", parseError);
-    console.error("Raw response body:", responseBodyText);
-    throw new Error("Failed to parse Airalo Top-Up API response.");
-  }
+  return {
+    success: success,
+    airalo_topup_id: airaloTopupId,
+    message: data.meta?.message || (success ? "Top-up successful" : "Top-up failed"),
+    airalo_response_data: data.data,
+  };
 }
 
 interface TopUpRequestBody {

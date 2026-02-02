@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import Stripe from "stripe";
 import { supabaseAdmin as supabase } from "@/lib/supabaseAdmin";
 import { AiraloTopup } from "@/types/airaloTopup";
+import { safeJsonParse } from "@/lib/apiResilience";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-04-30.basil",
@@ -114,9 +115,27 @@ export default async function handler(
           }),
         });
 
-        const topUpApiResult = await topUpResponse.json();
+        // Use safe JSON parsing to handle non-JSON responses (e.g., 502 HTML pages)
+        const parseResult = await safeJsonParse<{
+          success: boolean;
+          message?: string;
+          airalo_topup_id?: string;
+          airalo_response_data?: any;
+        }>(topUpResponse);
 
-        if (!topUpResponse.ok || !topUpApiResult.success) {
+        if (!parseResult.success || !parseResult.data) {
+          console.error(
+            `Failed to parse top-up API response: ${parseResult.error}`,
+            parseResult.rawText ? `Raw: ${parseResult.rawText}` : ""
+          );
+          throw new Error(
+            `Failed to process Airalo top-up: ${parseResult.error || "Invalid response"}`,
+          );
+        }
+
+        const topUpApiResult = parseResult.data;
+
+        if (!topUpApiResult.success) {
           console.error(
             `Failed to process Airalo top-up via local API: ${topUpResponse.status} - ${topUpApiResult.message || "Unknown API error"}`,
           );
@@ -230,17 +249,40 @@ export default async function handler(
           },
         );
 
-        if (!edgeFunctionResponse.ok) {
-          const errorText = await edgeFunctionResponse.text();
+        // Use safe JSON parsing to handle non-JSON responses (e.g., 502 HTML pages)
+        const orderParseResult = await safeJsonParse<{
+          order?: {
+            order_id?: string;
+            sim_iccid?: string;
+            qr_code_url?: string;
+          };
+          order_reference?: string;
+          id?: string;
+          sim_iccid?: string;
+          qr_code?: string;
+          error?: string;
+        }>(edgeFunctionResponse);
+
+        if (!orderParseResult.success || !orderParseResult.data) {
           console.error(
-            `Failed to create Airalo order via Edge Function: ${edgeFunctionResponse.status} - ${errorText}`,
+            `Failed to parse Airalo order response: ${orderParseResult.error}`,
+            orderParseResult.rawText ? `Raw: ${orderParseResult.rawText}` : ""
           );
           throw new Error(
-            `Failed to create Airalo order: ${edgeFunctionResponse.status} - ${errorText}`,
+            `Failed to create Airalo order: ${orderParseResult.error || "Invalid response"}`,
           );
         }
 
-        const airaloOrderData = await edgeFunctionResponse.json();
+        if (orderParseResult.data.error) {
+          console.error(
+            `Airalo order API returned error: ${orderParseResult.data.error}`,
+          );
+          throw new Error(
+            `Failed to create Airalo order: ${orderParseResult.data.error}`,
+          );
+        }
+
+        const airaloOrderData = orderParseResult.data;
         console.log(
           "Airalo order created successfully via Edge Function:",
           airaloOrderData,

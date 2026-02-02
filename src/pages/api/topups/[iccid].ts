@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getAiraloToken } from "@/lib/airalo";
+import { resilientFetch } from "@/lib/apiResilience";
 
 const AIRALO_API_URL = process.env.AIRALO_API_URL;
 
@@ -20,21 +21,35 @@ export default async function handler(
   try {
     const token = await getAiraloToken();
 
-    const topupRes = await fetch(`${AIRALO_API_URL}/sims/${iccid}/topups`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
+    const result = await resilientFetch<{ data: any[] }>(
+      `${AIRALO_API_URL}/sims/${iccid}/topups`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
       },
-    });
+      {
+        maxRetries: 2,
+        initialDelayMs: 1000,
+        retryOn5xx: true,
+        retryOnNetworkError: true,
+        onRetry: (attempt, error) => {
+          console.warn(`[Topups API Retry ${attempt}] ${error}`);
+        },
+      }
+    );
 
-    if (!topupRes.ok) {
-      console.error("Topup fetch error:", await topupRes.text());
-      return res.status(500).json({ message: "Failed to fetch top-up data" });
+    if (!result.success || !result.data) {
+      console.error("Topup fetch error:", result.error);
+      if (result.rawText) {
+        console.error("Raw response:", result.rawText);
+      }
+      return res.status(500).json({ message: `Failed to fetch top-up data: ${result.error}` });
     }
 
-    const data = await topupRes.json();
-    res.status(200).json(data);
+    res.status(200).json(result.data);
   } catch (error: any) {
     console.error("Server error:", error);
     res.status(500).json({ message: error.message || "Internal server error" });

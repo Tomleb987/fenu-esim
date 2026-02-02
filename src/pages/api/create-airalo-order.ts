@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin as supabase } from "@/lib/supabaseAdmin";
+import { resilientFetch } from "@/lib/apiResilience";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -9,29 +10,42 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const { packageId, customerEmail, airalo_id, customerName, customerFirstname, quantity, description } = req.body;
 
-
     const AIRALO_API_URL = process.env.AIRALO_API_URL;
-    const tokenResponse = await fetch(`${AIRALO_API_URL}/token`, {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/x-www-form-urlencoded'
+    
+    // Step 1: Get Airalo access token with resilience
+    const tokenResult = await resilientFetch<{ data: { access_token: string } }>(
+      `${AIRALO_API_URL}/token`,
+      {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({
+          client_id: process.env.AIRALO_CLIENT_ID ?? '',
+          client_secret: process.env.AIRALO_CLIENT_SECRET ?? '',
+          grant_type: 'client_credentials'
+        })
       },
-      body: new URLSearchParams({
-        client_id: process.env.AIRALO_CLIENT_ID ?? '',
-        client_secret: process.env.AIRALO_CLIENT_SECRET ?? '',
-        grant_type: 'client_credentials'
-      })
-    });
+      {
+        maxRetries: 2,
+        initialDelayMs: 1000,
+        retryOn5xx: true,
+        retryOnNetworkError: true,
+        onRetry: (attempt, error) => {
+          console.warn(`[Airalo Token Retry ${attempt}] ${error}`);
+        },
+      }
+    );
 
-    if (!tokenResponse.ok) {
-      const tokenError = await tokenResponse.text();
-      throw new Error(`Failed to get Airalo access token: ${tokenError}`);
+    if (!tokenResult.success || !tokenResult.data) {
+      console.error("Failed to get Airalo token:", tokenResult.error);
+      throw new Error(`Failed to get Airalo access token: ${tokenResult.error}`);
     }
 
-    const tokenData = await tokenResponse.json();
-    const accessToken = tokenData.data.access_token;
+    const accessToken = tokenResult.data.data.access_token;
 
+    // Step 2: Create Airalo order with resilience
     const orderBody = {
       package_id: airalo_id,
       quantity: quantity || 1,
@@ -40,22 +54,51 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       description: description
     };
 
-    const orderResponse = await fetch(`${AIRALO_API_URL}/orders`, {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`
+    const orderResult = await resilientFetch<{
+      data: {
+        id: number;
+        sims?: Array<{
+          iccid: string;
+          qrcode_url: string;
+          direct_apple_installation_url: string;
+        }>;
+        data?: string;
+      };
+      meta?: { message: string };
+    }>(
+      `${AIRALO_API_URL}/orders`,
+      {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`
+        },
+        body: JSON.stringify(orderBody)
       },
-      body: JSON.stringify(orderBody)
-    });
-    console.log("Airalo order response here: ", orderResponse);
+      {
+        maxRetries: 3,
+        initialDelayMs: 1500,
+        maxDelayMs: 10000,
+        retryOn5xx: true,
+        retryOnNetworkError: true,
+        onRetry: (attempt, error, delayMs) => {
+          console.warn(`[Airalo Order Retry ${attempt}] ${error}. Waiting ${Math.round(delayMs)}ms...`);
+        },
+      }
+    );
 
-    const orderText = await orderResponse.clone().text();
-    if (!orderResponse.ok) {
-      throw new Error(`Airalo API error: ${orderText}`);
+    console.log("Airalo order result:", orderResult.success ? "success" : orderResult.error);
+
+    if (!orderResult.success || !orderResult.data) {
+      console.error(`Airalo order failed after ${orderResult.attempts} attempts:`, orderResult.error);
+      if (orderResult.rawText) {
+        console.error("Raw response (truncated):", orderResult.rawText);
+      }
+      throw new Error(`Airalo API error after ${orderResult.attempts} attempts: ${orderResult.error}`);
     }
-    const orderData = JSON.parse(orderText);
+
+    const orderData = orderResult.data;
 
     const sim = orderData.data.sims?.[0];
     const { data: order, error } = await supabase.from('airalo_orders').insert({

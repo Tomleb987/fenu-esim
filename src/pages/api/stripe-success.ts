@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import Stripe from "stripe";
+import { safeJsonParse } from "@/lib/apiResilience";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -36,7 +37,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       })
     })
 
-    const edgeData = await edgeRes.json()
+    // Use safe JSON parsing to handle non-JSON responses
+    const parseResult = await safeJsonParse<any>(edgeRes);
+    
+    if (!parseResult.success) {
+      console.error('Failed to parse edge function response:', parseResult.error);
+      return res.status(502).json({ 
+        error: 'Erreur lors de la création de la commande eSIM', 
+        details: parseResult.error 
+      });
+    }
+    
+    const edgeData = parseResult.data;
     if (!edgeRes.ok) {
       return res.status(500).json({ error: 'Erreur lors de la création de la commande eSIM', details: edgeData })
     }

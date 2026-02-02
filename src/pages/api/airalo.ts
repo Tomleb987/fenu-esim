@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getAiraloToken } from "@/lib/airalo";
+import { safeJsonParse } from "@/lib/apiResilience";
 
 export default async function handler(
   req: NextApiRequest,
@@ -48,18 +49,32 @@ export default async function handler(
     console.log('airalo API Response status:', response.status);
     console.log('airalo API Response ok:', response.ok);
 
-    const data = await response.json();
+    // Use safe JSON parsing to handle non-JSON responses (e.g., 502 HTML pages)
+    const parseResult = await safeJsonParse<any>(response);
+
+    if (!parseResult.success) {
+      console.error('airalo API Failed to parse response:', parseResult.error);
+      if (parseResult.rawText) {
+        console.error('Raw response:', parseResult.rawText);
+      }
+      return res.status(502).json({
+        success: false,
+        error: `Failed to parse Airalo API response: ${parseResult.error}`,
+      });
+    }
+
+    const data = parseResult.data;
     console.log('airalo API Response data:', JSON.stringify(data, null, 2));
 
     if (!response.ok) {
       console.error('airalo API Request failed:', {
         status: response.status,
-        error: data.message || 'Airalo API request failed',
+        error: data?.message || 'Airalo API request failed',
         details: data
       });
       return res.status(response.status).json({
         success: false,
-        error: data.message || 'Airalo API request failed',
+        error: data?.message || 'Airalo API request failed',
         details: data
       });
     }

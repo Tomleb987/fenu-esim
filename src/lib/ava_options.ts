@@ -3,7 +3,7 @@
 export interface AvaOption {
   id: string; // L'ID "Parent" (ex: 335 pour Annulation)
   label: string;
-  type: 'boolean' | 'select';
+  type: 'boolean' | 'select' | 'date-range'; // date-range = option avec from/to dates (ex: CDW 728)
   description?: string;
   subOptions?: { id: string; label: string }[];
   defaultSubOptionId?: string; // L'ID "Enfant" par défaut si c'est un boolean (ex: 338)
@@ -44,13 +44,13 @@ export const AVA_TOURIST_OPTIONS: AvaOption[] = [
   },
 
   // --- VÉHICULE ---
-  // Mappé vers 458 selon votre tableau (ID parent 728 pour l'affichage, mais envoie 458)
+  // Option 728 : type "date-range" — AVA attend from_date_option / to_date_option (pas de sous-option ID)
+  // Format correct : {"728": {"0": {"from_date_option": "jj/mm/AAAA", "to_date_option": "jj/mm/AAAA"}}}
   { 
     id: "728", 
     label: "Rachat de franchise Véhicule (CDW)", 
-    type: "boolean", 
-    description: "Couverture dommages jusqu'à 150.000€",
-    defaultSubOptionId: "458" 
+    type: "date-range", 
+    description: "Couverture dommages jusqu'à 150.000€ — dates de location requises",
   },
 
   // --- ACCIDENT ---

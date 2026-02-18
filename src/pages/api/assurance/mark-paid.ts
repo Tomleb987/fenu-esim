@@ -1,4 +1,4 @@
-// src/pages/api/insurance/mark-paid.ts
+// src/pages/api/assurance/mark-paid.ts
 import { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
@@ -22,5 +22,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: 'Erreur mise à jour Supabase' });
   }
 
-  return res.status(200).json({ success: true });
+  // Récupère les liens documents stockés par le webhook AVA
+  const { data } = await supabaseAdmin
+    .from('insurances')
+    .select('contract_link, attestation_url')
+    .eq('id', insurance_id)
+    .single();
+
+  return res.status(200).json({ 
+    success: true,
+    contract_link: data?.contract_link || null,
+    attestation_url: data?.attestation_url || null,
+  });
 }

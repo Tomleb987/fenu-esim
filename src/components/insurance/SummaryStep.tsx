@@ -14,6 +14,9 @@ interface SummaryStepProps {
 
 export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProps) => {
 
+  const EUR_TO_XPF = 119.33;
+  const toXPF = (eur: number) => Math.round(eur * EUR_TO_XPF).toLocaleString('fr-FR');
+
   const getDestinationLabel = (code: string | number) => {
     const codeStr = String(code).trim();
     switch (codeStr) {
@@ -152,9 +155,14 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProp
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
     doc.text("TOTAL ESTIMÉ TTC", margin + 5, y + 10.5);
-    const priceText = quote ? `${quote.premium.toFixed(2)} €` : "En cours de calcul";
+    const priceEur = quote ? `${quote.premium.toFixed(2)} €` : "En cours de calcul";
+    const priceXpf = quote ? `≈ ${toXPF(quote.premium)} XPF` : "";
     doc.setFontSize(14);
-    doc.text(priceText, pageW - margin - 5, y + 10.5, { align: "right" });
+    doc.setFontSize(14);
+    doc.text(priceEur, pageW - margin - 5, y + 7, { align: "right" });
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text(priceXpf, pageW - margin - 5, y + 14, { align: "right" });
     y += 24;
 
     // --- MENTIONS LÉGALES ---
@@ -285,9 +293,16 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProp
             {isLoadingQuote ? (
               <span className="text-sm italic text-primary animate-pulse">Calcul en cours...</span>
             ) : (
-              <span className="font-bold text-3xl text-primary">
-                {quote ? `${quote.premium.toFixed(2)} €` : "-- €"}
-              </span>
+              <div className="text-right">
+                <span className="font-bold text-3xl text-primary block">
+                  {quote ? `${quote.premium.toFixed(2)} €` : "-- €"}
+                </span>
+                {quote && (
+                  <span className="text-sm text-gray-400 font-normal">
+                    ≈ {toXPF(quote.premium)} XPF
+                  </span>
+                )}
+              </div>
             )}
           </div>
         </div>

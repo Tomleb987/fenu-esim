@@ -1,6 +1,7 @@
 import { InsuranceFormData } from "@/types/insurance";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { AVA_TOURIST_OPTIONS } from "@/lib/ava_options";
 
 interface SummaryStepProps {
   formData: InsuranceFormData;
@@ -113,11 +114,20 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProp
             <span className="block text-xs text-gray-500 uppercase font-semibold mb-1">Options choisies</span>
             {formData.selectedOptions && formData.selectedOptions.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
-                    {formData.selectedOptions.map((optId) => (
-                        <span key={optId} className="bg-primary/10 text-primary text-xs px-2 py-1 rounded-full font-medium">
-                            Option {optId}
-                        </span>
-                    ))}
+                    {formData.selectedOptions.map((optId) => {
+                        // Cherche d'abord dans les options parentes, puis dans les sous-options
+                        const allOptions = AVA_TOURIST_OPTIONS.flatMap(opt => [
+                            opt,
+                            ...(opt.subOptions?.map(sub => ({ ...sub, type: 'select' as const })) || [])
+                        ]);
+                        const found = allOptions.find(o => o.id === optId);
+                        const label = found ? found.label : `Option ${optId}`;
+                        return (
+                            <span key={optId} className="bg-primary/10 text-primary text-xs px-2 py-1 rounded-full font-medium">
+                                {label}
+                            </span>
+                        );
+                    })}
                 </div>
             ) : (
                 <span className="text-gray-400 text-sm italic">Aucune option sélectionnée</span>

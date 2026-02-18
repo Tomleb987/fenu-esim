@@ -141,9 +141,47 @@ export default function InsuranceForm() {
         setCurrentStep(prev => prev + 1);
         window.scrollTo(0, 0);
     } else {
-        // Vers le paiement
-        setIsSubmitted(true);
-        window.location.href = "/api/insurance-checkout"; 
+        // Vers le paiement — appel POST avec toutes les données du formulaire
+        setIsLoading(true);
+        try {
+            const res = await fetch('/api/insurance-checkout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    quoteData: {
+                        startDate: formData.departureDate,
+                        endDate: formData.returnDate,
+                        tripCost: formData.tripPrice,
+                        destinationRegion: formData.destination,
+                        subscriberCountry: formData.subscriberCountry,
+                        subscriber: {
+                            firstName: formData.firstName,
+                            lastName: formData.lastName,
+                            birthDate: formData.birthDate,
+                            email: formData.email,
+                            address: formData.address,
+                            postalCode: formData.postalCode,
+                            city: formData.city,
+                        },
+                        companions: formData.additionalTravelers,
+                        options: formData.selectedOptions,
+                    },
+                    userEmail: formData.email,
+                    amount: quote?.premium,
+                }),
+            });
+            const data = await res.json();
+            if (data.url) {
+                window.location.href = data.url;
+            } else {
+                toast.error(data.error || "Erreur lors de la création du paiement");
+                setIsLoading(false);
+            }
+        } catch (err) {
+            console.error('Erreur checkout:', err);
+            toast.error("Erreur réseau, veuillez réessayer");
+            setIsLoading(false);
+        }
     }
   };
 

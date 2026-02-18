@@ -125,10 +125,21 @@ function buildTarificationPayload(data: any): URLSearchParams {
               // On initialise l'objet pour ce parent s'il n'existe pas
               if (!optionsJson[parentId]) optionsJson[parentId] = {};
 
-              // 2. On applique l'option à TOUS les voyageurs (0 = Souscripteur, 1..N = Compagnons)
-              // Format attendu : {"335": {"0": "338", "1": "338"}}
-              for (let i = 0; i < totalTravelers; i++) {
-                  optionsJson[parentId][String(i)] = selectedId;
+              if (parentOption.type === 'date-range') {
+                  // Option 728 (CDW véhicule) : AVA attend des dates from/to, pas un ID de sous-option
+                  // On utilise les dates du voyage comme dates de location par défaut
+                  for (let i = 0; i < totalTravelers; i++) {
+                      optionsJson[parentId][String(i)] = {
+                          from_date_option: journeyStartDate,
+                          to_date_option: journeyEndDate,
+                      };
+                  }
+              } else {
+                  // Options standard (boolean ou select) : on envoie l'ID de la sous-option
+                  // Format : {"335": {"0": "338", "1": "338"}}
+                  for (let i = 0; i < totalTravelers; i++) {
+                      optionsJson[parentId][String(i)] = selectedId;
+                  }
               }
           }
       });
@@ -211,6 +222,38 @@ export async function createAvaAdhesion(data: any) {
 }
 
 /* --- 4. VALIDATION --- */
+// Appelé APRÈS confirmation du paiement Stripe pour activer le contrat AVA
+// Le numéro d'adhésion doit être au format "AD/xx-xxxxxx"
 export async function validateAvaAdhesion(adhesionNumber: string) {
-    return true; 
+    const token = await getAvaToken();
+
+    const params = new URLSearchParams();
+    params.append('numeroAdhesion', adhesionNumber);
+
+    try {
+        const response = await axios.post(
+            `${AVA_API_URL}/assurance/adhesion/validationAdhesion.php`,
+            params,
+            { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/x-www-form-urlencoded' } }
+        );
+
+        const d = response.data;
+        console.log("📥 Réponse Validation Adhésion:", d);
+
+        // AVA renvoie un message de validation + certificat + attestation signée
+        const certificatUrl = d?.["Certificat de garantie"] || d?.certificat || d?.certificate_url || null;
+        const attestationUrl = d?.["Attestation d'assurance"] || d?.attestation || null;
+        const message = d?.message || d?.Message || null;
+
+        return {
+            success: true,
+            certificat_url: certificatUrl,
+            attestation_url: attestationUrl,
+            message,
+        };
+
+    } catch (error: any) {
+        console.error("❌ Erreur Validation Adhésion:", error.response?.data || error.message);
+        throw new Error("Échec validation contrat AVA");
+    }
 }

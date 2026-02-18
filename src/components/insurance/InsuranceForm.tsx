@@ -202,7 +202,8 @@ export default function InsuranceForm() {
       {/* Le prix s'affiche dès qu'il est disponible (Étape 4+) */}
       {quote && currentStep >= 4 && (
           <div className="absolute top-0 right-0 bg-primary text-white px-6 py-2 rounded-bl-xl shadow-md z-20 font-bold animate-in slide-in-from-right">
-              {quote.premium} €
+              {quote.premium.toFixed(2)} €
+              <span className="text-xs font-normal opacity-60 block text-right">≈ {Math.round(quote.premium * 119.33).toLocaleString('fr-FR')} XPF</span>
               <span className="text-xs font-normal opacity-80 block text-right">Total</span>
           </div>
       )}

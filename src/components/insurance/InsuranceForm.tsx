@@ -114,9 +114,18 @@ export default function InsuranceForm() {
 
     // --- ÉTAPE 2 : INFOS ---
     if (currentStep === 2) {
-        if (!formData.firstName || !formData.lastName || !formData.birthDate || !formData.email) {
-             toast.error("Veuillez remplir vos informations personnelles");
-             return;
+        const missingFields: Record<string, string> = {};
+        if (!formData.firstName)   missingFields.firstName  = "Prénom requis";
+        if (!formData.lastName)    missingFields.lastName   = "Nom requis";
+        if (!formData.birthDate)   missingFields.birthDate  = "Date de naissance requise";
+        if (!formData.email)       missingFields.email      = "Email requis";
+        if (!formData.address)     missingFields.address    = "Adresse requise";
+        if (!formData.postalCode)  missingFields.postalCode = "Code postal requis";
+        if (!formData.city)        missingFields.city       = "Ville requise";
+        if (Object.keys(missingFields).length > 0) {
+            setErrors(missingFields);
+            toast.error("Veuillez remplir tous les champs obligatoires");
+            return;
         }
     }
 

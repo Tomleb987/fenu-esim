@@ -107,6 +107,10 @@ export default function InsuranceForm() {
   const handleNext = async () => {
     // --- ÉTAPE 1 : VOYAGE ---
     if (currentStep === 1) {
+        if (formData.subscriberCountry !== "PF") {
+            toast.error("Cette assurance est réservée aux résidents de Polynésie française 🇵🇫");
+            return;
+        }
         if (!formData.destination) { setErrors({ destination: "Requis" }); return; }
         if (!formData.tripPrice) { setErrors({ tripPrice: "Requis" }); return; }
         // Pas de calcul ici, on attend d'avoir toutes les infos

@@ -35,6 +35,13 @@ export default async function handler(
       });
     }
 
+    // 🇵🇫 Blocage : réservé aux résidents de Polynésie française
+    if (quoteData.subscriberCountry !== "PF") {
+      return res.status(403).json({
+        error: "Cette assurance est réservée aux résidents de Polynésie française.",
+      });
+    }
+
     const internalRef = `CMD-${Date.now()}`;
 
     // 1️⃣ Création contrat AVA (brouillon, en attente de paiement)

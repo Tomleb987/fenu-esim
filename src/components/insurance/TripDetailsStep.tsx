@@ -47,7 +47,7 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
 
       <div className="space-y-4">
         
-        {/* PAYS DE RÉSIDENCE */}
+        {/* PAYS DE RÉSIDENCE — Réservé aux résidents de Polynésie française */}
         <div>
           <label className={labelClass}>Votre pays de résidence *</label>
           <div className="relative">
@@ -64,6 +64,19 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
               ))}
             </select>
           </div>
+          {/* Alerte si pays != PF */}
+          {formData.subscriberCountry && formData.subscriberCountry !== "PF" && (
+            <div className="mt-3 flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl p-4">
+              <span className="text-red-500 text-xl flex-shrink-0">🚫</span>
+              <div>
+                <p className="text-red-700 font-semibold text-sm">Souscription non disponible</p>
+                <p className="text-red-600 text-xs mt-1">
+                  Cette assurance voyage est réservée aux résidents de <strong>Polynésie française</strong>.
+                  Veuillez sélectionner "Polynésie française 🇵🇫" pour continuer.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* DESTINATION */}

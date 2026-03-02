@@ -1,5 +1,5 @@
 "use client";
-
+import { usePartnerCodes } from "@/hooks/usePartnerCodes";
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -11,7 +11,6 @@ import OrderSummary from "@/components/checkout/OrderSummary";
 import { stripePromise } from "@/lib/stripe/config";
 import { getFrenchRegionName } from "@/lib/regionTranslations";
 
-// Types
 
 type Package = Database["public"]["Tables"]["airalo_packages"]["Row"] & {
   region_image_url?: string;
@@ -236,6 +235,18 @@ export default function RegionPage() {
   });
   const [formError, setFormError] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const { partnerCode, promoCode: partnerPromoCode, isFromPartnerLink } = usePartnerCodes();
+
+
+  useEffect(() => {
+    if (partnerCode || partnerPromoCode) {
+      setForm((prev) => ({
+        ...prev,
+        codePartenaire: prev.codePartenaire || partnerCode,
+        codePromo: prev.codePromo || partnerPromoCode,
+      }));
+    }
+  }, [partnerCode, partnerPromoCode]);
 
   // Panier stocké dans le localStorage
   const [cart, setCart] = useState<Package[]>([]);
@@ -772,7 +783,7 @@ export default function RegionPage() {
             </div>
           </div>
           <div className="my-6 p-3 text-gray-600 font-semibold rounded shadow bg-gray-100">
-            ✅ Tous les forfaits sont rechargeables après commande depuis votre
+            Tous les forfaits sont rechargeables après commande depuis votre
             espace client
           </div>
         </div>
@@ -1073,13 +1084,15 @@ export default function RegionPage() {
                 }
                 required
               />
+
               <input
                 type="text"
                 name="codePromo"
                 placeholder="Code promo (optionnel)"
                 value={form.codePromo}
                 onChange={handleFormChange}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-900 placeholder-gray-500 text-base"
+                readOnly={isFromPartnerLink && !!form.codePromo}
+                className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-900 placeholder-gray-500 text-base ${isFromPartnerLink && form.codePromo ? "bg-gray-100 cursor-not-allowed" : ""}`}
                 style={
                   {
                     WebkitTextFillColor: "#111827",
@@ -1087,13 +1100,15 @@ export default function RegionPage() {
                   } as React.CSSProperties
                 }
               />
+
               <input
                 type="text"
                 name="codePartenaire"
                 placeholder="Code partenaire (optionnel)"
                 value={form.codePartenaire}
                 onChange={handleFormChange}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-900 placeholder-gray-500 text-base"
+                readOnly={isFromPartnerLink && !!form.codePartenaire}
+                className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-900 placeholder-gray-500 text-base ${isFromPartnerLink && form.codePartenaire ? "bg-gray-100 cursor-not-allowed" : ""}`}
                 style={
                   {
                     WebkitTextFillColor: "#111827",

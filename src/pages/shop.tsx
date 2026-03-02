@@ -356,7 +356,7 @@ export default function Shop() {
   );
   const [margin, setMargin] = useState(0);
 
-  // ✅ Pré-remplissage & stockage local
+// ✅ Pré-remplissage & stockage local (React state, no DOM manipulation)
   useEffect(() => {
     if (!router.isReady) return;
 
@@ -367,18 +367,12 @@ export default function Shop() {
 
     if (promoCode) {
       localStorage.setItem("promoCode", promoCode);
-      const inputPromo = document.querySelector<HTMLInputElement>(
-        'input[placeholder="Code promo (optionnel)"]'
-      );
-      if (inputPromo) inputPromo.value = promoCode;
+      localStorage.setItem("fenuasim_promo_code", promoCode);
     }
 
     if (partnerRef) {
       localStorage.setItem("partnerRef", partnerRef);
-      const inputPartner = document.querySelector<HTMLInputElement>(
-        'input[placeholder="Code partenaire (optionnel)"]'
-      );
-      if (inputPartner) inputPartner.value = partnerRef;
+      localStorage.setItem("fenuasim_partner_code", partnerRef);
     }
   }, [router.isReady, router.query]);
 

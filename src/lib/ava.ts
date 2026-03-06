@@ -47,8 +47,16 @@ export async function getAvaToken() {
 /* --- HELPERS --- */
 const toFrDate = (d: string | undefined | null) => {
     if (!d) return undefined;
-    const date = new Date(d);
-    return isValid(date) ? format(date, 'dd/MM/yyyy') : undefined;
+    try {
+        // Parser manuellement pour éviter le décalage UTC → PF (UTC-10)
+        const dateStr = d.split("T")[0]; // prend "2026-02-21" de "2026-02-21T00:00:00Z"
+        const [year, month, day] = dateStr.split("-").map(Number);
+        if (!year || !month || !day) return undefined;
+        const date = new Date(year, month - 1, day);
+        return isValid(date) ? format(date, 'dd/MM/yyyy') : undefined;
+    } catch {
+        return undefined;
+    }
 };
 
 function buildTarificationPayload(data: any): URLSearchParams {

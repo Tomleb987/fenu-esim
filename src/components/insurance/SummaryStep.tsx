@@ -180,16 +180,14 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProp
     doc.setFont("helvetica", "bold");
     doc.text("TOTAL ESTIMÉ TTC", margin + 5, y + 10.5);
     const EUR_TO_XPF_LOCAL = 119.33;
-    const priceEur = quote ? `${quote.premium.toFixed(2)} €` : "En cours de calcul";
+    const priceEur = quote ? (quote.premium.toFixed(2) + " EUR") : "En cours de calcul";
     const xpfAmount = quote ? Math.round(quote.premium * EUR_TO_XPF_LOCAL) : 0;
-    const xpfFormatted = xpfAmount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-    const priceXpf = quote ? `≈ ${xpfFormatted} XPF` : "";
-    doc.setFontSize(14);
+    const xpfStr = xpfAmount > 0 ? ("~ " + xpfAmount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " XPF") : "";
     doc.setFontSize(14);
     doc.text(priceEur, pageW - margin - 5, y + 7, { align: "right" });
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    doc.text(priceXpf, pageW - margin - 5, y + 14, { align: "right" });
+    if (xpfStr) doc.text(xpfStr, pageW - margin - 5, y + 14, { align: "right" });
     y += 24;
 
     // --- MENTIONS LÉGALES ---

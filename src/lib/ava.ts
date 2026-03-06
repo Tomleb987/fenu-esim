@@ -86,7 +86,7 @@ function buildTarificationPayload(data: any): URLSearchParams {
 
   const sub = data.subscriber || {};
   const subscriberInfos = {
-      subscriberCountry: data.subscriberCountry || "FR",
+      subscriberCountry: data.subscriberCountry || "PF",
       birthdate: subscriberBirth,
       firstName: sub.firstName || "Prénom",
       lastName: sub.lastName || "Nom",

@@ -12,7 +12,15 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
   const [today, setToday] = useState("");
 
   useEffect(() => {
-    setToday(new Date().toISOString().split('T')[0]);
+    // Minimum = J+1 côté France (UTC+1 hiver / UTC+2 été)
+    // PF est UTC-10, donc quand il est minuit à Papeete il peut être J+1 en France
+    // On prend toujours la date de demain côté France pour éviter tout rejet AVA
+    const nowFrance = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" }));
+    nowFrance.setDate(nowFrance.getDate() + 1); // J+1 France
+    const yyyy = nowFrance.getFullYear();
+    const mm = String(nowFrance.getMonth() + 1).padStart(2, "0");
+    const dd = String(nowFrance.getDate()).padStart(2, "0");
+    setToday(`${yyyy}-${mm}-${dd}`);
   }, []);
 
   const countryList = Array.isArray(COUNTRIES) ? COUNTRIES : [];
@@ -83,9 +91,12 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
               type="date"
               className={inputClass}
               value={formData.departureDate}
-              onChange={handleDepartureChange} // Utilisation du nouveau handler
+              onChange={handleDepartureChange}
               min={today}
             />
+            <p className="text-xs text-gray-400 mt-1">
+              ⏱ Départ minimum : le lendemain (traitement en heure de France)
+            </p>
           </div>
 
           <div>

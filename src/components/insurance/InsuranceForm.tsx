@@ -60,10 +60,10 @@ export default function InsuranceForm() {
                     productType: "ava_tourist_card",
                     startDate: formData.departureDate,
                     endDate: formData.returnDate,
-                    // On envoie la zone choisie par l'utilisateur (ou 102 par défaut)
-                    destinationRegion: formData.destination || 102, 
-                    tripCost: formData.tripPrice, 
-                    subscriber: { 
+                    destinationRegion: formData.destination || 102,
+                    tripCost: formData.tripPrice,
+                    subscriberCountry: "PF",
+                    subscriber: {
                         firstName: formData.firstName,
                         lastName: formData.lastName,
                         birthDate: formData.birthDate,
@@ -73,7 +73,7 @@ export default function InsuranceForm() {
                         city: formData.city
                     },
                     companions: formData.additionalTravelers,
-                    options: formData.selectedOptions 
+                    options: formData.selectedOptions
                 }
             })
         });

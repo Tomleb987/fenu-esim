@@ -47,39 +47,17 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
 
       <div className="space-y-4">
         
-        {/* PAYS DE RÉSIDENCE — Réservé aux résidents de Polynésie française */}
+        {/* PAYS DE RÉSIDENCE — Figé en Polynésie française */}
         <div>
-          <label className={labelClass}>Votre pays de résidence *</label>
-          <div className="relative">
-            <select
-              className={selectClass}
-              value={formData.subscriberCountry}
-              onChange={(e) => updateFormData({ subscriberCountry: e.target.value })}
-            >
-              <option value="" disabled>Sélectionnez...</option>
-              {countryList.map((country) => (
-                <option key={country.code} value={country.code}>
-                  {country.name}
-                </option>
-              ))}
-            </select>
+          <label className={labelClass}>Pays de résidence</label>
+          <div className="flex items-center gap-3 border border-gray-200 rounded-lg px-4 py-3 bg-gray-50 text-gray-700 font-medium">
+            <span className="text-xl">🇵🇫</span>
+            <span>Polynésie française</span>
+            <span className="ml-auto text-xs text-gray-400 bg-gray-200 px-2 py-0.5 rounded-full">Réservé résidents PF</span>
           </div>
-          {/* Alerte si pays != PF */}
-          {formData.subscriberCountry && formData.subscriberCountry !== "PF" && (
-            <div className="mt-3 flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl p-4">
-              <span className="text-red-500 text-xl flex-shrink-0">🚫</span>
-              <div>
-                <p className="text-red-700 font-semibold text-sm">Souscription non disponible</p>
-                <p className="text-red-600 text-xs mt-1">
-                  Cette assurance voyage est réservée aux résidents de <strong>Polynésie française</strong>.
-                  Veuillez sélectionner "Polynésie française 🇵🇫" pour continuer.
-                </p>
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* DESTINATION */}
+                {/* DESTINATION */}
         <div>
           <label className={labelClass}>Zone de destination *</label>
           <div className="relative">

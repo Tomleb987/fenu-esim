@@ -31,8 +31,12 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProp
 
   const formatDate = (d: string) => {
     if (!d) return "--";
-    try { return format(new Date(d), 'dd MMM yyyy', { locale: fr }); }
-    catch { return d; }
+    try {
+      // Eviter le décalage timezone UTC → PF : parser manuellement YYYY-MM-DD
+      const [year, month, day] = d.split("T")[0].split("-").map(Number);
+      const date = new Date(year, month - 1, day);
+      return format(date, 'dd MMM yyyy', { locale: fr });
+    } catch { return d; }
   };
 
   // Résolution des noms d'options
@@ -177,7 +181,9 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProp
     doc.text("TOTAL ESTIMÉ TTC", margin + 5, y + 10.5);
     const EUR_TO_XPF_LOCAL = 119.33;
     const priceEur = quote ? `${quote.premium.toFixed(2)} €` : "En cours de calcul";
-    const priceXpf = quote ? `≈ ${Math.round(quote.premium * EUR_TO_XPF_LOCAL).toLocaleString('fr-FR')} XPF` : "";
+    const xpfAmount = quote ? Math.round(quote.premium * EUR_TO_XPF_LOCAL) : 0;
+    const xpfFormatted = xpfAmount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    const priceXpf = quote ? `≈ ${xpfFormatted} XPF` : "";
     doc.setFontSize(14);
     doc.setFontSize(14);
     doc.text(priceEur, pageW - margin - 5, y + 7, { align: "right" });

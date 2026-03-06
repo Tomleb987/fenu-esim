@@ -58,16 +58,36 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProp
 
     // --- EN-TÊTE ---
     doc.setFillColor(...purple);
-    doc.rect(0, 0, pageW, 38, "F");
+    doc.rect(0, 0, pageW, 42, "F");
+
+    // Logo FENUASIM (image base64 si dispo, sinon texte)
+    try {
+      const logoRes = await fetch("/logo.png");
+      if (logoRes.ok) {
+        const logoBlob = await logoRes.blob();
+        const logoBase64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.readAsDataURL(logoBlob);
+        });
+        doc.addImage(logoBase64, "PNG", margin, 6, 50, 20);
+      } else {
+        throw new Error("logo not found");
+      }
+    } catch {
+      // Fallback texte si logo non disponible
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(22);
+      doc.setFont("helvetica", "bold");
+      doc.text("FENUASIM", margin, 18);
+    }
+
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(20);
-    doc.setFont("helvetica", "bold");
-    doc.text("FENUASIM", margin, 16);
     doc.setFontSize(11);
     doc.setFont("helvetica", "normal");
-    doc.text("Assurance Voyage — Devis", margin, 25);
+    doc.text("Assurance Voyage — Devis", margin, 34);
     doc.setFontSize(9);
-    doc.text(`Émis le ${format(new Date(), 'dd/MM/yyyy', { locale: fr })}`, pageW - margin, 25, { align: "right" });
+    doc.text(`Émis le ${format(new Date(), 'dd/MM/yyyy', { locale: fr })}`, pageW - margin, 34, { align: "right" });
 
     let y = 50;
 
@@ -155,8 +175,9 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProp
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
     doc.text("TOTAL ESTIMÉ TTC", margin + 5, y + 10.5);
+    const EUR_TO_XPF_LOCAL = 119.33;
     const priceEur = quote ? `${quote.premium.toFixed(2)} €` : "En cours de calcul";
-    const priceXpf = quote ? `≈ ${toXPF(quote.premium)} XPF` : "";
+    const priceXpf = quote ? `≈ ${Math.round(quote.premium * EUR_TO_XPF_LOCAL).toLocaleString('fr-FR')} XPF` : "";
     doc.setFontSize(14);
     doc.setFontSize(14);
     doc.text(priceEur, pageW - margin - 5, y + 7, { align: "right" });
@@ -173,6 +194,8 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProp
       "Ce document est un devis non contractuel établi sur la base des informations fournies.",
       "L'assurance AVA Tourist Card est distribuée par FENUASIM, partenaire d'ANSET ASSURANCES.",
       "La souscription définitive est conditionnée au paiement et à la validation du contrat.",
+      "FENUASIM est enregistré au registre des intermédiaires d'assurance de Polynésie française",
+      "sous le numéro PF 26 012 en qualité de mandataire d'intermédiaire d'assurance.",
     ];
     mentions.forEach(line => {
       doc.text(line, margin, y);

@@ -1,102 +1,110 @@
-import { OpenAI } from 'openai';
-import { OpenAIStream, StreamingTextResponse } from 'ai';
+import { streamText } from 'ai';
+import { openai } from '@ai-sdk/openai';
 import { systemPrompt } from './systemPrompt';
 import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
 
-// 1. Config OpenAI
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// ─── CONFIG ────────────────────────────────────────────────────────────────
 
-// 2. Config Supabase (Admin pour pouvoir écrire)
+// ✅ SERVICE_ROLE_KEY sans préfixe NEXT_PUBLIC_ (jamais exposée côté client)
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY! // Ou SERVICE_ROLE_KEY si besoin de droits élevés
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// 3. Config Email (SMTP)
-// Utilisez les identifiants de votre adresse contact@fenuasim.com ou une adresse Gmail
 const transporter = nodemailer.createTransport({
-  host: "smtp.office365.com", // Ou smtp.gmail.com
+  host: "smtp.office365.com",
   port: 587,
-  secure: false, // true pour 465, false pour les autres
+  secure: false,
   auth: {
-    user: process.env.SMTP_USER, // Votre email (ex: contact@fenuasim.com)
-    pass: process.env.SMTP_PASSWORD, // Votre mot de passe d'application
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASSWORD,
   },
 });
 
-export const runtime = 'nodejs'; // Important : on passe en Node.js pour Nodemailer (pas 'edge')
+export const runtime = 'nodejs';
+
+// ─── DÉTECTION & TRAITEMENT DU LEAD ────────────────────────────────────────
+
+async function handleLeadDetection(completion: string) {
+  const leadRegex = /\|\|LEAD\|(.*?)\|(.*?)\|(.*?)\|(.*?)\|\|/;
+  const match = completion.match(leadRegex);
+  if (!match) return;
+
+  const [prenom, telephone, email, demande] = match.slice(1).map((s) => s.trim());
+
+  // Validation minimale
+  if (!prenom || !email.includes('@')) {
+    console.warn("⚠️ Lead mal formé, ignoré :", { prenom, email });
+    return;
+  }
+
+  console.log("🔥 LEAD DÉTECTÉ :", prenom);
+
+  // A. Supabase — exécution en parallèle avec l'email
+  const [dbResult, mailResult] = await Promise.allSettled([
+    supabase.from('assistance').insert({ prenom, telephone, email, demande }),
+    transporter.sendMail({
+      from: '"Chatbot FenuaSIM" <contact@fenuasim.com>',
+      to: "sav@fenua-sim.odoo.com",
+      replyTo: email,
+      subject: `Nouveau Lead Chatbot : ${prenom}`,
+      text: `
+Nouveau prospect détecté par le chatbot IA :
+
+👤 Prénom  : ${prenom}
+📞 Tél.    : ${telephone}
+📧 Email   : ${email}
+
+📝 Demande :
+${demande}
+
+---
+Horodatage : ${new Date().toISOString()}
+      `.trim(),
+    }),
+  ]);
+
+  if (dbResult.status === 'rejected')
+    console.error("❌ Erreur Supabase :", dbResult.reason);
+  else if (dbResult.value.error)
+    console.error("❌ Erreur Supabase :", dbResult.value.error);
+  else
+    console.log("✅ Lead sauvegardé dans Supabase");
+
+  if (mailResult.status === 'rejected')
+    console.error("❌ Erreur email :", mailResult.reason);
+  else
+    console.log("✅ Email envoyé à Odoo");
+}
+
+// ─── ROUTE POST ────────────────────────────────────────────────────────────
 
 export async function POST(req: Request) {
   try {
     const { messages } = await req.json();
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
-      stream: true,
-      messages: [
-        systemPrompt, 
-        ...messages
-      ],
+    // Validation des messages entrants
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return new Response(JSON.stringify({ error: "Messages invalides" }), { status: 400 });
+    }
+
+    // Limite anti-prompt stuffing (20 derniers messages)
+    const safeMessages = messages.slice(-20);
+
+    const result = await streamText({
+      model: openai('gpt-4o-mini'), // ✅ Plus récent, moins cher, meilleur que gpt-3.5-turbo
+      system: systemPrompt.content,
+      messages: safeMessages,
+      onFinish: async ({ text }) => {
+        await handleLeadDetection(text);
+      },
     });
 
-    const stream = OpenAIStream(response as any, {
-      onCompletion: async (completion) => {
-        // --- DÉTECTION DU LEAD ---
-        const leadRegex = /\|\|LEAD\|(.*?)\|(.*?)\|(.*?)\|(.*?)\|\|/;
-        const match = completion.match(leadRegex);
+    return result.toDataStreamResponse();
 
-        if (match) {
-          const [_, prenom, telephone, email, demande] = match;
-          console.log("🔥 LEAD DÉTECTÉ :", prenom);
-
-          // A. SAUVEGARDE DANS SUPABASE (Sécurité)
-          const { error: dbError } = await supabase
-            .from('assistance')
-            .insert({
-              prenom,
-              telephone,
-              email,
-              demande
-            });
-          
-          if (dbError) console.error("Erreur Supabase:", dbError);
-
-          // B. ENVOI DU MAIL VERS ODOO (Action)
-          // C'est ça qui crée le ticket dans Odoo
-          try {
-            await transporter.sendMail({
-              from: '"Chatbot FenuaSIM" <contact@fenuasim.com>', // Votre adresse d'envoi
-              to: "sav@fenua-sim.odoo.com", // L'adresse alias Odoo
-              replyTo: email, // IMPORTANT : Pour répondre directement au client depuis Odoo
-              subject: `Nouveau Lead Chatbot : ${prenom}`,
-              text: `
-                Nouveau prospect détecté par l'IA :
-                
-                👤 Nom : ${prenom}
-                📞 Téléphone : ${telephone}
-                📧 Email : ${email}
-                
-                📝 Demande :
-                ${demande}
-                
-                (Sauvegardé dans Supabase ID: ${new Date().toISOString()})
-              `,
-            });
-            console.log("✅ Email envoyé à Odoo");
-          } catch (mailError) {
-            console.error("❌ Erreur envoi mail:", mailError);
-          }
-        }
-      }
-    });
-    
-    return new StreamingTextResponse(stream);
-    
   } catch (error) {
-    console.error("Erreur API:", error);
+    console.error("Erreur API :", error);
     return new Response(JSON.stringify({ error: "Erreur serveur" }), { status: 500 });
   }
 }

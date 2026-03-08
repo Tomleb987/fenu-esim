@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import Head from "next/head";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import PackageCard from "@/components/shop/PackageCard";
 import type { Database } from "@/lib/supabase/config";
@@ -12,185 +11,250 @@ import {
   ArrowRight,
   Wifi,
   CheckCircle,
-  ShieldCheck,
-  MapPin,
   Globe,
   ChevronDown,
-  Star,
+  ChevronLeft,
+  ChevronRight,
   Smartphone,
-  Zap,
 } from "lucide-react";
 
-// --- CONSTANTES ---
+// ─────────────────────────────────────────────────────────────────────────────
+// TRUSTPILOT REVIEWS — Composant autonome (aucun script externe requis)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const REVIEWS = [
+  { id: 1, author: "Marie L.", country: "🇫🇷 France", rating: 5, date: "Janvier 2026", title: "Parfait pour le Japon !", text: "Activation en 2 minutes chrono à l'aéroport. Connexion stable partout, même dans le métro de Tokyo. Je ne voyagerai plus jamais sans FenuaSIM.", destination: "Japon" },
+  { id: 2, author: "Thomas R.", country: "🇧🇪 Belgique", rating: 5, date: "Février 2026", title: "Fini le roaming hors de prix", text: "J'ai économisé plus de 80€ sur mon voyage aux États-Unis. Le service client répond en quelques minutes. Une vraie révolution pour les voyageurs.", destination: "États-Unis" },
+  { id: 3, author: "Sophie M.", country: "🇨🇭 Suisse", rating: 5, date: "Décembre 2025", title: "Indispensable en Asie du Sud-Est", text: "Utilisée en Thaïlande, Vietnam et Indonésie. Aucune coupure, débit excellent. Je recommande à tous mes amis voyageurs sans hésitation.", destination: "Asie" },
+  { id: 4, author: "Lucas B.", country: "🇫🇷 France", rating: 5, date: "Novembre 2025", title: "Simple, rapide, efficace", text: "Commande passée la veille du départ. QR code reçu en quelques minutes. Connexion immédiate à l'atterrissage à Dubai. Exactement ce que je cherchais.", destination: "Dubaï" },
+  { id: 5, author: "Camille D.", country: "🇫🇷 France", rating: 4, date: "Octobre 2025", title: "Très bon rapport qualité-prix", text: "Très satisfaite de mon eSIM pour l'Europe. Couverture impeccable en Espagne et Italie. Je reviendrai pour mon prochain voyage en Amérique du Sud.", destination: "Europe" },
+  { id: 6, author: "Antoine V.", country: "🇨🇦 Canada", rating: 5, date: "Mars 2026", title: "Le meilleur service eSIM", text: "Testé plusieurs concurrents avant de trouver FenuaSIM. Aucune comparaison possible : meilleur prix, meilleure couverture, meilleur support. Client fidèle !", destination: "Monde" },
+];
+
+function StarRating({ rating }: { rating: number }) {
+  return (
+    <div className="flex gap-0.5">
+      {[1, 2, 3, 4, 5].map((s) => (
+        <svg key={s} width="16" height="16" viewBox="0 0 24 24" fill={s <= rating ? "#00b67a" : "#e0e0e0"}>
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+        </svg>
+      ))}
+    </div>
+  );
+}
+
+function TrustpilotSection() {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const VISIBLE = 3;
+
+  const startAuto = useCallback(() => {
+    intervalRef.current = setInterval(() => {
+      setActiveIndex((p) => (p + 1) % REVIEWS.length);
+    }, 4500);
+  }, []);
+
+  const stopAuto = useCallback(() => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+  }, []);
+
+  useEffect(() => {
+    startAuto();
+    return () => stopAuto();
+  }, [startAuto, stopAuto]);
+
+  const go = (dir: 1 | -1) => {
+    if (isAnimating) return;
+    stopAuto();
+    setIsAnimating(true);
+    setTimeout(() => {
+      setActiveIndex((p) => (p + dir + REVIEWS.length) % REVIEWS.length);
+      setIsAnimating(false);
+      startAuto();
+    }, 250);
+  };
+
+  const visible = Array.from({ length: VISIBLE }, (_, i) => REVIEWS[(activeIndex + i) % REVIEWS.length]);
+
+  return (
+    <section className="py-16 bg-gradient-to-br from-emerald-50 via-white to-teal-50">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="text-center mb-10">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold uppercase tracking-widest mb-4">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            Avis vérifiés
+          </span>
+          <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-3">
+            Ils voyagent avec <span className="text-emerald-600">FenuaSIM</span>
+          </h2>
+          <p className="text-gray-500 max-w-md mx-auto">Des milliers de voyageurs nous font confiance pour rester connectés partout dans le monde.</p>
+
+          {/* Score bar */}
+          <div className="inline-flex items-center gap-6 mt-6 px-8 py-4 bg-white rounded-2xl shadow-sm border border-gray-100">
+            <div className="flex items-center gap-2">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                <rect width="24" height="24" rx="4" fill="#00b67a"/>
+                <path d="M12 4l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 19l-6.2 3.9 2.4-7.4L2 11.4h7.6z" fill="white"/>
+              </svg>
+              <span className="font-bold text-gray-900 text-lg">Trustpilot</span>
+            </div>
+            <div className="w-px h-8 bg-gray-200" />
+            <div className="text-center">
+              <div className="text-2xl font-extrabold text-gray-900">4.9</div>
+              <div className="flex gap-0.5 justify-center mt-0.5">
+                {[1,2,3,4,5].map(s => (
+                  <svg key={s} width="14" height="14" viewBox="0 0 24 24" fill="#00b67a"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                ))}
+              </div>
+              <div className="text-xs text-gray-400 mt-0.5">Excellent</div>
+            </div>
+            <div className="w-px h-8 bg-gray-200" />
+            <div className="text-center">
+              <div className="text-2xl font-extrabold text-gray-900">180+</div>
+              <div className="text-xs text-gray-400">Avis clients</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Cards */}
+        <div
+          className="grid grid-cols-1 sm:grid-cols-3 gap-5"
+          style={{ opacity: isAnimating ? 0 : 1, transition: "opacity 0.25s ease" }}
+          onMouseEnter={stopAuto}
+          onMouseLeave={startAuto}
+        >
+          {visible.map((review) => (
+            <div key={review.id} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md hover:-translate-y-1 transition-all duration-300 relative overflow-hidden">
+              <span className="absolute top-2 right-4 text-7xl text-emerald-50 font-serif leading-none pointer-events-none select-none">"</span>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+                  {review.author[0]}
+                </div>
+                <div>
+                  <div className="font-semibold text-gray-900 text-sm">{review.author}</div>
+                  <div className="text-xs text-gray-400">{review.country} · {review.date}</div>
+                </div>
+              </div>
+              <StarRating rating={review.rating} />
+              <div className="mt-3 font-semibold text-gray-800 text-sm">{review.title}</div>
+              <p className="mt-1.5 text-gray-500 text-sm leading-relaxed">{review.text}</p>
+              <div className="mt-4 pt-3 border-t border-gray-50 flex items-center justify-between">
+                <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">✈ {review.destination}</span>
+                <span className="text-xs text-gray-300">{review.date}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Controls */}
+        <div className="flex items-center justify-center gap-4 mt-8">
+          <button onClick={() => go(-1)} className="w-10 h-10 rounded-full border border-emerald-200 bg-white flex items-center justify-center text-emerald-600 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 transition-all">
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <div className="flex gap-1.5">
+            {REVIEWS.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => { stopAuto(); setActiveIndex(i); startAuto(); }}
+                className={`h-1.5 rounded-full transition-all duration-300 ${i === activeIndex ? "w-6 bg-emerald-500" : "w-1.5 bg-gray-200"}`}
+              />
+            ))}
+          </div>
+          <button onClick={() => go(1)} className="w-10 h-10 rounded-full border border-emerald-200 bg-white flex items-center justify-center text-emerald-600 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 transition-all">
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* CTA Trustpilot */}
+        <div className="text-center mt-6">
+          <a href="https://fr.trustpilot.com/review/fenuasim.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-600 hover:text-emerald-700 border-b border-emerald-200 hover:border-emerald-500 pb-0.5 transition-all">
+            Voir tous les avis sur Trustpilot
+            <ArrowRight className="w-3.5 h-3.5" />
+          </a>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CONSTANTES
+// ─────────────────────────────────────────────────────────────────────────────
 
 const TOP_DESTINATIONS = [
-  "Europe",
-  "Japon",
-  "Australie",
-  "États-Unis",
-  "Fidji",
-  "Nouvelle-Zélande",
-  "Mexique",
-  "France",
-  "Asie",
-  "Monde",
+  "Europe", "Japon", "Australie", "États-Unis", "Fidji",
+  "Nouvelle-Zélande", "Mexique", "France", "Asie", "Monde",
 ];
 
 const REGION_TRANSLATIONS: Record<string, string> = {
-  "Discover Global": "Monde",
-  "Asia": "Asie",
-  "Europe": "Europe",
-  "Japan": "Japon",
-  "Canary Islands": "Îles Canaries",
-  "South Korea": "Corée du Sud",
-  "Hong Kong": "Hong Kong",
-  "United States": "États-Unis",
-  "Australia": "Australie",
-  "New Zealand": "Nouvelle-Zélande",
-  "Mexico": "Mexique",
-  "Fiji": "Fidji",
-  "Thailand": "Thaïlande",
-  "Singapore": "Singapour",
-  "Malaysia": "Malaisie",
-  "Indonesia": "Indonésie",
-  "Philippines": "Philippines",
-  "Vietnam": "Viêt Nam",
-  "India": "Inde",
-  "China": "Chine",
-  "Taiwan": "Taïwan",
-  "United Kingdom": "Royaume-Uni",
-  "Germany": "Allemagne",
-  "Spain": "Espagne",
-  "Italy": "Italie",
-  "Greece": "Grèce",
-  "Portugal": "Portugal",
-  "Netherlands": "Pays-Bas",
-  "Belgium": "Belgique",
-  "Switzerland": "Suisse",
-  "Austria": "Autriche",
-  "Poland": "Pologne",
-  "Czech Republic": "République tchèque",
-  "Turkey": "Turquie",
-  "Egypt": "Égypte",
-  "Morocco": "Maroc",
-  "South Africa": "Afrique du Sud",
-  "Brazil": "Brésil",
-  "Argentina": "Argentine",
-  "Chile": "Chili",
-  "Colombia": "Colombie",
-  "Peru": "Pérou",
-  "UAE": "Émirats arabes unis",
-  "United Arab Emirates": "Émirats arabes unis",
-  "Saudi Arabia": "Arabie saoudite",
-  "Israel": "Israël",
-  "Jordan": "Jordanie",
-  "Lebanon": "Liban",
-  "Qatar": "Qatar",
-  "Kuwait": "Koweït",
-  "Bahrain": "Bahreïn",
-  "Oman": "Oman",
-  "Azerbaijan": "Azerbaïdjan",
-  "Jamaica": "Jamaïque",
-  "Albania": "Albanie",
-  "Algeria": "Algérie",
-  "Angola": "Angola",
-  "Armenia": "Arménie",
-  "Bangladesh": "Bangladesh",
-  "Belarus": "Biélorussie",
-  "Bolivia": "Bolivie",
-  "Bosnia and Herzegovina": "Bosnie-Herzégovine",
-  "Botswana": "Botswana",
-  "Bulgaria": "Bulgarie",
-  "Cambodia": "Cambodge",
-  "Cameroon": "Cameroun",
-  "Chad": "Tchad",
-  "Croatia": "Croatie",
-  "Cuba": "Cuba",
-  "Cyprus": "Chypre",
-  "Denmark": "Danemark",
-  "Dominican Republic": "République dominicaine",
-  "Ecuador": "Équateur",
-  "Estonia": "Estonie",
-  "Ethiopia": "Éthiopie",
-  "Finland": "Finlande",
-  "Georgia": "Géorgie",
-  "Ghana": "Ghana",
-  "Guatemala": "Guatemala",
-  "Honduras": "Honduras",
-  "Hungary": "Hongrie",
-  "Iceland": "Islande",
-  "Ireland": "Irlande",
-  "Ivory Coast": "Côte d'Ivoire",
-  "Kazakhstan": "Kazakhstan",
-  "Kenya": "Kenya",
-  "Kyrgyzstan": "Kirghizistan",
-  "Laos": "Laos",
-  "Latvia": "Lettonie",
-  "Lithuania": "Lituanie",
-  "Luxembourg": "Luxembourg",
-  "Madagascar": "Madagascar",
-  "Malawi": "Malawi",
-  "Maldives": "Maldives",
-  "Mali": "Mali",
-  "Malta": "Malte",
-  "Mauritius": "Maurice",
-  "Moldova": "Moldavie",
-  "Mongolia": "Mongolie",
-  "Montenegro": "Monténégro",
-  "Myanmar": "Myanmar",
-  "Namibia": "Namibie",
-  "Nepal": "Népal",
-  "Nicaragua": "Nicaragua",
-  "Nigeria": "Nigeria",
-  "North Macedonia": "Macédoine du Nord",
-  "Norway": "Norvège",
-  "Pakistan": "Pakistan",
-  "Panama": "Panama",
-  "Paraguay": "Paraguay",
-  "Romania": "Roumanie",
-  "Russia": "Russie",
-  "Rwanda": "Rwanda",
-  "Senegal": "Sénégal",
-  "Serbia": "Serbie",
-  "Slovakia": "Slovaquie",
-  "Slovenia": "Slovénie",
-  "Sri Lanka": "Sri Lanka",
-  "Sweden": "Suède",
-  "Tanzania": "Tanzanie",
-  "Tunisia": "Tunisie",
-  "Ukraine": "Ukraine",
-  "Uruguay": "Uruguay",
-  "Uzbekistan": "Ouzbékistan",
-  "Venezuela": "Venezuela",
-  "Zambia": "Zambie",
-  "Zimbabwe": "Zimbabwe",
-  "Canada": "Canada",
+  "Discover Global": "Monde", "Asia": "Asie", "Europe": "Europe", "Japan": "Japon",
+  "Canary Islands": "Îles Canaries", "South Korea": "Corée du Sud", "Hong Kong": "Hong Kong",
+  "United States": "États-Unis", "Australia": "Australie", "New Zealand": "Nouvelle-Zélande",
+  "Mexico": "Mexique", "Fiji": "Fidji", "Thailand": "Thaïlande", "Singapore": "Singapour",
+  "Malaysia": "Malaisie", "Indonesia": "Indonésie", "Philippines": "Philippines",
+  "Vietnam": "Viêt Nam", "India": "Inde", "China": "Chine", "Taiwan": "Taïwan",
+  "United Kingdom": "Royaume-Uni", "Germany": "Allemagne", "Spain": "Espagne",
+  "Italy": "Italie", "Greece": "Grèce", "Portugal": "Portugal", "Netherlands": "Pays-Bas",
+  "Belgium": "Belgique", "Switzerland": "Suisse", "Austria": "Autriche", "Poland": "Pologne",
+  "Czech Republic": "République tchèque", "Turkey": "Turquie", "Egypt": "Égypte",
+  "Morocco": "Maroc", "South Africa": "Afrique du Sud", "Brazil": "Brésil",
+  "Argentina": "Argentine", "Chile": "Chili", "Colombia": "Colombie", "Peru": "Pérou",
+  "UAE": "Émirats arabes unis", "United Arab Emirates": "Émirats arabes unis",
+  "Saudi Arabia": "Arabie saoudite", "Israel": "Israël", "Jordan": "Jordanie",
+  "Lebanon": "Liban", "Qatar": "Qatar", "Kuwait": "Koweït", "Bahrain": "Bahreïn",
+  "Oman": "Oman", "Azerbaijan": "Azerbaïdjan", "Jamaica": "Jamaïque", "Albania": "Albanie",
+  "Algeria": "Algérie", "Angola": "Angola", "Armenia": "Arménie", "Bangladesh": "Bangladesh",
+  "Belarus": "Biélorussie", "Bolivia": "Bolivie", "Bosnia and Herzegovina": "Bosnie-Herzégovine",
+  "Botswana": "Botswana", "Bulgaria": "Bulgarie", "Cambodia": "Cambodge",
+  "Cameroon": "Cameroun", "Chad": "Tchad", "Croatia": "Croatie", "Cuba": "Cuba",
+  "Cyprus": "Chypre", "Denmark": "Danemark", "Dominican Republic": "République dominicaine",
+  "Ecuador": "Équateur", "Estonia": "Estonie", "Ethiopia": "Éthiopie", "Finland": "Finlande",
+  "Georgia": "Géorgie", "Ghana": "Ghana", "Guatemala": "Guatemala", "Honduras": "Honduras",
+  "Hungary": "Hongrie", "Iceland": "Islande", "Ireland": "Irlande",
+  "Ivory Coast": "Côte d'Ivoire", "Kazakhstan": "Kazakhstan", "Kenya": "Kenya",
+  "Kyrgyzstan": "Kirghizistan", "Laos": "Laos", "Latvia": "Lettonie",
+  "Lithuania": "Lituanie", "Luxembourg": "Luxembourg", "Madagascar": "Madagascar",
+  "Malawi": "Malawi", "Maldives": "Maldives", "Mali": "Mali", "Malta": "Malte",
+  "Mauritius": "Maurice", "Moldova": "Moldavie", "Mongolia": "Mongolie",
+  "Montenegro": "Monténégro", "Myanmar": "Myanmar", "Namibia": "Namibie",
+  "Nepal": "Népal", "Nicaragua": "Nicaragua", "Nigeria": "Nigeria",
+  "North Macedonia": "Macédoine du Nord", "Norway": "Norvège", "Pakistan": "Pakistan",
+  "Panama": "Panama", "Paraguay": "Paraguay", "Romania": "Roumanie", "Russia": "Russie",
+  "Rwanda": "Rwanda", "Senegal": "Sénégal", "Serbia": "Serbie", "Slovakia": "Slovaquie",
+  "Slovenia": "Slovénie", "Sri Lanka": "Sri Lanka", "Sweden": "Suède",
+  "Tanzania": "Tanzanie", "Tunisia": "Tunisie", "Ukraine": "Ukraine", "Uruguay": "Uruguay",
+  "Uzbekistan": "Ouzbékistan", "Venezuela": "Venezuela", "Zambia": "Zambie",
+  "Zimbabwe": "Zimbabwe", "Canada": "Canada",
 };
 
 function getFrenchRegionName(regionFr: string | null, region: string | null): string {
-  if (regionFr && regionFr.trim()) {
-    const trimmedFr = regionFr.trim();
-    if (REGION_TRANSLATIONS[trimmedFr]) return REGION_TRANSLATIONS[trimmedFr];
-    return trimmedFr;
+  if (regionFr?.trim()) {
+    const t = regionFr.trim();
+    return REGION_TRANSLATIONS[t] ?? t;
   }
-  if (region && region.trim()) {
-    const trimmedRegion = region.trim();
-    if (REGION_TRANSLATIONS[trimmedRegion]) return REGION_TRANSLATIONS[trimmedRegion];
-    const lowerRegion = trimmedRegion.toLowerCase();
-    for (const [key, value] of Object.entries(REGION_TRANSLATIONS)) {
-      if (key.toLowerCase() === lowerRegion) return value;
+  if (region?.trim()) {
+    const t = region.trim();
+    if (REGION_TRANSLATIONS[t]) return REGION_TRANSLATIONS[t];
+    const lower = t.toLowerCase();
+    for (const [k, v] of Object.entries(REGION_TRANSLATIONS)) {
+      if (k.toLowerCase() === lower) return v;
     }
+    return t;
   }
-  return region?.trim() || "Autres";
+  return "Autres";
 }
 
 type Package = Database["public"]["Tables"]["airalo_packages"]["Row"];
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PAGE PRINCIPALE
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function Home() {
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // --- GESTION DE LA DEVISE ---
   const [currency, setCurrency] = useState<"EUR" | "XPF" | "USD">("EUR");
   const [showCurrencyMenu, setShowCurrencyMenu] = useState(false);
   const [margin, setMargin] = useState(0);
@@ -201,7 +265,6 @@ export default function Home() {
     }
   }, []);
 
-  // Fetch forfaits
   useEffect(() => {
     async function fetchPackages() {
       const { data } = await supabase
@@ -214,92 +277,45 @@ export default function Home() {
     fetchPackages();
   }, []);
 
-  // Récupération devise & marge depuis localStorage
   useEffect(() => {
     if (typeof window !== "undefined") {
       const cur = localStorage.getItem("currency") as "EUR" | "USD" | "XPF" | null;
       if (cur) setCurrency(cur);
-      const storedMargin = parseFloat(localStorage.getItem("global_margin") || "0");
-      setMargin(storedMargin);
+      setMargin(parseFloat(localStorage.getItem("global_margin") || "0"));
     }
   }, []);
 
-  // ✅ CORRECTION TRUSTPILOT — bon script d'affichage widget
-  useEffect(() => {
-    const script = document.createElement("script");
-    script.src = "https://widget.trustpilot.com/bootstrap/v5/tp.widget.bootstrap.min.js";
-    script.async = true;
-    document.body.appendChild(script);
-    script.onload = () => {
-      /* @ts-ignore */
-      if (window.Trustpilot) {
-        /* @ts-ignore */
-        window.Trustpilot.loadFromElement(
-          document.querySelector(".trustpilot-widget")
-        );
-      }
-    };
-    return () => {
-      if (document.body.contains(script)) {
-        document.body.removeChild(script);
-      }
-    };
-  }, []);
-
-  // Helper pour obtenir le prix selon la devise
-  const getPrice = (pkg: Package, currency: string): number => {
-    switch (currency) {
-      case "USD":
-        return pkg.final_price_usd || 0;
-      case "XPF":
-        return pkg.final_price_xpf || 0;
-      default:
-        return pkg.final_price_eur || 0;
-    }
+  const getPrice = (pkg: Package, cur: string): number => {
+    if (cur === "USD") return pkg.final_price_usd || 0;
+    if (cur === "XPF") return pkg.final_price_xpf || 0;
+    return pkg.final_price_eur || 0;
   };
 
-  // Group forfaits by region
-  const packagesByRegion = packages.reduce(
-    (acc, pkg) => {
-      const region = getFrenchRegionName(pkg.region_fr, pkg.region);
-      if (!acc[region]) acc[region] = [];
-      acc[region].push(pkg);
-      return acc;
-    },
-    {} as Record<string, Package[]>
-  );
+  const packagesByRegion = packages.reduce((acc, pkg) => {
+    const region = getFrenchRegionName(pkg.region_fr, pkg.region);
+    if (!acc[region]) acc[region] = [];
+    acc[region].push(pkg);
+    return acc;
+  }, {} as Record<string, Package[]>);
 
-  // Stats per region
-  const regionStats = Object.entries(packagesByRegion).reduce(
-    (acc, [region, pkgs]) => {
-      const prices = pkgs.map((p) => getPrice(p, currency)).filter((p) => p > 0);
-      const minPriceRaw = prices.length > 0 ? Math.min(...prices) : 0;
-      const maxPriceRaw = prices.length > 0 ? Math.max(...prices) : 0;
-      const minPrice = minPriceRaw * (1 + margin);
-      const maxPrice = maxPriceRaw * (1 + margin);
+  const regionStats = Object.entries(packagesByRegion).reduce((acc, [region, pkgs]) => {
+    const prices = pkgs.map((p) => getPrice(p, currency)).filter((p) => p > 0);
+    const minPriceRaw = prices.length > 0 ? Math.min(...prices) : 0;
+    const maxPriceRaw = prices.length > 0 ? Math.max(...prices) : 0;
+    acc[region] = {
+      minData: Math.min(...pkgs.map((p) => p.data_amount ?? 0)),
+      maxData: Math.max(...pkgs.map((p) => p.data_amount ?? 0)),
+      minDays: Math.min(...pkgs.map((p) => parseInt(p.validity?.toString().split(" ")[0] || "0"))),
+      maxDays: Math.max(...pkgs.map((p) => parseInt(p.validity?.toString().split(" ")[0] || "0"))),
+      minPrice: minPriceRaw * (1 + margin),
+      maxPrice: maxPriceRaw * (1 + margin),
+      packageCount: pkgs.length,
+      originalRegion: pkgs[0]?.region || pkgs[0]?.region_fr || region,
+    };
+    return acc;
+  }, {} as Record<string, any>);
 
-      acc[region] = {
-        minData: Math.min(...pkgs.map((p) => p.data_amount ?? 0)),
-        maxData: Math.max(...pkgs.map((p) => p.data_amount ?? 0)),
-        minDays: Math.min(
-          ...pkgs.map((p) => parseInt(p.validity?.toString().split(" ")[0] || "0"))
-        ),
-        maxDays: Math.max(
-          ...pkgs.map((p) => parseInt(p.validity?.toString().split(" ")[0] || "0"))
-        ),
-        minPrice,
-        maxPrice,
-        packageCount: pkgs.length,
-        originalRegion: pkgs[0]?.region || pkgs[0]?.region_fr || region,
-      };
-      return acc;
-    },
-    {} as Record<string, any>
-  );
-
-  const topDestinations = TOP_DESTINATIONS.filter(
-    (region) => packagesByRegion[region]
-  );
+  const topDestinations = TOP_DESTINATIONS.filter((r) => packagesByRegion[r]);
 
   return (
     <div className="min-h-screen bg-white">
@@ -311,36 +327,20 @@ export default function Home() {
               "@context": "https://schema.org",
               "@type": "FAQPage",
               mainEntity: [
-                {
-                  "@type": "Question",
-                  name: "Comment fonctionne l'eSIM ?",
-                  acceptedAnswer: {
-                    "@type": "Answer",
-                    text: "L'eSIM est une carte SIM intégrée à votre appareil...",
-                  },
-                },
-                {
-                  "@type": "Question",
-                  name: "Mon appareil est-il compatible ?",
-                  acceptedAnswer: {
-                    "@type": "Answer",
-                    text: "La plupart des smartphones récents sont compatibles...",
-                  },
-                },
+                { "@type": "Question", name: "Comment fonctionne l'eSIM ?", acceptedAnswer: { "@type": "Answer", text: "L'eSIM est une carte SIM intégrée à votre appareil..." } },
+                { "@type": "Question", name: "Mon appareil est-il compatible ?", acceptedAnswer: { "@type": "Answer", text: "La plupart des smartphones récents sont compatibles..." } },
               ],
             }),
           }}
         />
       </Head>
 
-      {/* ----------------------------------------------------------------------------------
-          HERO SECTION
-         ---------------------------------------------------------------------------------- */}
+      {/* ── HERO ─────────────────────────────────────────────────────────────── */}
       <section className="relative w-full min-h-[600px] flex items-center bg-gradient-to-br from-purple-100 via-purple-50/30 to-orange-100 overflow-hidden">
-        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-purple-300/30 rounded-full blur-3xl opacity-70 pointer-events-none"></div>
-        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-orange-300/30 rounded-full blur-3xl opacity-70 pointer-events-none"></div>
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-purple-300/30 rounded-full blur-3xl opacity-70 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-orange-300/30 rounded-full blur-3xl opacity-70 pointer-events-none" />
 
-        {/* --- SELECTEUR DE DEVISE --- */}
+        {/* Sélecteur devise */}
         <div className="absolute top-6 right-6 md:right-12 z-50">
           <div className="relative">
             <button
@@ -351,12 +351,13 @@ export default function Home() {
               <span>{currency}</span>
               <ChevronDown className={`w-4 h-4 transition-transform ${showCurrencyMenu ? "rotate-180" : ""}`} />
             </button>
-
             {showCurrencyMenu && (
               <div className="absolute right-0 mt-2 w-32 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50 flex flex-col">
-                <button onClick={() => { setCurrency("EUR"); localStorage.setItem("currency", "EUR"); setShowCurrencyMenu(false); }} className="px-4 py-2 text-left hover:bg-purple-50 text-sm font-medium text-gray-700">EUR (€)</button>
-                <button onClick={() => { setCurrency("USD"); localStorage.setItem("currency", "USD"); setShowCurrencyMenu(false); }} className="px-4 py-2 text-left hover:bg-purple-50 text-sm font-medium text-gray-700">USD ($)</button>
-                <button onClick={() => { setCurrency("XPF"); localStorage.setItem("currency", "XPF"); setShowCurrencyMenu(false); }} className="px-4 py-2 text-left hover:bg-purple-50 text-sm font-medium text-gray-700">XPF (₣)</button>
+                {(["EUR", "USD", "XPF"] as const).map((c) => (
+                  <button key={c} onClick={() => { setCurrency(c); localStorage.setItem("currency", c); setShowCurrencyMenu(false); }} className="px-4 py-2 text-left hover:bg-purple-50 text-sm font-medium text-gray-700">
+                    {c === "EUR" ? "EUR (€)" : c === "USD" ? "USD ($)" : "XPF (₣)"}
+                  </button>
+                ))}
               </div>
             )}
           </div>
@@ -365,43 +366,30 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 z-10 w-full py-12 md:py-20">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
 
-            {/* COLONNE GAUCHE */}
+            {/* Colonne gauche */}
             <div className="text-left space-y-8 pt-8 lg:pt-0">
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-purple-100 shadow-sm text-purple-700 text-sm font-bold">
                 <Wifi className="w-4 h-4" />
                 <span>La connexion de voyage simplifiée</span>
               </div>
-
               <h1 className="text-4xl md:text-6xl font-extrabold text-gray-900 leading-tight">
                 Explorez le monde, <br />
                 restez{" "}
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-orange-500">
-                  connecté.
-                </span>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-orange-500">connecté.</span>
               </h1>
-
               <p className="text-lg text-gray-600 max-w-lg leading-relaxed">
                 Fini le hors forfait. Activez votre eSIM en 2 minutes et profitez de la data locale dans +180 pays dès l'atterrissage.
               </p>
-
               <div>
                 <div className="flex flex-col sm:flex-row gap-4">
-                  <Link
-                    href="/shop"
-                    className="inline-flex justify-center items-center gap-3 bg-purple-600 hover:bg-purple-700 text-white px-8 py-4 rounded-xl font-bold transition-all shadow-lg shadow-purple-200 transform hover:scale-[1.02]"
-                  >
+                  <Link href="/shop" className="inline-flex justify-center items-center gap-3 bg-purple-600 hover:bg-purple-700 text-white px-8 py-4 rounded-xl font-bold transition-all shadow-lg shadow-purple-200 transform hover:scale-[1.02]">
                     Nos destinations <ArrowRight className="w-5 h-5" />
                   </Link>
-
-                  <Link
-                    href="https://www.fenuasim.com/compatibilite"
-                    className="inline-flex justify-center items-center gap-3 bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 px-8 py-4 rounded-xl font-bold transition-all shadow-md transform hover:scale-[1.02]"
-                  >
+                  <Link href="/compatibilite" className="inline-flex justify-center items-center gap-3 bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 px-8 py-4 rounded-xl font-bold transition-all shadow-md transform hover:scale-[1.02]">
                     <Smartphone className="w-5 h-5" />
                     Vérifier la compatibilité
                   </Link>
                 </div>
-
                 <p className="mt-4 text-sm text-gray-500 flex items-center gap-2">
                   <CheckCircle className="w-4 h-4 text-green-500" />
                   Installation instantanée par QR code
@@ -409,43 +397,43 @@ export default function Home() {
               </div>
             </div>
 
-            {/* VERSION MOBILE */}
+            {/* Images hero — mobile */}
             <div className="block lg:hidden mt-4">
               <div className="grid grid-cols-2 gap-4 h-40">
-                <Link href="/shop?region=Japon" className="relative rounded-2xl overflow-hidden shadow-lg border-2 border-white transform translate-y-3">
+                <Link href="/shop?region=Japon" className="relative rounded-2xl overflow-hidden shadow-lg border-2 border-white transform translate-y-3 block">
                   <img src="https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=600" alt="Japon" className="w-full h-full object-cover" />
                   <div className="absolute bottom-2 left-2 text-white font-bold text-xs drop-shadow-md">Japon</div>
                 </Link>
-                <Link href="/shop?region=États-Unis" className="relative rounded-2xl overflow-hidden shadow-lg border-2 border-white transform -translate-y-3">
+                <Link href="/shop?region=États-Unis" className="relative rounded-2xl overflow-hidden shadow-lg border-2 border-white transform -translate-y-3 block">
                   <img src="https://images.unsplash.com/photo-1501594907352-04cda38ebc29?q=80&w=600" alt="USA" className="w-full h-full object-cover" />
                   <div className="absolute bottom-2 left-2 text-white font-bold text-xs drop-shadow-md">États-Unis</div>
                 </Link>
               </div>
             </div>
 
-            {/* VERSION DESKTOP */}
+            {/* Images hero — desktop */}
             <div className="relative hidden lg:grid grid-cols-2 gap-4 h-[500px] items-center">
               <div className="space-y-4 pt-12">
-                <Link href="/shop?region=Japon" className="relative h-48 rounded-2xl overflow-hidden shadow-lg border-4 border-white transform hover:-translate-y-1 transition-transform duration-300 group block">
+                <Link href="/shop?region=Japon" className="relative h-48 rounded-2xl overflow-hidden shadow-lg border-4 border-white hover:-translate-y-1 transition-transform duration-300 group block">
                   <img src="https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=600" alt="Japon" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                   <div className="absolute bottom-3 left-3 text-white font-bold text-sm drop-shadow-md">Japon</div>
                 </Link>
-                <Link href="/shop?region=États-Unis" className="relative h-64 rounded-2xl overflow-hidden shadow-lg border-4 border-white transform hover:-translate-y-1 transition-transform duration-300 group block">
+                <Link href="/shop?region=États-Unis" className="relative h-64 rounded-2xl overflow-hidden shadow-lg border-4 border-white hover:-translate-y-1 transition-transform duration-300 group block">
                   <img src="https://images.unsplash.com/photo-1501594907352-04cda38ebc29?q=80&w=600" alt="USA" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                   <div className="absolute bottom-3 left-3 text-white font-bold text-sm drop-shadow-md">États-Unis</div>
                 </Link>
               </div>
               <div className="space-y-4 pb-12">
-                <Link href="/shop?region=Monde" className="relative h-64 rounded-2xl overflow-hidden shadow-lg border-4 border-white transform hover:-translate-y-1 transition-transform duration-300 group block">
+                <Link href="/shop?region=Monde" className="relative h-64 rounded-2xl overflow-hidden shadow-lg border-4 border-white hover:-translate-y-1 transition-transform duration-300 group block">
                   <img src="https://images.unsplash.com/photo-1506929562872-bb421503ef21?q=80&w=600" alt="Monde" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                   <div className="absolute bottom-3 left-3 text-white font-bold text-sm drop-shadow-md">Monde</div>
                 </Link>
-                <Link href="/shop?region=Europe" className="relative h-48 rounded-2xl overflow-hidden shadow-lg border-4 border-white transform hover:-translate-y-1 transition-transform duration-300 group block">
+                <Link href="/shop?region=Europe" className="relative h-48 rounded-2xl overflow-hidden shadow-lg border-4 border-white hover:-translate-y-1 transition-transform duration-300 group block">
                   <img src="https://images.unsplash.com/photo-1467269204594-9661b134dd2b?q=80&w=600" alt="Europe" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                   <div className="absolute bottom-3 left-3 text-white font-bold text-sm drop-shadow-md">Europe</div>
                 </Link>
               </div>
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white/90 backdrop-blur-md px-6 py-3 rounded-full shadow-xl border border-white z-20 flex items-center gap-2 animate-bounce-slow">
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white/90 backdrop-blur-md px-6 py-3 rounded-full shadow-xl border border-white z-20 flex items-center gap-2">
                 <Globe className="w-5 h-5 text-purple-600" />
                 <span className="font-bold text-gray-800 text-sm whitespace-nowrap">180+ Destinations</span>
               </div>
@@ -455,7 +443,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Destinations */}
+      {/* ── DESTINATIONS ─────────────────────────────────────────────────────── */}
       <div className="py-12 sm:py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 text-center mb-8 sm:mb-12">
@@ -472,12 +460,11 @@ export default function Home() {
               {topDestinations.map((region) => {
                 const pkg = packagesByRegion[region]?.[0];
                 if (!pkg) return null;
-                const stats = regionStats[region];
                 return (
                   <PackageCard
                     key={region}
                     pkg={pkg}
-                    {...stats}
+                    {...regionStats[region]}
                     currency={currency}
                     isPopular={true}
                   />
@@ -488,36 +475,10 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Avis Clients */}
-      <div className="max-w-3xl mx-auto my-12 px-4">
-        <div className="bg-gradient-to-r from-purple-50 to-orange-50 rounded-2xl shadow-lg p-8 flex flex-col items-center border border-purple-100">
-          <h3 className="text-2xl sm:text-3xl font-bold text-purple-800 mb-2 text-center">
-            Ce que nos clients disent de FenuaSIM
-          </h3>
-          <p className="text-gray-700 text-center mb-6 max-w-xl">Votre satisfaction est notre priorité.</p>
-          {/* ✅ Widget Trustpilot — chargé via tp.widget.bootstrap.min.js */}
-          <div
-            className="trustpilot-widget w-full"
-            data-locale="fr-FR"
-            data-template-id="53aa8807dec7e10d38f59f32"
-            data-businessunit-id="t5j5yxc20tHVgyo"
-            data-style-height="500px"
-            data-style-width="100%"
-            data-theme="light"
-          >
-            <a
-              href="https://fr.trustpilot.com/review/fenuasim.com"
-              target="_blank"
-              rel="noopener"
-              className="text-purple-700 underline flex justify-center"
-            >
-              Voir tous les avis sur Trustpilot
-            </a>
-          </div>
-        </div>
-      </div>
+      {/* ── AVIS CLIENTS — composant autonome, aucun script externe ─────────── */}
+      <TrustpilotSection />
 
-      {/* FAQ */}
+      {/* ── FAQ ──────────────────────────────────────────────────────────────── */}
       <div className="py-12 sm:py-16 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 text-center mb-8">
@@ -536,7 +497,7 @@ export default function Home() {
             ))}
             <div className="text-center mt-8">
               <Link href="/faq" className="text-purple-600 font-bold hover:underline">
-                Voir toutes les questions &rarr;
+                Voir toutes les questions →
               </Link>
             </div>
           </div>

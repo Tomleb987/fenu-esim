@@ -1,6 +1,6 @@
 ---
 title: "Installer une eSIM sur Android : Samsung / Pixel (guide clair)"
-description: "Guide Android : ajouter une eSIM, définir la ligne data, activer à l'arrivée et dépanner "pas de service / pas d'internet"."
+description: "Guide Android : ajouter une eSIM, définir la ligne data, activer à l'arrivée et dépanner les problèmes de service et d'internet."
 date: "2025-12-20"
 category: "Guides"
 ---

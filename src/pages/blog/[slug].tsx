@@ -1,271 +1,100 @@
-import type { GetStaticPaths, GetStaticProps } from "next";
-import Head from "next/head";
-import Link from "next/link";
-import { useState, useEffect } from "react";
-import BlogCta from "../../components/BlogCta";
-import { getAllSlugs, getPostBySlug, BlogFrontmatter } from "../../lib/blog";
+---
+title: "Installer une eSIM sur Android : Samsung / Pixel (guide clair)"
+description: "Guide Android : ajouter une eSIM, définir la ligne data, activer à l'arrivée et dépanner les problèmes de service et d'internet."
+date: "2025-12-20"
+category: "Guides"
+---
 
-type Props = {
-  slug: string;
-  frontmatter: BlogFrontmatter;
-  contentHtml: string;
-  readingTimeMin: number;
-};
+Android regroupe des dizaines de marques avec des menus différents — ce qui rend les guides génériques souvent inutilisables. Ce guide couvre les deux cas les plus courants (Samsung et Pixel/Google) avec les chemins exacts, et les adaptations pour les autres marques.
 
-export const getStaticPaths: GetStaticPaths = async () => {
-  const slugs = getAllSlugs();
-  return {
-    paths: slugs.map((slug) => ({ params: { slug } })),
-    fallback: false,
-  };
-};
+## Avant de commencer : 3 vérifications
 
-export const getStaticProps: GetStaticProps<Props> = async ({ params }) => {
-  const slug = String(params?.slug || "");
-  const post = await getPostBySlug(slug);
-  return {
-    props: {
-      slug,
-      frontmatter: post.frontmatter,
-      contentHtml: post.contentHtml,
-      readingTimeMin: post.readingTimeMin,
-    },
-  };
-};
+**1. Votre téléphone est-il compatible eSIM ?**
+La compatibilité eSIM dépend du modèle exact. Les Samsung Galaxy S20 et ultérieurs, les Pixel 3 et ultérieurs sont compatibles. Vérifiez sur [notre page compatibilité →](/compatibilite) si vous avez un doute.
 
-const CATEGORY_STYLES: Record<string, { bg: string; text: string; border: string }> = {
-  Destinations: { bg: "bg-sky-50",     text: "text-sky-700",     border: "border-sky-200" },
-  Guides:       { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" },
-  Comparatifs:  { bg: "bg-amber-50",   text: "text-amber-700",   border: "border-amber-200" },
-  Conseils:     { bg: "bg-rose-50",    text: "text-rose-700",    border: "border-rose-200" },
-};
+**2. Votre téléphone est-il désimlockó ?**
+Un téléphone verrouillé sur un opérateur ne peut pas utiliser une eSIM d'un autre réseau. Si vous avez acheté votre téléphone directement (pas via un abonnement opérateur), il est probablement débloqué. En cas de doute, contactez votre opérateur.
 
-const DESTINATION_IMAGES: Record<string, string> = {
-  japon:        "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=1600",
-  japan:        "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=1600",
-  usa:          "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?q=80&w=1600",
-  "états-unis": "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?q=80&w=1600",
-  europe:       "https://images.unsplash.com/photo-1467269204594-9661b134dd2b?q=80&w=1600",
-  australie:    "https://images.unsplash.com/photo-1523482580672-f109ba8cb9be?q=80&w=1600",
-  bali:         "https://images.unsplash.com/photo-1537996194471-e657df975ab4?q=80&w=1600",
-  thaïlande:    "https://images.unsplash.com/photo-1528181304800-259b08848526?q=80&w=1600",
-  maroc:        "https://images.unsplash.com/photo-1539020140153-e479b8c22e70?q=80&w=1600",
-  italie:       "https://images.unsplash.com/photo-1523906834658-6e24ef2386f9?q=80&w=1600",
-  iphone:       "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?q=80&w=1600",
-  android:      "https://images.unsplash.com/photo-1598327105666-5b89351aff97?q=80&w=1600",
-  roaming:      "https://images.unsplash.com/photo-1488085061387-422e29b40080?q=80&w=1600",
-  voyage:       "https://images.unsplash.com/photo-1488085061387-422e29b40080?q=80&w=1600",
-  réseau:       "https://images.unsplash.com/photo-1522199755839-a2bacb67c546?q=80&w=1600",
-  dépannage:    "https://images.unsplash.com/photo-1522199755839-a2bacb67c546?q=80&w=1600",
-};
+**3. Avez-vous une connexion Wi-Fi stable ?**
+L'installation se fait uniquement en Wi-Fi. Faites-le chez vous avant le départ — c'est beaucoup plus confortable qu'à l'aéroport.
 
-const CATEGORY_IMAGES: Record<string, string> = {
-  Destinations: "https://images.unsplash.com/photo-1488085061387-422e29b40080?q=80&w=1600",
-  Guides:       "https://images.unsplash.com/photo-1522199755839-a2bacb67c546?q=80&w=1600",
-  Comparatifs:  "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?q=80&w=1600",
-  Conseils:     "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?q=80&w=1600",
-};
+---
 
-function getHeroImage(frontmatter: BlogFrontmatter, slug: string): string {
-  if ((frontmatter as any).image) return (frontmatter as any).image;
-  const text = (frontmatter.title + " " + slug).toLowerCase();
-  for (const [key, url] of Object.entries(DESTINATION_IMAGES)) {
-    if (text.includes(key)) return url;
-  }
-  return CATEGORY_IMAGES[frontmatter.category] || CATEGORY_IMAGES["Guides"];
-}
+## Installation sur Samsung Galaxy
 
-// Barre de progression de lecture
-function ReadingProgress() {
-  const [progress, setProgress] = useState(0);
+### Étape 1 — Accédez aux réglages SIM
+**Paramètres → Connexions → Gestionnaire de carte SIM**
 
-  useEffect(() => {
-    const update = () => {
-      const el = document.documentElement;
-      const scrolled = el.scrollTop;
-      const total = el.scrollHeight - el.clientHeight;
-      setProgress(total > 0 ? (scrolled / total) * 100 : 0);
-    };
-    window.addEventListener("scroll", update, { passive: true });
-    return () => window.removeEventListener("scroll", update);
-  }, []);
+Sur certains modèles récents (One UI 5+) : **Paramètres → Connexions → Cartes SIM**
 
-  return (
-    <div className="fixed top-0 left-0 right-0 h-0.5 bg-gray-100 z-50">
-      <div
-        className="h-full bg-gradient-to-r from-purple-500 to-orange-400 transition-all duration-100"
-        style={{ width: `${progress}%` }}
-      />
-    </div>
-  );
-}
+### Étape 2 — Ajoutez l'eSIM
+Appuyez sur **Ajouter une carte eSIM** ou **Ajouter un forfait mobile**, puis choisissez **Scanner un code QR**.
 
-export default function BlogPostPage({ frontmatter, contentHtml, readingTimeMin, slug }: Props) {
-  const heroImage = getHeroImage(frontmatter, slug);
-  const cat = CATEGORY_STYLES[frontmatter.category] || CATEGORY_STYLES["Guides"];
-  const formattedDate = new Date(frontmatter.date).toLocaleDateString("fr-FR", {
-    day: "numeric", month: "long", year: "numeric",
-  });
+### Étape 3 — Scannez le QR code
+Pointez l'appareil photo vers le QR code reçu par email. Si vous lisez cet email sur le même téléphone, ouvrez-le sur un autre appareil ou faites une capture d'écran et utilisez la saisie manuelle du code de confirmation.
 
-  return (
-    <>
-      <Head>
-        <title>{frontmatter.title} | FENUA SIM</title>
-        <meta name="description" content={frontmatter.description} />
-        <meta property="og:title" content={frontmatter.title} />
-        <meta property="og:description" content={frontmatter.description} />
-        <meta property="og:image" content={heroImage} />
-        <meta property="og:type" content="article" />
-      </Head>
+### Étape 4 — Assignez les données à l'eSIM
+Une fois l'eSIM installée, allez dans **Paramètres → Connexions → Gestionnaire de carte SIM → Données mobiles** et sélectionnez votre ligne eSIM.
 
-      <ReadingProgress />
+---
 
-      <main className="min-h-screen bg-white">
+## Installation sur Google Pixel
 
-        {/* ── HERO IMAGE ───────────────────────────────────────────────────────── */}
-        <div className="relative w-full h-64 sm:h-80 md:h-96 overflow-hidden bg-gray-900">
-          <img
-            src={heroImage}
-            alt={frontmatter.title}
-            className="w-full h-full object-cover opacity-70"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-900/50 to-transparent" />
+### Étape 1 — Accédez aux réglages réseau
+**Paramètres → Réseau et Internet → Cartes SIM**
 
-          {/* Breadcrumb sur l'image */}
-          <div className="absolute top-6 left-0 right-0 max-w-3xl mx-auto px-4">
-            <Link
-              href="/blog"
-              className="inline-flex items-center gap-1.5 text-white/80 hover:text-white text-sm font-medium transition-colors"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-              Retour au blog
-            </Link>
-          </div>
+### Étape 2 — Ajoutez l'eSIM
+Appuyez sur **Ajouter une carte SIM** puis **Télécharger un forfait SIM**
 
-          {/* Titre sur l'image */}
-          <div className="absolute bottom-0 left-0 right-0 max-w-3xl mx-auto px-4 pb-8">
-            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${cat.bg} ${cat.text} ${cat.border} mb-3`}>
-              <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />
-              {frontmatter.category}
-            </span>
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white leading-tight">
-              {frontmatter.title}
-            </h1>
-          </div>
-        </div>
+### Étape 3 — Scannez le QR code
+Choisissez **Scanner le code** et pointez vers le QR code. Confirmez l'installation quand le système vous le demande.
 
-        {/* ── CONTENU ──────────────────────────────────────────────────────────── */}
-        <div className="max-w-3xl mx-auto px-4">
+### Étape 4 — Définissez la ligne data
+**Paramètres → Réseau et Internet → Cartes SIM → Préférences** et sélectionnez l'eSIM pour les données mobiles.
 
-          {/* Meta bar */}
-          <div className="flex items-center gap-4 py-5 border-b border-gray-100 text-sm text-gray-500">
-            <span className="flex items-center gap-1.5">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-              {formattedDate}
-            </span>
-            <span className="w-1 h-1 rounded-full bg-gray-300" />
-            <span className="flex items-center gap-1.5">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              {readingTimeMin} min de lecture
-            </span>
-          </div>
+---
 
-          {/* Description mise en avant */}
-          <p className="mt-6 text-lg text-gray-600 leading-relaxed font-medium border-l-4 border-purple-200 pl-5 py-1">
-            {frontmatter.description}
-          </p>
+## Autres marques Android (OnePlus, Xiaomi, Oppo…)
 
-          {/* Corps de l'article */}
-          <article
-            className="
-              mt-8 pb-12
-              prose prose-gray max-w-none
+Le chemin varie selon le fabricant, mais la logique est toujours la même. Cherchez dans vos Paramètres l'une de ces options :
 
-              prose-headings:font-extrabold
-              prose-headings:text-gray-900
-              prose-headings:tracking-tight
+- **Réseau et Internet → Cartes SIM**
+- **Connexions → Gestion SIM**
+- **Téléphone → SIM et réseau mobile**
 
-              prose-h2:text-2xl
-              prose-h2:mt-10
-              prose-h2:mb-4
-              prose-h2:pb-2
-              prose-h2:border-b
-              prose-h2:border-gray-100
-              prose-h2:scroll-mt-24
+Une fois trouvé, l'option "Ajouter une eSIM" ou "Ajouter un forfait mobile" vous guidera avec le même processus de scan QR code.
 
-              prose-h3:text-lg
-              prose-h3:mt-6
-              prose-h3:mb-3
+---
 
-              prose-p:text-gray-700
-              prose-p:leading-relaxed
-              prose-p:text-base
+## À l'arrivée : connexion en 1 minute
 
-              prose-a:text-purple-700
-              prose-a:font-semibold
-              prose-a:no-underline
-              hover:prose-a:underline
+Désactivez le mode avion à l'atterrissage et vérifiez :
 
-              prose-strong:text-gray-900
-              prose-strong:font-bold
+1. **Données mobiles** → la ligne eSIM est bien sélectionnée
+2. Le réseau local apparaît dans la barre de statut (ex : "SoftBank" au Japon, "T-Mobile" aux États-Unis)
+3. Si pas de connexion après 1 minute : activez l'**itinérance des données** sur la ligne eSIM uniquement
 
-              prose-li:text-gray-700
-              prose-li:leading-relaxed
+**Samsung** : Paramètres → Connexions → Gestionnaire SIM → eSIM → Itinérance des données → ON
+**Pixel** : Paramètres → Réseau → Cartes SIM → eSIM → Itinérance → ON
 
-              prose-table:text-sm
-              prose-thead:bg-gray-50
-              prose-th:font-bold
-              prose-th:text-gray-900
-              prose-th:py-3
-              prose-th:px-4
-              prose-td:py-3
-              prose-td:px-4
-              prose-tr:border-b
-              prose-tr:border-gray-100
+⚠️ Gardez l'itinérance **désactivée sur votre SIM principale** pour éviter toute facturation surprise de votre opérateur habituel.
 
-              prose-blockquote:border-l-4
-              prose-blockquote:border-purple-300
-              prose-blockquote:bg-purple-50
-              prose-blockquote:rounded-r-xl
-              prose-blockquote:px-5
-              prose-blockquote:py-3
-              prose-blockquote:not-italic
-              prose-blockquote:text-purple-900
+---
 
-              prose-code:bg-gray-100
-              prose-code:text-purple-700
-              prose-code:px-1.5
-              prose-code:py-0.5
-              prose-code:rounded
-              prose-code:text-sm
-              prose-code:font-mono
-              prose-code:before:content-none
-              prose-code:after:content-none
+## Dépannage express
 
-              prose-hr:border-gray-200
-              prose-hr:my-8
-            "
-            dangerouslySetInnerHTML={{ __html: contentHtml }}
-          />
+| Problème | Solution rapide |
+|---|---|
+| "Pas de service" | Mode avion 10 secondes → OFF, puis redémarrage |
+| "Pas d'internet" | Vérifier que Données mobiles = eSIM dans les réglages |
+| eSIM inactive | Vérifier que la ligne est bien activée dans Gestionnaire SIM |
+| Réseau trouvé mais lent | Passer la sélection réseau en automatique |
+| Rien ne fonctionne | Réinitialiser les paramètres réseau (efface les Wi-Fi enregistrés) |
 
-          {/* CTA */}
-          <div className="border-t border-gray-100 pt-10">
-            <BlogCta />
-          </div>
+Pour un diagnostic plus complet, consultez notre checklist de dépannage :
+👉 [7 vérifications pour résoudre les problèmes eSIM →](/blog/depannage-esim-pas-de-reseau)
 
-          {/* Retour blog */}
-          <div className="py-8 text-center">
-            <Link
-              href="/blog"
-              className="inline-flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-purple-700 transition-colors"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-              Voir tous les articles
-            </Link>
-          </div>
+---
 
-        </div>
-      </main>
-    </>
-  );
-}
+👉 [Vérifier la compatibilité de votre Android →](/compatibilite)
+👉 [Choisir votre forfait eSIM →](/shop)

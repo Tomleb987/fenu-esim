@@ -23,12 +23,14 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const REVIEWS = [
-  { id: 1, author: "Marie L.", country: "🇫🇷 France", rating: 5, date: "Janvier 2026", title: "Parfait pour le Japon !", text: "Activation en 2 minutes chrono à l'aéroport. Connexion stable partout, même dans le métro de Tokyo. Je ne voyagerai plus jamais sans FenuaSIM.", destination: "Japon" },
-  { id: 2, author: "Thomas R.", country: "🇧🇪 Belgique", rating: 5, date: "Février 2026", title: "Fini le roaming hors de prix", text: "J'ai économisé plus de 80€ sur mon voyage aux États-Unis. Le service client répond en quelques minutes. Une vraie révolution pour les voyageurs.", destination: "États-Unis" },
-  { id: 3, author: "Sophie M.", country: "🇨🇭 Suisse", rating: 5, date: "Décembre 2025", title: "Indispensable en Asie du Sud-Est", text: "Utilisée en Thaïlande, Vietnam et Indonésie. Aucune coupure, débit excellent. Je recommande à tous mes amis voyageurs sans hésitation.", destination: "Asie" },
-  { id: 4, author: "Lucas B.", country: "🇫🇷 France", rating: 5, date: "Novembre 2025", title: "Simple, rapide, efficace", text: "Commande passée la veille du départ. QR code reçu en quelques minutes. Connexion immédiate à l'atterrissage à Dubai. Exactement ce que je cherchais.", destination: "Dubaï" },
-  { id: 5, author: "Camille D.", country: "🇫🇷 France", rating: 4, date: "Octobre 2025", title: "Très bon rapport qualité-prix", text: "Très satisfaite de mon eSIM pour l'Europe. Couverture impeccable en Espagne et Italie. Je reviendrai pour mon prochain voyage en Amérique du Sud.", destination: "Europe" },
-  { id: 6, author: "Antoine V.", country: "🇨🇦 Canada", rating: 5, date: "Mars 2026", title: "Le meilleur service eSIM", text: "Testé plusieurs concurrents avant de trouver FenuaSIM. Aucune comparaison possible : meilleur prix, meilleure couverture, meilleur support. Client fidèle !", destination: "Monde" },
+  { id: 1, author: "Phil", country: "🇵🇫 Polynésie", rating: 5, date: "Février 2026", title: "Très satisfait", text: "Très satisfait! Aucun problème de connexion au Japon, grande ville et village dans les montagnes! Au top :)", destination: "Japon" },
+  { id: 2, author: "Bajon Gregory", country: "🇸🇬 Singapour", rating: 5, date: "Février 2026", title: "Expérience extrêmement satisfaisante", text: "Expérience extrêmement satisfaisante. Je conseille fortement.", destination: "Monde" },
+  { id: 3, author: "Nelly M.", country: "🇵🇫 Polynésie", rating: 5, date: "Janvier 2026", title: "eSIM utilisée aux États-Unis", text: "Tout était parfait, de la mise en place rapide à son utilisation sans aucun souci durant la totalité de mon séjour. Très bon rapport qualité prix. Pour mon prochain séjour, pas besoin de réfléchir, c'est Fenua SIM qui m'accompagnera.", destination: "États-Unis" },
+  { id: 4, author: "Dereeper", country: "🇲🇬 Madagascar", rating: 5, date: "Janvier 2026", title: "1ère expérience avec Fenuasim", text: "Dès les premiers contacts j'ai tout de suite constaté une forte réactivité. Réactivité plus que confirmée lors des petits soucis rencontrés en début de voyage. Vous êtes super et je vous recommande à 100%.", destination: "Monde" },
+  { id: 5, author: "Ateo M.", country: "🇵🇫 Polynésie", rating: 5, date: "Novembre 2025", title: "Fonctionne en Égypte", text: "Fonctionne en Égypte, en Turquie et France et surtout la eSIM dure longtemps. Au top 🙏👌", destination: "Égypte" },
+  { id: 6, author: "Hélène M.", country: "🇵🇫 Polynésie", rating: 5, date: "Octobre 2025", title: "Foncez !", text: "J'ai utilisé une carte Fenuasim aux USA puis j'ai rechargé en 2 minutes top chrono ! Comparé à d'autres eSIM testées en même temps, Fenuasim est beaucoup mieux. En plus, l'équipe est toujours là en cas de soucis. Je conseille à 1000%", destination: "États-Unis" },
+  { id: 7, author: "Mirella A.", country: "🇮🇹 Italie", rating: 5, date: "Septembre 2025", title: "Super, sérieux", text: "Super service. Grâce au professionnalisme de Thomas tout a été réglé très rapidement. Il n'a pas lésé sur les moyens de communication jusqu'à ce que je sois connectée. MERCI encore à Thomas pour le suivi et surtout pour ton professionnalisme. MAURUURU", destination: "Italie" },
+  { id: 8, author: "Thomas", country: "🇳🇨 Nouvelle-Calédonie", rating: 5, date: "Juillet 2025", title: "eSIM Nouvelle-Zélande", text: "C'était rapide et efficace. La eSIM s'est activée dès mon arrivée à l'aéroport, aucun problème de connexion pendant mon séjour. J'ai pris 10 Go pendant 5 jours ce qui était amplement suffisant.", destination: "Nouvelle-Zélande" },
 ];
 
 function StarRating({ rating }: { rating: number }) {
@@ -102,17 +104,17 @@ function TrustpilotSection() {
             </div>
             <div className="w-px h-8 bg-gray-200" />
             <div className="text-center">
-              <div className="text-2xl font-extrabold text-gray-900">4.9</div>
+              <div className="text-2xl font-extrabold text-gray-900">4,4</div>
               <div className="flex gap-0.5 justify-center mt-0.5">
                 {[1,2,3,4,5].map(s => (
-                  <svg key={s} width="14" height="14" viewBox="0 0 24 24" fill="#00b67a"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                  <svg key={s} width="14" height="14" viewBox="0 0 24 24" fill={s <= 4 ? "#00b67a" : "#e0e0e0"}><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
                 ))}
               </div>
               <div className="text-xs text-gray-400 mt-0.5">Excellent</div>
             </div>
             <div className="w-px h-8 bg-gray-200" />
             <div className="text-center">
-              <div className="text-2xl font-extrabold text-gray-900">180+</div>
+              <div className="text-2xl font-extrabold text-gray-900">11</div>
               <div className="text-xs text-gray-400">Avis clients</div>
             </div>
           </div>

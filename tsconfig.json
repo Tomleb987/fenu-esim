@@ -35,7 +35,7 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts"
-, "next.config.js"  ],
+, "next.config.js", "src/pages/api/track-partner/route.ys"  ],
   "exclude": [
     "node_modules"
   ]

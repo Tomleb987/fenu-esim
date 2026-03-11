@@ -16,7 +16,7 @@ export default async function handler(
       return res.status(405).json({ error: "Method not allowed" });
     }
 
-    const { code } = req.query;
+    const code = (req.query.code as string).toUpperCase();
 
     if (!code || typeof code !== "string") {
       return res.status(400).json({ error: "Missing partner code" });

@@ -14,8 +14,46 @@ export default function AssurancePage() {
   return (
     <>
       <Head>
-        <title>Assurance Voyage | Fenuasim</title>
-        <meta name="description" content="Souscrivez votre assurance voyage en ligne. Couverture médicale, annulation, bagages — résidents de Polynésie française." />
+        <title>Assurance Voyage en ligne — Résidents de Polynésie française | FENUA SIM</title>
+        <meta name="description" content="Souscrivez votre assurance voyage depuis Tahiti. AVA Tourist Card & Carte Santé : frais médicaux 500 000 €, annulation, rapatriement, bagages. Partenaire officiel ANSET Assurances. N° RUIAM PF 26 012." />
+        <meta name="keywords" content="assurance voyage Polynésie française, assurance voyage Tahiti, assurance voyage résidents PF, assurance annulation Tahiti, AVA Tourist Card, assurance médicale voyage, assurance rapatriement Tahiti" />
+        <link rel="canonical" href="https://www.fenuasim.com/assurance" />
+        <meta property="og:title" content="Assurance Voyage en ligne — Résidents de Polynésie française | FENUA SIM" />
+        <meta property="og:description" content="Frais médicaux 500 000 €, annulation, rapatriement. Souscription 100% en ligne, contrat délivré en quelques minutes. Partenaire ANSET Assurances." />
+        <meta property="og:url" content="https://www.fenuasim.com/assurance" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "InsuranceAgency",
+            name: "FENUA SIM — Assurance Voyage",
+            url: "https://www.fenuasim.com/assurance",
+            description: "Assurance voyage en ligne pour les résidents de Polynésie française. Partenaire AVA Assurances via ANSET. N° RUIAM PF 26 012.",
+            areaServed: { "@type": "AdministrativeArea", name: "Polynésie française" },
+            hasOfferCatalog: {
+              "@type": "OfferCatalog",
+              name: "Assurances voyage",
+              itemListElement: [
+                {
+                  "@type": "Offer",
+                  itemOffered: {
+                    "@type": "Service",
+                    name: "AVA Tourist Card",
+                    description: "Assurance multirisque voyage : annulation jusqu'à 6 000 €, frais médicaux 500 000 €, bagages 1 500 €, responsabilité civile 4 500 000 €. Aucune limite d'âge."
+                  }
+                },
+                {
+                  "@type": "Offer",
+                  itemOffered: {
+                    "@type": "Service",
+                    name: "AVA Carte Santé",
+                    description: "Assurance santé voyage : frais médicaux 500 000 € sans franchise, hospitalisation 100% frais réels, rapatriement sanitaire. Dès 5 €/jour."
+                  }
+                }
+              ]
+            }
+          })}}
+        />
       </Head>
 
       <div className="min-h-screen bg-background pb-20 font-sans text-foreground">

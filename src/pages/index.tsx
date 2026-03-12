@@ -322,6 +322,30 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-white">
       <Head>
+        <title>FENUA SIM — eSIM de voyage pour les résidents de Polynésie française</title>
+        <meta name="description" content="Achetez votre eSIM de voyage depuis Tahiti. Connexion 4G/5G dans 180+ pays, activation immédiate, sans carte SIM physique. Le spécialiste eSIM des résidents de Polynésie française." />
+        <meta name="keywords" content="eSIM Polynésie française, eSIM Tahiti, carte SIM voyage, eSIM voyage, connexion étranger Polynésie" />
+        <link rel="canonical" href="https://www.fenuasim.com/" />
+        <meta property="og:title" content="FENUA SIM — eSIM de voyage pour les résidents de Polynésie française" />
+        <meta property="og:description" content="Achetez votre eSIM de voyage depuis Tahiti. Connexion 4G/5G dans 180+ pays, activation immédiate." />
+        <meta property="og:url" content="https://www.fenuasim.com/" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "WebSite",
+              name: "FENUA SIM",
+              url: "https://www.fenuasim.com",
+              description: "Vente d'eSIM de voyage pour les résidents de Polynésie française",
+              potentialAction: {
+                "@type": "SearchAction",
+                target: "https://www.fenuasim.com/shop?q={search_term_string}",
+                "query-input": "required name=search_term_string"
+              }
+            }),
+          }}
+        />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -329,8 +353,10 @@ export default function Home() {
               "@context": "https://schema.org",
               "@type": "FAQPage",
               mainEntity: [
-                { "@type": "Question", name: "Comment fonctionne l'eSIM ?", acceptedAnswer: { "@type": "Answer", text: "L'eSIM est une carte SIM intégrée à votre appareil..." } },
-                { "@type": "Question", name: "Mon appareil est-il compatible ?", acceptedAnswer: { "@type": "Answer", text: "La plupart des smartphones récents sont compatibles..." } },
+                { "@type": "Question", name: "Comment fonctionne l'eSIM ?", acceptedAnswer: { "@type": "Answer", text: "L'eSIM est une carte SIM numérique intégrée à votre téléphone. Vous recevez un QR code par email après achat, vous le scannez dans les réglages de votre téléphone, et vous êtes connecté à votre arrivée dans le pays de destination." } },
+                { "@type": "Question", name: "Mon téléphone est-il compatible avec l'eSIM ?", acceptedAnswer: { "@type": "Answer", text: "La plupart des smartphones récents sont compatibles : iPhone XS et versions ultérieures, Samsung Galaxy S20+, Google Pixel 3+. Consultez notre page compatibilité pour la liste complète." } },
+                { "@type": "Question", name: "Quand activer son eSIM FENUA SIM ?", acceptedAnswer: { "@type": "Answer", text: "Installez votre eSIM avant le départ (vous avez besoin d'une connexion internet), mais activez-la à votre arrivée dans le pays de destination pour éviter de consommer votre forfait pendant le vol." } },
+                { "@type": "Question", name: "Peut-on recharger une eSIM FENUA SIM ?", acceptedAnswer: { "@type": "Answer", text: "Oui, la recharge est possible directement depuis votre espace client sur fenuasim.com en quelques clics, sans avoir à racheter une nouvelle eSIM." } },
               ],
             }),
           }}

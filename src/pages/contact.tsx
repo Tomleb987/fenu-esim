@@ -1,4 +1,5 @@
 "use client";
+import Head from "next/head";
 import { 
   Mail, 
   MessageCircle, 
@@ -22,6 +23,52 @@ Je vous contacte pour :
 export default function Contact() {
   return (
     <div className="max-w-5xl mx-auto py-16 px-4">
+      <Head>
+        <title>Contact — Support FENUA SIM | eSIM Polynésie française</title>
+        <meta name="description" content="Contactez l'équipe FENUA SIM pour toute question sur votre eSIM ou assurance voyage. Support par email et WhatsApp, 7j/7, en français. Réponse sous 24h." />
+        <meta name="keywords" content="contact FENUA SIM, support eSIM Tahiti, aide eSIM Polynésie, WhatsApp FENUA SIM" />
+        <link rel="canonical" href="https://www.fenuasim.com/contact" />
+        <meta property="og:title" content="Contactez FENUA SIM — Support 7j/7 en français" />
+        <meta property="og:description" content="Email ou WhatsApp, notre équipe vous répond 7j/7. Idéal pour les questions avant achat ou le suivi de commande." />
+        <meta property="og:url" content="https://www.fenuasim.com/contact" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "ContactPage",
+            name: "Contact FENUA SIM",
+            url: "https://www.fenuasim.com/contact",
+            mainEntity: {
+              "@type": "Organization",
+              name: "FENUA SIM",
+              email: "sav@fenua-sim.odoo.com",
+              url: "https://www.fenuasim.com",
+              areaServed: "Polynésie française",
+              availableLanguage: "French",
+              sameAs: [
+                "https://www.facebook.com/fenuasim",
+                "https://www.instagram.com/fenuasim"
+              ],
+              contactPoint: [
+                {
+                  "@type": "ContactPoint",
+                  contactType: "customer support",
+                  email: "sav@fenua-sim.odoo.com",
+                  availableLanguage: "French",
+                  hoursAvailable: "Mo-Su 00:00-23:59"
+                },
+                {
+                  "@type": "ContactPoint",
+                  contactType: "customer support",
+                  url: "https://wa.me/33749782101",
+                  contactOption: "TollFree",
+                  availableLanguage: "French"
+                }
+              ]
+            }
+          })}}
+        />
+      </Head>
       
       {/* --- EN-TÊTE --- */}
       <div className="text-center mb-16">

@@ -1,7 +1,7 @@
 import { InsuranceFormData } from "@/types/insurance";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { AVA_TOURIST_OPTIONS } from "@/lib/ava_options";
+import { AVA_TOURIST_OPTIONS, getOptionsForProduct } from "@/lib/ava_options";
 import { Download, FileText } from "lucide-react";
 
 interface SummaryStepProps {
@@ -10,9 +10,10 @@ interface SummaryStepProps {
   errors: Record<string, string>;
   quote: { premium: number } | null;
   isLoadingQuote: boolean;
+  productType?: string;
 }
 
-export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProps) => {
+export const SummaryStep = ({ formData, quote, isLoadingQuote, productType = 'ava_tourist_card' }: SummaryStepProps) => {
 
   const EUR_TO_XPF = 119.33;
   const toXPF = (eur: number) => Math.round(eur * EUR_TO_XPF).toLocaleString('fr-FR');
@@ -42,7 +43,8 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProp
   };
 
   // Résolution des noms d'options
-  const allOptions = AVA_TOURIST_OPTIONS.flatMap(opt => [
+  const productOptions = getOptionsForProduct(productType);
+  const allOptions = productOptions.flatMap(opt => [
     opt,
     ...(opt.subOptions?.map(sub => ({ ...sub, type: 'select' as const })) || [])
   ]);

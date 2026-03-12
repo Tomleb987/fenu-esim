@@ -1,179 +1,931 @@
-type DestinationPageProps = {
-  title?: string;
-  subtitle?: string;
-  price?: string;
-  heroImage?: string;
-  countries?: string[];
-  featuredCountries?: string[];
-  coverageLabel?: string;
-  benefits?: string[];
-  ctaPrimary?: string;
-  ctaSecondary?: string;
+"use client";
+import Head from "next/head";
+import { usePartnerCodes } from "@/hooks/usePartnerCodes";
+import { useState, useEffect } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
+import type { Database } from "@/lib/supabase/config";
+import Image from "next/image";
+import { Camera, Globe, Video, MessageSquare } from "lucide-react";
+import React from "react";
+import OrderSummary from "@/components/checkout/OrderSummary";
+import { stripePromise } from "@/lib/stripe/config";
+import { getFrenchRegionName } from "@/lib/regionTranslations";
+
+
+type Package = Database["public"]["Tables"]["airalo_packages"]["Row"] & {
+  region_image_url?: string;
+  region_description?: string;
+  region_slug?: string;
+  image_url?: string;
 };
 
-export default function DestinationPage({
-  title = "Monde",
-  subtitle = "Une eSIM simple à activer, pensée pour voyager sans stress et rester connecté dès l’arrivée.",
-  price = "17,00 $",
-  heroImage = "https://images.unsplash.com/photo-1526778548025-fa2f459cd5ce?auto=format&fit=crop&w=1200&q=80",
-  countries = [
-    "Afrique du Sud", "Albanie", "Algérie", "Allemagne", "Andorre", "Antilles", "Arabie saoudite",
-    "Argentine", "Arménie", "Aruba", "Australie", "Autriche", "Azerbaïdjan", "Bahamas", "Bahreïn",
-    "Bangladesh", "Belgique", "Belize", "Biélorussie", "Bolivie", "Botswana", "Brésil", "Bulgarie",
-    "Cambodge", "Cameroun", "Canada", "Chili", "Chine", "Chypre", "Colombie", "Corée du Sud",
-    "Costa Rica", "Croatie", "Danemark", "Égypte", "Émirats arabes unis", "Espagne", "Estonie",
-    "États-Unis", "Fidji", "Finlande", "France", "Géorgie", "Ghana", "Grèce", "Guadeloupe",
-    "Guam", "Guatemala", "Guernesey", "Guyane", "Honduras", "Hong Kong", "Hongrie", "Inde",
-    "Indonésie", "Irlande", "Islande", "Israël", "Italie", "Jamaïque", "Japon", "Jersey",
-    "Jordanie", "Kazakhstan", "Kenya", "Koweït", "Lettonie", "Liechtenstein", "Lituanie",
-    "Luxembourg", "Macao", "Macédoine du Nord", "Madagascar", "Malaisie", "Mali", "Malte",
-    "Maroc", "Mexique", "Moldavie", "Monaco", "Mongolie", "Monténégro", "Mozambique", "Népal",
-    "Nicaragua", "Nigeria", "Norvège", "Nouvelle-Zélande", "Oman", "Ouganda", "Ouzbékistan",
-    "Pakistan", "Panama", "Paraguay", "Pays-Bas", "Pérou", "Philippines", "Pologne", "Polynésie française",
-    "Portugal", "Qatar", "République tchèque", "Réunion", "Roumanie", "Royaume-Uni", "Russie",
-    "Saint-Barthélemy", "Saint-Martin", "Salvador", "Serbie", "Singapour", "Slovaquie", "Slovénie",
-    "Sri Lanka", "Suède", "Suisse", "Taïwan", "Tanzanie", "Thaïlande", "Tunisie", "Turquie",
-    "Ukraine", "Uruguay", "Vietnam"
-  ],
-  featuredCountries = [],
-  coverageLabel,
-  benefits = [
-    "Connexion activable avant le départ ou à l’arrivée.",
-    "Parfait pour les voyages multi-destinations ou séjours urbains.",
-    "Aucune manipulation compliquée en boutique locale.",
-    "Idéal pour Maps, WhatsApp, mails et partage de connexion."
-  ],
-  ctaPrimary = "Acheter maintenant",
-  ctaSecondary = "Vérifier la compatibilité"
-}: DestinationPageProps) {
-  const sortedCountries = [...countries].sort((a, b) => a.localeCompare(b, "fr"));
-  const displayedFeatured = featuredCountries.length > 0 ? featuredCountries : sortedCountries.slice(0, 8);
-  const computedCoverageLabel = coverageLabel || `${sortedCountries.length}+ destinations`;
+type DataTip = {
+  photo: string;
+  web: string;
+  video: string;
+  chat: string;
+  calls: string;
+};
+
+function getDataTip(amount: number, unit: string): DataTip {
+  let go = unit.toLowerCase() === "mo" ? amount / 1024 : amount;
+  return {
+    photo: Math.floor(go * 500).toLocaleString(),
+    web: Math.floor(go / 0.06) + "h",
+    video: Math.floor(go / 1) + "h",
+    chat: Math.floor(go * 3333).toLocaleString(),
+    calls: Math.floor(go / 0.036) + "h",
+  };
+}
+
+function deburr(str: string) {
+  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function getCountryCode(region: string | null): string {
+  if (!region) return "xx";
+  const cleaned = region.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const words = cleaned.trim().split(/\s+/);
+  if (words.length >= 2) {
+    return (words[0][0] + words[1][0]).toLowerCase();
+  } else {
+    return words[0].slice(0, 2).toLowerCase();
+  }
+}
+
+const FRENCH_TO_ENGLISH_REGION: Record<string, string> = {
+  "japon": "Japan",
+  "etats-unis": "United States",
+  "australie": "Australia",
+  "nouvelle-zelande": "New Zealand",
+  "mexique": "Mexico",
+  "fidji": "Fiji",
+  "thailande": "Thailand",
+  "singapour": "Singapore",
+  "malaisie": "Malaysia",
+  "indonesie": "Indonesia",
+  "philippines": "Philippines",
+  "viet-nam": "Vietnam",
+  "inde": "India",
+  "chine": "China",
+  "taiwan": "Taiwan",
+  "royaume-uni": "United Kingdom",
+  "allemagne": "Germany",
+  "espagne": "Spain",
+  "italie": "Italy",
+  "grece": "Greece",
+  "portugal": "Portugal",
+  "pays-bas": "Netherlands",
+  "belgique": "Belgium",
+  "suisse": "Switzerland",
+  "autriche": "Austria",
+  "pologne": "Poland",
+  "republique-tcheque": "Czech Republic",
+  "turquie": "Turkey",
+  "egypte": "Egypt",
+  "maroc": "Morocco",
+  "afrique-du-sud": "South Africa",
+  "bresil": "Brazil",
+  "argentine": "Argentina",
+  "chili": "Chile",
+  "colombie": "Colombia",
+  "perou": "Peru",
+  "emirats-arabes-unis": "United Arab Emirates",
+  "arabie-saoudite": "Saudi Arabia",
+  "israel": "Israel",
+  "jordanie": "Jordan",
+  "liban": "Lebanon",
+  "qatar": "Qatar",
+  "koweit": "Kuwait",
+  "bahrein": "Bahrain",
+  "oman": "Oman",
+  "azerbaidjan": "Azerbaijan",
+  "jamaique": "Jamaica",
+  "asie": "Asia",
+  "europe": "Europe",
+  "decouvrir-global": "Discover Global",
+  "iles-canaries": "Canary Islands",
+  "coree-du-sud": "South Korea",
+};
+
+function slugToRegionFr(slug: string): string {
+  return slug
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ")
+    .toLowerCase();
+}
+
+function getEnglishRegionFromSlug(slug: string): string {
+  const normalizedSlug = slug.toLowerCase().trim();
+  if (FRENCH_TO_ENGLISH_REGION[normalizedSlug]) {
+    return FRENCH_TO_ENGLISH_REGION[normalizedSlug];
+  }
+  return slug;
+}
+
+async function validateAndApplyPromoCode(
+  code: string,
+  packagePrice: number,
+): Promise<{
+  isValid: boolean;
+  discountedPrice: number;
+  error?: string;
+}> {
+  try {
+    const { data: promoCode, error } = await supabase
+      .from("promo_codes")
+      .select("*")
+      .eq("code", code)
+      .single();
+
+    if (error || !promoCode) {
+      return { isValid: false, discountedPrice: packagePrice, error: "Code promo invalide" };
+    }
+    if (!promoCode.is_active) {
+      return { isValid: false, discountedPrice: packagePrice, error: "Ce code promo n'est plus actif" };
+    }
+    const now = new Date();
+    if (new Date(promoCode.valid_from) > now || new Date(promoCode.valid_until) < now) {
+      return { isValid: false, discountedPrice: packagePrice, error: "Ce code promo n'est plus valide" };
+    }
+    if (promoCode.usage_limit && promoCode.times_used >= promoCode.usage_limit) {
+      return { isValid: false, discountedPrice: packagePrice, error: "Ce code promo a atteint sa limite d'utilisation" };
+    }
+
+    let discountedPrice = packagePrice;
+    if (promoCode.discount_percentage) {
+      discountedPrice = packagePrice * (1 - promoCode.discount_percentage / 100);
+    } else if (promoCode.discount_amount) {
+      discountedPrice = Math.max(0, packagePrice - promoCode.discount_amount);
+    }
+    return { isValid: true, discountedPrice };
+  } catch (error) {
+    console.error("Error validating promo code:", error);
+    return { isValid: false, discountedPrice: packagePrice, error: "Une erreur est survenue lors de la validation du code promo" };
+  }
+}
+
+export default function RegionPage() {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const router = useRouter();
+  const params = useParams();
+  const [packages, setPackages] = useState<Package[]>([]);
+  const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
+  const [destinationImage, setDestinationImage] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showCartModal, setShowCartModal] = useState(false);
+  const [showSimulator, setShowSimulator] = useState(false);
+  const [showRecapModal, setShowRecapModal] = useState(false);
+  const [destinationInfo, setDestinationInfo] = useState();
+  const [form, setForm] = useState({
+    nom: "",
+    first_name: "",
+    last_name: "",
+    prenom: "",
+    email: "",
+    codePromo: "",
+    codePartenaire: "",
+  });
+  const [formError, setFormError] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const { partnerCode, promoCode: partnerPromoCode, isFromPartnerLink } = usePartnerCodes();
+
+  useEffect(() => {
+    if (partnerCode || partnerPromoCode) {
+      setForm((prev) => ({
+        ...prev,
+        codePartenaire: prev.codePartenaire || partnerCode,
+        codePromo: prev.codePromo || partnerPromoCode,
+      }));
+    }
+  }, [partnerCode, partnerPromoCode]);
+
+  const [cart, setCart] = useState<Package[]>([]);
+  const [currency, setCurrency] = useState<"EUR" | "USD" | "XPF">("EUR");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const cur = localStorage.getItem("currency") as "EUR" | "USD" | "XPF" | null;
+      if (cur) setCurrency(cur);
+    }
+  }, []);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("cart");
+    if (stored) setCart(JSON.parse(stored));
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("cart", JSON.stringify(cart));
+  }, [cart]);
+
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true);
+      setError(null);
+      try {
+        if (!params?.region) {
+          setError("Destination non trouvée");
+          setLoading(false);
+          return;
+        }
+        const regionParam = Array.isArray(params.region) ? params.region[0] : params.region;
+        const regionFr = slugToRegionFr(regionParam.toLowerCase());
+        const englishRegion = getEnglishRegionFromSlug(regionParam);
+        const dbSlug = englishRegion.toLowerCase();
+
+        const { data: pkgs, error: pkgError } = await supabase
+          .from("airalo_packages")
+          .select("*")
+          .eq("slug", dbSlug);
+        const { data: dest, error: destError } = await supabase
+          .from("destination_info")
+          .select("*")
+          .eq("name", pkgs?.[0].region_fr);
+        /* @ts-ignore */
+        setDestinationInfo(dest);
+
+        const region = regionFr.toLowerCase().replace(/\s+/g, "-");
+        const { data } = await supabase.storage
+          .from("product-images")
+          .getPublicUrl(`esim-${region}.jpg`);
+        setDestinationImage(`${data.publicUrl}`);
+
+        if (pkgError) throw pkgError;
+        if (!pkgs || pkgs.length === 0) {
+          setError("Aucun forfait disponible pour cette destination");
+          setLoading(false);
+          return;
+        }
+        setPackages(pkgs);
+        setSelectedPackage(pkgs[0]);
+      } catch (err) {
+        setError("Erreur lors du chargement des données");
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, [params?.region]);
+
+  useEffect(() => {
+    const checkScreenSize = () => setIsMobile(window.innerWidth < 768);
+    checkScreenSize();
+    window.addEventListener("resize", checkScreenSize);
+    return () => window.removeEventListener("resize", checkScreenSize);
+  }, []);
+
+  useEffect(() => { console.log(destinationInfo); }, [destinationInfo]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-t-2 border-b-2 border-purple-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="text-center">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4">{error}</h2>
+          <button
+            onClick={() => router.push("/shop")}
+            className="bg-purple-600 text-white px-4 sm:px-6 py-2 rounded-xl hover:bg-purple-700 transition-colors text-sm sm:text-base"
+          >
+            Retour à la boutique
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const regionParam = Array.isArray(params.region) ? params.region[0] : params.region;
+  const regionName = packages[0]
+    ? getFrenchRegionName(packages[0].region_fr, packages[0].region)
+    : regionParam;
+  const regionDescription = packages[0]?.region_description || "";
+
+  function handleAddToCart(pkg: Package) {
+    const margin = parseFloat(localStorage.getItem("global_margin") || "0");
+    const pkgWithMargin = { ...pkg, final_price_eur: pkg.final_price_eur! * (1 + margin) };
+    setCart((prev) => [...prev, pkgWithMargin]);
+    setShowCartModal(true);
+  }
+
+  function handleAcheter(pkg: Package) {
+    setSelectedPackage(pkg);
+    setShowSimulator(true);
+    setShowRecapModal(true);
+  }
+
+  function handleFormChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  }
+
+  async function handleRecapSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.nom || !form.prenom || !form.email) {
+      setFormError("Merci de remplir tous les champs obligatoires.");
+      return;
+    }
+    if (!selectedPackage) {
+      setFormError("Aucun forfait sélectionné.");
+      return;
+    }
+    if (!selectedPackage.id) {
+      console.error("Missing package ID - selectedPackage:", JSON.stringify(selectedPackage));
+      setFormError("Erreur: Données du forfait incomplètes. Veuillez rafraîchir la page et réessayer.");
+      return;
+    }
+    setFormError(null);
+
+    let promoCodeToSave = null;
+    let basePrice = selectedPackage.final_price_eur!;
+    if (currency === "USD") basePrice = selectedPackage.final_price_usd!;
+    else if (currency === "XPF") basePrice = selectedPackage.final_price_xpf!;
+
+    let finalPrice = basePrice * (1 + margin);
+
+    if (form.codePromo) {
+      const promoResult = await validateAndApplyPromoCode(form.codePromo, finalPrice);
+      if (!promoResult.isValid) {
+        setFormError(promoResult.error || "Code promo invalide");
+        return;
+      }
+      finalPrice = promoResult.discountedPrice;
+      promoCodeToSave = form.codePromo;
+    }
+
+    localStorage.setItem("packageId", selectedPackage.id);
+    localStorage.setItem("customerId", form.email);
+    localStorage.setItem("customerEmail", form.email);
+    localStorage.setItem("customerName", `${form.prenom} ${form.nom}`);
+    if (form.codePromo) localStorage.setItem("promoCode", form.codePromo);
+    if (form.codePartenaire) localStorage.setItem("partnerCode", form.codePartenaire);
+
+    setShowRecapModal(false);
+    try {
+      const response = await fetch("/api/create-checkout-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          first_name: form.prenom,
+          last_name: form.nom,
+          customer_email: form.email,
+          cartItems: [
+            {
+              id: selectedPackage.id,
+              name: selectedPackage.name,
+              description: selectedPackage.description ?? "",
+              price: finalPrice,
+              currency: currency,
+              final_price_eur: selectedPackage.final_price_eur! * (1 + margin),
+              final_price_usd: selectedPackage.final_price_usd! * (1 + margin),
+              final_price_xpf: selectedPackage.final_price_xpf! * (1 + margin),
+              promo_code: promoCodeToSave || undefined,
+              partner_code: form.codePartenaire || undefined,
+            },
+          ],
+        }),
+      });
+
+      const responseData = await response.json();
+      if (!response.ok) {
+        console.error("Checkout session creation failed:", responseData);
+        if (responseData.error === "MISSING_PACKAGE_ID") {
+          setFormError("Erreur: Données du forfait incomplètes. Veuillez rafraîchir la page et réessayer.");
+        } else {
+          setFormError(responseData.message || "Une erreur est survenue. Veuillez réessayer.");
+        }
+        return;
+      }
+
+      const { sessionId } = responseData;
+      if (!sessionId) throw new Error("Session ID not returned from API");
+
+      const stripe = await stripePromise;
+      if (!stripe) throw new Error("Stripe non initialisé");
+      const { error } = await stripe.redirectToCheckout({ sessionId });
+      if (error) throw error;
+    } catch (err) {
+      console.error("Erreur lors de la redirection Stripe:", err);
+      setFormError("Une erreur est survenue lors de la redirection vers le paiement. Veuillez rafraîchir la page et réessayer.");
+    }
+  }
+
+  const handlePrev = () => {
+    setCurrentIndex((prev) => (prev === 0 ? packages.length - 1 : prev - 1));
+  };
+  const handleNext = () => {
+    setCurrentIndex((prev) => (prev === packages.length - 1 ? 0 : prev + 1));
+  };
+
+  const margin = parseFloat(localStorage.getItem("global_margin")!);
+
+  const selectedPackagePrice = () => {
+    let price = selectedPackage?.final_price_eur;
+    let symbol = "€";
+    if (currency === "USD") { price = selectedPackage?.final_price_usd; symbol = "$"; }
+    else if (currency === "XPF") { price = selectedPackage?.final_price_xpf; symbol = "₣"; }
+    const priceWithMargin = price! * (1 + margin);
+    return `${priceWithMargin.toFixed(2)} ${symbol}`;
+  };
+
+  // ── SEO dynamique ──────────────────────────────────────────────────────
+  const seoTitle = regionName
+    ? `eSIM ${regionName} — Forfaits depuis Polynésie française | FENUA SIM`
+    : "Forfait eSIM — FENUA SIM";
+
+  const minPrice = packages.length > 0
+    ? Math.min(...packages.map(p => p.final_price_eur || 999)).toFixed(2)
+    : null;
+
+  const packageCount = packages.length;
+
+  const seoDescription = regionName && minPrice
+    ? `Achetez votre eSIM ${regionName} depuis Tahiti. ${packageCount} forfait${packageCount > 1 ? "s" : ""} disponible${packageCount > 1 ? "s" : ""} à partir de ${minPrice} €. Activation instantanée, couverture 4G/5G, support 7j/7.`
+    : `Forfait eSIM de voyage — Activation instantanée depuis la Polynésie française.`;
+
+  const canonicalSlug = Array.isArray(params?.region) ? params.region[0] : params?.region || "";
+  const canonicalUrl = `https://www.fenuasim.com/shop/${canonicalSlug}`;
 
   return (
-    <div className="min-h-screen bg-white text-slate-900">
-      <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8 lg:py-8">
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-10">
-          <div className="order-1">
-            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-50 shadow-sm">
-              <img
-                src={heroImage}
-                alt={`Forfait eSIM ${title}`}
-                className="h-[260px] w-full object-cover sm:h-[420px] lg:h-[640px]"
-              />
+    <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 lg:py-8 space-y-6 sm:space-y-8 lg:space-y-10">
+    <Head>
+      <title>{seoTitle}</title>
+      <meta name="description" content={seoDescription} />
+      <meta name="keywords" content={regionName ? `eSIM ${regionName}, eSIM ${regionName} Polynésie, eSIM ${regionName} Tahiti, forfait data ${regionName}, acheter eSIM ${regionName}` : "eSIM voyage"} />
+      <link rel="canonical" href={canonicalUrl} />
+      <meta property="og:title" content={seoTitle} />
+      <meta property="og:description" content={seoDescription} />
+      <meta property="og:url" content={canonicalUrl} />
+      {packages[0]?.flag_url && (
+        <meta property="og:image" content={packages[0].flag_url} />
+      )}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "Product",
+          name: regionName ? `eSIM ${regionName} — FENUA SIM` : "eSIM de voyage FENUA SIM",
+          description: seoDescription,
+          brand: { "@type": "Brand", name: "FENUA SIM" },
+          url: canonicalUrl,
+          offers: packages.slice(0, 5).map(pkg => ({
+            "@type": "Offer",
+            name: pkg.package_id || pkg.operator_name || "Forfait eSIM",
+            price: pkg.final_price_eur?.toFixed(2) || "0",
+            priceCurrency: "EUR",
+            availability: "https://schema.org/InStock",
+            seller: { "@type": "Organization", name: "FENUA SIM" }
+          }))
+        })}}
+      />
+    </Head>
+
+      {/* ── Bloc 1 : Présentation destination ── */}
+      <section className="bg-white rounded-xl sm:rounded-2xl shadow-sm p-4 sm:p-6 flex flex-col md:flex-row gap-4 sm:gap-6 lg:gap-8 items-start">
+
+        {/* Destination image — desktop only */}
+        <div className="relative w-1/3 h-[40rem] hidden md:block rounded-lg overflow-hidden flex-shrink-0">
+          <Image src={destinationImage} alt="Region" fill className="object-cover" />
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="absolute bottom-0 left-0 w-full h-1/3 bg-gradient-to-t from-white via-white/30 to-transparent" />
+          </div>
+        </div>
+
+        {/* Right column */}
+        <div className="flex-1 min-w-0 w-full">
+
+          {/* Header row: flag + title + price */}
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+            {/* Flag + title + description */}
+            <div className="flex flex-row items-start gap-3 min-w-0">
+              <div className="flex-shrink-0 pt-1">
+                <img
+                  src={packages[0]?.flag_url ?? ""}
+                  alt={regionName || ""}
+                  width={60}
+                  height={40}
+                  className="rounded object-cover"
+                />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-purple-800 leading-tight">
+                  {regionName}
+                </h1>
+                <p className="text-purple-700 text-sm sm:text-base leading-relaxed mt-1">
+                  {packages[0]?.region_description || "Découvrez nos forfaits eSIM pour cette destination."}
+                </p>
+              </div>
+            </div>
+            {/* Price — always visible */}
+            <div className="text-xl sm:text-2xl font-bold text-purple-700 sm:flex-shrink-0">
+              {selectedPackagePrice()}
             </div>
           </div>
 
-          <div className="order-2 flex flex-col">
-            <div className="mb-4 flex items-start justify-between gap-4">
-              <div>
-                <div className="mb-3 inline-flex items-center rounded-full bg-fuchsia-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-fuchsia-700">
-                  eSIM {title}
-                </div>
-                <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                  {title}
-                </h1>
-                <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
-                  {subtitle}
-                </p>
+          {/* Description + CTA */}
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mt-6">
+            <div className="flex flex-col gap-3">
+              <div className="text-black font-semibold text-sm border rounded-xl text-center py-1 bg-gray-200 w-32">
+                Description
               </div>
-              <div className="shrink-0 rounded-2xl bg-fuchsia-600 px-4 py-3 text-right text-white shadow-sm">
-                <div className="text-xs uppercase tracking-wide text-fuchsia-100">À partir de</div>
-                <div className="text-2xl font-bold">{price}</div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <div className="rounded-2xl border border-slate-200 p-4">
-                <div className="text-sm font-semibold">{computedCoverageLabel}</div>
-                <div className="mt-1 text-xs text-slate-500">Couverture disponible</div>
-              </div>
-              <div className="rounded-2xl border border-slate-200 p-4">
-                <div className="text-sm font-semibold">QR code</div>
-                <div className="mt-1 text-xs text-slate-500">Activation rapide</div>
-              </div>
-              <div className="rounded-2xl border border-slate-200 p-4">
-                <div className="text-sm font-semibold">Data only</div>
-                <div className="mt-1 text-xs text-slate-500">Partage de connexion inclus</div>
-              </div>
-              <div className="rounded-2xl border border-slate-200 p-4">
-                <div className="text-sm font-semibold">Support FR</div>
-                <div className="mt-1 text-xs text-slate-500">Assistance client francophone</div>
+              <div className="flex items-start gap-2 max-w-xs sm:max-w-sm">
+                <svg
+                  className="w-5 h-5 mt-0.5 flex-shrink-0 text-purple-600"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z"
+                    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                  />
+                </svg>
+                <span className="text-gray-700 text-sm">
+                  {/* @ts-ignore */}
+                  {destinationInfo?.[0]?.description ?? "Description"}
+                </span>
               </div>
             </div>
+            <button
+              className="bg-gradient-to-r from-purple-600 to-orange-500 text-white px-5 py-2.5 rounded-xl hover:from-purple-700 hover:to-orange-600 transition-all duration-300 text-sm sm:text-base whitespace-nowrap self-start sm:self-auto"
+              onClick={() => router.push("/compatibilite")}
+            >
+              Vérifier la compatibilité
+            </button>
+          </div>
 
-            <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-              <h2 className="text-lg font-semibold">Pourquoi choisir cette eSIM</h2>
-              <div className="mt-4 grid gap-3">
-                {benefits.map((item) => (
-                  <div key={item} className="flex items-start gap-3 rounded-2xl bg-slate-50 p-3">
-                    <div className="mt-1 h-2.5 w-2.5 rounded-full bg-fuchsia-600" />
-                    <p className="text-sm leading-6 text-slate-700">{item}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
+          {/* Currency selector */}
+          <div className="flex justify-end mt-5">
+            <select
+              value={currency}
+              onChange={(e) => {
+                setCurrency(e.target.value as "EUR" | "XPF" | "USD");
+                localStorage.setItem("currency", e.target.value);
+              }}
+              className="border border-purple-300 text-purple-800 bg-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 shadow-md font-semibold text-sm sm:text-base min-w-[6rem]"
+            >
+              <option value="EUR">€ EUR</option>
+              <option value="XPF">₣ XPF</option>
+              <option value="USD">$ USD</option>
+            </select>
+          </div>
 
-            <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-              <div>
-                <h2 className="text-lg font-semibold">Destinations mises en avant</h2>
-                <p className="mt-1 text-sm text-slate-500">Affichage court, efficace et très lisible sur smartphone</p>
-              </div>
+          {/* ── Carousel ── */}
+          <div className="mt-8 rounded-xl shadow bg-gray-100 p-4 sm:p-6">
+            <h2 className="text-xl sm:text-2xl text-purple-800 font-bold mb-4 sm:mb-6">
+              Forfaits disponibles
+            </h2>
 
-              <div className="mt-4 flex flex-wrap gap-2">
-                {displayedFeatured.map((country) => (
-                  <span
-                    key={country}
-                    className="rounded-full border border-fuchsia-200 bg-fuchsia-50 px-3 py-1.5 text-sm font-medium text-fuchsia-700"
-                  >
-                    {country}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-              <details className="group">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
-                  <div>
-                    <h2 className="text-lg font-semibold">Voir la couverture complète</h2>
-                    <p className="mt-1 text-sm text-slate-500">Liste propre, classée alphabétiquement et scrollable</p>
-                  </div>
-                  <div className="rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 group-open:hidden">
-                    Ouvrir
-                  </div>
-                  <div className="hidden rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 group-open:block">
-                    Réduire
-                  </div>
-                </summary>
-
-                <div className="mt-5 max-h-[340px] overflow-y-auto pr-1">
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-2">
-                    {sortedCountries.map((country) => (
-                      <div
-                        key={country}
-                        className="flex items-center gap-2 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 text-sm text-slate-700"
-                      >
-                        <span className="h-2 w-2 rounded-full bg-fuchsia-600" />
-                        <span>{country}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </details>
-            </div>
-
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <button className="inline-flex items-center justify-center rounded-2xl bg-fuchsia-600 px-5 py-4 text-sm font-semibold text-white shadow-sm transition hover:opacity-95">
-                {ctaPrimary}
+            <div className="relative flex items-center justify-center px-8 sm:px-10">
+              {/* Left Arrow */}
+              <button
+                onClick={handlePrev}
+                className="absolute left-0 z-10 bg-white border border-gray-200 rounded-full p-1.5 sm:p-2 shadow hover:bg-purple-50 transition disabled:opacity-50"
+                style={{ top: "50%", transform: "translateY(-50%)" }}
+                aria-label="Précédent"
+                disabled={packages.length <= (isMobile ? 1 : 2)}
+              >
+                <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M13 16l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
               </button>
-              <button className="inline-flex items-center justify-center rounded-2xl border border-slate-300 px-5 py-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
-                {ctaSecondary}
+
+              {/* Cards */}
+              {packages.length > 0 && (
+                <div className="w-full flex justify-center gap-3 sm:gap-4">
+                  {packages
+                    .slice(currentIndex, currentIndex + (isMobile ? 1 : 2))
+                    .map((pkg) => {
+                      let price = pkg.final_price_eur;
+                      let symbol = "€";
+                      if (currency === "USD") { price = pkg.final_price_usd; symbol = "$"; }
+                      else if (currency === "XPF") { price = pkg.final_price_xpf; symbol = "₣"; }
+                      const priceWithMargin = price! * (1 + margin);
+
+                      return (
+                        <div
+                          key={pkg.id}
+                          className={`flex-1 min-w-0 bg-white rounded-xl border-2 p-4 sm:p-6 flex flex-col items-center shadow transition-all duration-200 cursor-pointer ${
+                            selectedPackage?.id === pkg.id
+                              ? "border-purple-500 shadow-lg"
+                              : "border-gray-100 hover:border-purple-300"
+                          }`}
+                          onClick={() => setSelectedPackage(pkg)}
+                        >
+                          {/* Flag & Name */}
+                          <div className="flex items-center gap-2 sm:gap-3 mb-3">
+                            <img
+                              src={pkg.image_url}
+                              alt={""}
+                              width={36}
+                              height={26}
+                              className="rounded object-cover border"
+                            />
+                            <h3 className="text-base sm:text-lg font-bold text-purple-800 text-center">
+                              {pkg.name}
+                            </h3>
+                          </div>
+                          {/* Badges */}
+                          <div className="flex flex-wrap gap-1.5 mb-3 justify-center">
+                            <span className="text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full font-bold">
+                              {pkg.includes_voice ? "Appels inclus" : "Pas d'appels"}
+                            </span>
+                            <span className="text-xs bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full font-bold">
+                              {pkg.includes_sms ? "SMS inclus" : "Pas de SMS"}
+                            </span>
+                          </div>
+                          {/* Description */}
+                          <div className="text-gray-700 text-xs sm:text-sm mb-3 text-center min-h-[36px]">
+                            {pkg.description}
+                          </div>
+                          {/* Price */}
+                          <div className="text-lg sm:text-xl font-bold text-purple-700 mb-4">
+                            {priceWithMargin && priceWithMargin > 0 ? (
+                              `${priceWithMargin.toFixed(2)} ${symbol}`
+                            ) : (
+                              <span className="text-gray-400">Prix indisponible</span>
+                            )}
+                          </div>
+                          {/* Buy Button */}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleAcheter(pkg); }}
+                            className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-orange-500 text-white font-semibold rounded-xl hover:from-purple-700 hover:to-orange-600 transition-all duration-300 text-sm sm:text-base"
+                          >
+                            Acheter - Paiement Sécurisé
+                          </button>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+
+              {/* Right Arrow */}
+              <button
+                onClick={handleNext}
+                className="absolute right-0 z-10 bg-white border border-gray-200 rounded-full p-1.5 sm:p-2 shadow hover:bg-purple-50 transition disabled:opacity-50"
+                style={{ top: "50%", transform: "translateY(-50%)" }}
+                aria-label="Suivant"
+                disabled={packages.length <= (isMobile ? 1 : 2)}
+              >
+                <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M7 4l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Dot indicators */}
+            <div className="flex justify-center mt-4 gap-2 flex-wrap">
+              {packages.map((_, idx) => (
+                <button
+                  key={idx}
+                  className={`w-2.5 h-2.5 rounded-full transition-colors ${idx === currentIndex ? "bg-purple-600" : "bg-gray-300"}`}
+                  onClick={() => setCurrentIndex(idx)}
+                  aria-label={`Aller au forfait ${idx + 1}`}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Rechargeable notice */}
+          <div className="mt-5 p-3 text-gray-600 text-sm font-semibold rounded-lg shadow bg-gray-100">
+            Tous les forfaits sont rechargeables après commande depuis votre espace client
+          </div>
+        </div>
+      </section>
+
+      {/* ── Bloc 2 : Que faire avec XX Go ? ── */}
+      {selectedPackage &&
+      typeof selectedPackage.data_amount === "number" &&
+      selectedPackage.data_unit ? (
+        <section className="bg-white rounded-xl sm:rounded-2xl shadow-sm p-4 sm:p-6 lg:p-8 text-gray-700">
+          <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 text-center sm:text-left">
+            Que faire avec {selectedPackage.data_amount}{" "}
+            {selectedPackage.data_unit?.toLowerCase() === "gb" ? "Go" : selectedPackage.data_unit || "Go"} ?
+          </h2>
+          {(() => {
+            const tips = getDataTip(selectedPackage.data_amount, selectedPackage.data_unit);
+            return (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+                <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-3 sm:p-5 text-center">
+                  <Camera className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2 text-purple-600" />
+                  <h3 className="font-semibold mb-1 text-sm">Photos</h3>
+                  <p className="text-purple-700 text-xs sm:text-sm">{tips.photo} photos</p>
+                </div>
+                <div className="bg-gradient-to-br from-purple-100 to-pink-100 rounded-xl p-3 sm:p-5 text-center">
+                  <Globe className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2 text-purple-600" />
+                  <h3 className="font-semibold mb-1 text-sm">Navigation</h3>
+                  <p className="text-purple-700 text-xs sm:text-sm">{tips.web} heures</p>
+                </div>
+                <div className="bg-gradient-to-br from-pink-100 to-red-100 rounded-xl p-3 sm:p-5 text-center">
+                  <Video className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2 text-purple-600" />
+                  <h3 className="font-semibold mb-1 text-sm">Vidéo</h3>
+                  <p className="text-purple-700 text-xs sm:text-sm">{tips.video} heures</p>
+                </div>
+                <div className="bg-gradient-to-br from-red-100 to-orange-100 rounded-xl p-3 sm:p-5 text-center">
+                  <MessageSquare className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2 text-purple-600" />
+                  <h3 className="font-semibold mb-1 text-sm">Messages</h3>
+                  <p className="text-purple-700 text-xs sm:text-sm">{tips.chat} messages</p>
+                </div>
+                <div className="bg-gradient-to-br from-orange-100 to-orange-50 rounded-xl p-3 sm:p-5 text-center col-span-2 sm:col-span-1">
+                  <svg className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                  </svg>
+                  <h3 className="font-semibold mb-1 text-sm">Appels</h3>
+                  <p className="text-purple-700 text-xs sm:text-sm">{tips.calls} heures</p>
+                  <p className="text-xs text-purple-700 mt-1">WhatsApp/Messenger</p>
+                </div>
+              </div>
+            );
+          })()}
+        </section>
+      ) : null}
+
+      {/* ── Bloc 3 : Comment activer ma eSIM ? ── */}
+      <section className="bg-white rounded-xl sm:rounded-2xl shadow-sm p-4 sm:p-6 lg:p-8 text-gray-800">
+        <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 text-center sm:text-left">
+          Comment activer ma eSIM ?
+        </h2>
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          {[
+            { step: "1", title: "Scanner le QR code", desc: "Scannez le QR code reçu par email." },
+            { step: "2", title: "Aller dans les réglages", desc: "Ouvrez les réglages de votre téléphone." },
+            { step: "3", title: "Activer la ligne eSIM", desc: "Ajoutez et activez la ligne eSIM dans les réglages." },
+            { step: "4", title: "Confirmation", desc: "Votre eSIM est prête à être utilisée !" },
+          ].map(({ step, title, desc }) => (
+            <div key={step} className="flex flex-col items-center text-center">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-purple-100 rounded-full flex items-center justify-center mb-3">
+                <span className="text-base sm:text-xl font-bold text-purple-600">{step}</span>
+              </div>
+              <h3 className="font-semibold mb-1.5 text-xs sm:text-base leading-snug">{title}</h3>
+              <p className="text-purple-700 text-xs sm:text-sm">{desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Modal panier ── */}
+      {showCartModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8 max-w-sm w-full text-center">
+            <h2 className="text-xl sm:text-2xl font-bold mb-4 text-purple-700">Ajouté au panier !</h2>
+            <p className="mb-6 text-sm sm:text-base">
+              Le forfait{" "}
+              <span className="font-semibold">
+                {selectedPackage?.data_amount} {selectedPackage?.data_unit}
+              </span>{" "}
+              a bien été ajouté à votre panier.
+            </p>
+            <div className="flex flex-col gap-3">
+              <button
+                className="w-full bg-gradient-to-r from-purple-600 to-pink-500 text-white py-3 px-4 rounded-xl font-semibold hover:from-purple-700 hover:to-pink-600 transition-all duration-300 text-sm sm:text-base"
+                onClick={() => router.push("/cart")}
+              >
+                Voir le panier
+              </button>
+              <button
+                className="w-full border border-purple-200 text-purple-700 py-3 px-4 rounded-xl font-semibold hover:bg-purple-50 transition-all duration-300 text-sm sm:text-base"
+                onClick={() => setShowCartModal(false)}
+              >
+                Continuer mes achats
               </button>
             </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* ── Modal récapitulatif + formulaire ── */}
+      {showRecapModal && selectedPackage && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-lg p-4 sm:p-6 w-full max-w-md relative animate-fade-in max-h-[95dvh] overflow-y-auto">
+            <button
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-2xl font-bold leading-none"
+              onClick={() => setShowRecapModal(false)}
+              aria-label="Fermer"
+            >
+              ×
+            </button>
+            <h2 className="text-xl sm:text-2xl font-bold mb-4 text-purple-700 pr-8">
+              Récapitulatif de la commande
+            </h2>
+
+            <div className="mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-base sm:text-lg font-bold">
+                  {selectedPackage.data_amount}{" "}
+                  {selectedPackage.data_unit === "GB" ? "Go" : selectedPackage.data_unit}
+                </span>
+                {selectedPackage.operator_logo_url ? (
+                  <Image
+                    src={selectedPackage.operator_logo_url}
+                    alt={selectedPackage.operator_name || ""}
+                    width={24}
+                    height={24}
+                    className="rounded-full bg-white border border-gray-100"
+                  />
+                ) : (
+                  <span className="text-xs text-gray-400">{selectedPackage.operator_name}</span>
+                )}
+              </div>
+              <div className="text-gray-500 text-sm mb-1">
+                {selectedPackage.slug &&
+                  selectedPackage.slug
+                    .replace(/days?/gi, "jours")
+                    .replace(/gb/gi, "Go")}
+              </div>
+              <div className="flex gap-1 flex-wrap text-xs mb-2">
+                <span className={`px-2 py-0.5 rounded-full font-semibold ${selectedPackage.includes_sms ? "bg-orange-50 text-orange-700" : "bg-gray-100 text-gray-400"}`}>
+                  SMS {selectedPackage.includes_sms ? "Oui" : "Non"}
+                </span>
+                <span className={`px-2 py-0.5 rounded-full font-semibold ${selectedPackage.includes_voice ? "bg-blue-50 text-blue-700" : "bg-gray-100 text-gray-400"}`}>
+                  Appels {selectedPackage.includes_voice ? "Oui" : "Non"}
+                </span>
+              </div>
+              <div className="text-xl font-bold text-gray-900 mb-2">
+                {(() => {
+                  let price = selectedPackage.final_price_eur! * (1 + margin);
+                  let symbol = "€";
+                  if (currency === "USD") { price = selectedPackage.final_price_usd! * (1 + margin); symbol = "$"; }
+                  else if (currency === "XPF") { price = selectedPackage.final_price_xpf! * (1 + margin); symbol = "₣"; }
+                  return `${price.toFixed(2)} ${symbol}`;
+                })()}
+              </div>
+            </div>
+
+            <form onSubmit={handleRecapSubmit} className="space-y-3">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  name="prenom"
+                  placeholder="Prénom *"
+                  value={form.prenom}
+                  onChange={handleFormChange}
+                  className="w-1/2 border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-900 placeholder-gray-500 text-base"
+                  style={{ WebkitTextFillColor: "#111827", opacity: 1, color: "#111827" }}
+                  required
+                />
+                <input
+                  type="text"
+                  name="nom"
+                  placeholder="Nom *"
+                  value={form.nom}
+                  onChange={handleFormChange}
+                  className="w-1/2 border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-900 placeholder-gray-500 text-base"
+                  style={{ WebkitTextFillColor: "#111827", color: "#111827" } as React.CSSProperties}
+                  required
+                />
+              </div>
+              <input
+                type="email"
+                name="email"
+                placeholder="Email *"
+                value={form.email}
+                onChange={handleFormChange}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-900 placeholder-gray-500 text-base"
+                style={{ WebkitTextFillColor: "#111827", color: "#111827" } as React.CSSProperties}
+                required
+              />
+              <input
+                type="text"
+                name="codePromo"
+                placeholder="Code promo (optionnel)"
+                value={form.codePromo}
+                onChange={handleFormChange}
+                readOnly={isFromPartnerLink && !!form.codePromo}
+                className={`w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-900 placeholder-gray-500 text-base ${isFromPartnerLink && form.codePromo ? "bg-gray-100 cursor-not-allowed" : ""}`}
+                style={{ WebkitTextFillColor: "#111827", color: "#111827" } as React.CSSProperties}
+              />
+              <input
+                type="text"
+                name="codePartenaire"
+                placeholder="Code partenaire (optionnel)"
+                value={form.codePartenaire}
+                onChange={handleFormChange}
+                readOnly={isFromPartnerLink && !!form.codePartenaire}
+                className={`w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-900 placeholder-gray-500 text-base ${isFromPartnerLink && form.codePartenaire ? "bg-gray-100 cursor-not-allowed" : ""}`}
+                style={{ WebkitTextFillColor: "#111827", color: "#111827" } as React.CSSProperties}
+              />
+              {formError && (
+                <div className="text-red-500 text-sm">{formError}</div>
+              )}
+              <button
+                type="submit"
+                className="w-full bg-gradient-to-r from-purple-600 to-orange-500 text-white py-3 px-4 rounded-xl font-bold text-base sm:text-lg shadow-md hover:from-purple-700 hover:to-orange-600 transition"
+              >
+                Payer
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

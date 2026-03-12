@@ -142,7 +142,7 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType = 'av
     doc.setTextColor(...purple1);
     doc.setFontSize(13);
     doc.setFont("helvetica", "bold");
-    doc.text("AVA Tourist Card", margin + 5, y + 9);
+    doc.text(productType === "ava_carte_sante" ? "AVA Carte Santé" : "AVA Tourist Card", margin + 5, y + 9);
     doc.setTextColor(...grayMd);
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
@@ -333,7 +333,7 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType = 'av
     doc.setFontSize(6.5);
     const mentions = [
       "Ce document est un devis non contractuel etabli sur la base des informations fournies.",
-      "L'assurance AVA Tourist Card est distribuee par FENUASIM, partenaire d'ANSET ASSURANCES.",
+      `L'assurance ${productType === 'ava_carte_sante' ? 'AVA Carte Sante' : 'AVA Tourist Card'} est distribuee par FENUASIM, partenaire d'ANSET ASSURANCES.`,
       "La souscription definitive est conditionnee au paiement et a la validation du contrat.",
       "FENUASIM est enregistre au registre des intermediaires d'assurance de Polynesie francaise",
       "sous le numero PF 26 012 en qualite de mandataire d'intermediaire d'assurance.",
@@ -374,7 +374,7 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType = 'av
           Vérifiez vos informations avant de payer.
         </p>
         <span className="inline-block mt-2 bg-primary/10 text-primary text-sm font-semibold px-4 py-1 rounded-full">
-          AVA Tourist Card
+          {productType === 'ava_carte_sante' ? '🏥 AVA Carte Santé' : '✈️ AVA Tourist Card'}
         </span>
       </div>
 

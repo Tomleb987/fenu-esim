@@ -229,6 +229,24 @@ export default function InsuranceForm() {
         toast.error("Veuillez remplir tous les champs obligatoires");
         return;
       }
+      // Validation âge
+      if (formData.birthDate) {
+        const birth = new Date(formData.birthDate);
+        const today = new Date();
+        let age = today.getFullYear() - birth.getFullYear();
+        const m = today.getMonth() - birth.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+        if (age < 18) {
+          setErrors({ birthDate: "Âge invalide" });
+          toast.error("Un mineur ne peut pas souscrire seul. L'assuré principal doit avoir au moins 18 ans.");
+          return;
+        }
+        if (selectedProduct === "ava_carte_sante" && age > 65) {
+          setErrors({ birthDate: "Âge invalide" });
+          toast.error("La AVA Carte Santé est réservée aux moins de 65 ans. Veuillez choisir la Tourist Card.");
+          return;
+        }
+      }
     }
 
     if (currentStep === 3) {
@@ -435,7 +453,7 @@ export default function InsuranceForm() {
 
         <div className="mt-8 min-h-[300px]">
           {currentStep === 1 && <TripDetailsStep formData={formData} updateFormData={updateFormData} errors={errors} />}
-          {currentStep === 2 && <PersonalInfoStep formData={formData} updateFormData={updateFormData} errors={errors} />}
+          {currentStep === 2 && <PersonalInfoStep formData={formData} updateFormData={updateFormData} errors={errors} productType={selectedProduct} />}
           {currentStep === 3 && <TravelersStep formData={formData} updateFormData={updateFormData} errors={errors} />}
           {currentStep === 4 && (
             <OptionsStep

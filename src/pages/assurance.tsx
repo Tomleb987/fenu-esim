@@ -2,15 +2,6 @@ import React, { useEffect } from "react";
 import Head from "next/head";
 import InsuranceForm from "@/components/insurance/InsuranceForm";
 
-const GUARANTEES = [
-  { icon: "🚑", label: "Frais médicaux", detail: "jusqu'à 500 000 €" },
-  { icon: "✈️", label: "Rapatriement", detail: "frais réels" },
-  { icon: "🧳", label: "Bagages", detail: "perte & vol" },
-  { icon: "❌", label: "Annulation", detail: "Tout Sauf" },
-  { icon: "⚖️", label: "Resp. civile", detail: "4 500 000 €" },
-  { icon: "🏥", label: "Assistance 24h/7j", detail: "monde entier" },
-];
-
 export default function AssurancePage() {
 
   useEffect(() => {
@@ -45,32 +36,18 @@ export default function AssurancePage() {
             </div>
 
             {/* Titre principal */}
-            <div className="mb-2">
-              <span className="text-sm font-semibold uppercase tracking-widest opacity-70">
+            <div className="mb-3">
+              <span className="text-xl md:text-2xl font-bold uppercase tracking-widest opacity-90">
                 Assurance Voyage
               </span>
             </div>
             <h1 className="text-4xl md:text-6xl font-bold mb-4 tracking-tight drop-shadow-sm">
               Voyagez l'esprit tranquille
             </h1>
-            <p className="text-lg md:text-xl opacity-80 max-w-2xl mx-auto font-light leading-relaxed mb-8">
+            <p className="text-lg md:text-xl opacity-80 max-w-2xl mx-auto font-light leading-relaxed">
               Couverture complète pour les résidents de Polynésie française.
               <br className="hidden md:block" /> Souscription immédiate, contrat délivré en quelques minutes.
             </p>
-
-            {/* Badges garanties */}
-            <div className="flex flex-wrap justify-center gap-2 mt-4">
-              {GUARANTEES.map((g) => (
-                <div
-                  key={g.label}
-                  className="flex items-center gap-1.5 bg-white/15 backdrop-blur-sm border border-white/20 rounded-full px-3 py-1.5 text-xs font-medium shadow-sm"
-                >
-                  <span>{g.icon}</span>
-                  <span className="font-semibold">{g.label}</span>
-                  <span className="opacity-70">· {g.detail}</span>
-                </div>
-              ))}
-            </div>
 
           </div>
         </section>

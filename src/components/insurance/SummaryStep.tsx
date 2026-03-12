@@ -16,6 +16,8 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProp
 
   const EUR_TO_XPF = 119.33;
   const toXPF = (eur: number) => Math.round(eur * EUR_TO_XPF).toLocaleString('fr-FR');
+  const FRAIS_DISTRIBUTION_EUR = 10;
+  const FRAIS_DISTRIBUTION_XPF = 1250;
 
   const getDestinationLabel = (code: string | number) => {
     const codeStr = String(code).trim();
@@ -91,36 +93,42 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProp
     }
 
     // =============================================
-    // EN-TÊTE : bande dégradée simulée (2 rects)
+    // EN-TÊTE : gauche blanc (logo), droite violet
     // =============================================
+    // Fond blanc côté logo
+    doc.setFillColor(255, 255, 255);
+    doc.rect(0, 0, pageW * 0.5, 48, "F");
+    // Fond violet côté infos
     doc.setFillColor(...purple1);
-    doc.rect(0, 0, pageW * 0.6, 48, "F");
-    doc.setFillColor(...purple2);
-    doc.rect(pageW * 0.6, 0, pageW * 0.4, 48, "F");
-    // Bande orange fine en bas de l'entête
+    doc.rect(pageW * 0.5, 0, pageW * 0.5, 48, "F");
+    // Bande orange fine en bas
     doc.setFillColor(...orange);
     doc.rect(0, 46, pageW, 2, "F");
+    // Bordure fine séparatrice
+    doc.setDrawColor(230, 230, 230);
+    doc.setLineWidth(0.3);
+    doc.line(0, 48, pageW, 48);
 
-    // Logo ou texte
+    // Logo sur fond blanc
     if (logoBase64) {
-      doc.addImage(logoBase64, "PNG", margin, 8, 52, 22);
+      doc.addImage(logoBase64, "PNG", margin, 10, 56, 24);
     } else {
-      doc.setTextColor(...white);
+      doc.setTextColor(...purple1);
       doc.setFontSize(22);
       doc.setFont("helvetica", "bold");
-      doc.text("FENUASIM", margin, 22);
+      doc.text("FENUASIM", margin, 28);
     }
 
-    // Titre + date à droite
+    // Titre + date sur fond violet
     doc.setTextColor(...white);
-    doc.setFontSize(10);
+    doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
     doc.text("ASSURANCE VOYAGE", pageW - margin, 16, { align: "right" });
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
-    doc.text("Devis personnalise", pageW - margin, 23, { align: "right" });
-    doc.text("Emis le " + format(new Date(), "dd/MM/yyyy", { locale: fr }), pageW - margin, 30, { align: "right" });
-    doc.text("Valable 30 jours", pageW - margin, 37, { align: "right" });
+    doc.text("Devis personnalise", pageW - margin, 24, { align: "right" });
+    doc.text("Emis le " + format(new Date(), "dd/MM/yyyy", { locale: fr }), pageW - margin, 31, { align: "right" });
+    doc.text("Valable 30 jours", pageW - margin, 38, { align: "right" });
 
     let y = 58;
 
@@ -256,11 +264,37 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProp
     y += 4;
 
     // =============================================
-    // TOTAL — carte dégradée
+    // TOTAL — lignes détaillées + carte dégradée
     // =============================================
+    const EUR_TO_XPF_LOCAL = 119.33;
+    const FRAIS_PDF = 10;
+    const FRAIS_PDF_XPF = 1250;
+    const eurVal = quote ? quote.premium : 0;
+    const totalEur = eurVal + FRAIS_PDF;
+    const totalXpf = Math.round(eurVal * EUR_TO_XPF_LOCAL) + FRAIS_PDF_XPF;
+
+    // Ligne prime AVA
+    doc.setTextColor(...grayMd);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.text("Prime d'assurance AVA", margin + 3, y);
+    doc.setTextColor(...grayDk);
+    doc.setFont("helvetica", "bold");
+    doc.text(eurVal.toFixed(2) + " EUR", pageW - margin - 3, y, { align: "right" });
+    y += 7;
+
+    // Ligne frais distribution
+    doc.setTextColor(...grayMd);
+    doc.setFont("helvetica", "normal");
+    doc.text("Frais de distribution FENUASIM", margin + 3, y);
+    doc.setTextColor(...grayDk);
+    doc.setFont("helvetica", "bold");
+    doc.text(FRAIS_PDF.toFixed(2) + " EUR", pageW - margin - 3, y, { align: "right" });
+    y += 9;
+
+    // Carte total
     doc.setFillColor(...purple1);
     doc.roundedRect(margin, y, colW, 22, 3, 3, "F");
-    // accent orange à droite
     doc.setFillColor(...orange);
     doc.roundedRect(margin + colW - 40, y, 40, 22, 3, 3, "F");
     doc.setFillColor(...orange);
@@ -272,21 +306,15 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProp
     doc.text("TOTAL ESTIME TTC", margin + 5, y + 8);
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
-    doc.text("Cotisation annuelle tout compris", margin + 5, y + 15);
+    doc.text("Prime + frais de distribution", margin + 5, y + 15);
 
-    const EUR_TO_XPF_LOCAL = 119.33;
-    const eurVal = quote ? quote.premium : 0;
-    const xpfVal = Math.round(eurVal * EUR_TO_XPF_LOCAL);
-    const xpfStr = xpfVal.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-    const eurStr = eurVal.toFixed(2) + " EUR";
-    const xpfDisplay = "~ " + xpfStr + " XPF";
-
+    const xpfStr = totalXpf.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.text(eurStr, pageW - margin - 5, y + 10, { align: "right" });
+    doc.text(totalEur.toFixed(2) + " EUR", pageW - margin - 5, y + 10, { align: "right" });
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    doc.text(xpfDisplay, pageW - margin - 5, y + 17, { align: "right" });
+    doc.text("~ " + xpfStr + " XPF", pageW - margin - 5, y + 17, { align: "right" });
     y += 30;
 
     // =============================================
@@ -428,23 +456,46 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProp
         </div>
 
         {/* TOTAL */}
-        <div className="flex justify-between items-center pt-4 mt-2 border-t border-gray-200 bg-white p-4 rounded-lg shadow-sm">
-          <span className="font-bold text-lg text-gray-900">Total à payer</span>
-          <div className="text-right">
-            {isLoadingQuote ? (
-              <span className="text-sm italic text-primary animate-pulse">Calcul en cours...</span>
-            ) : (
-              <div className="text-right">
-                <span className="font-bold text-3xl text-primary block">
+        <div className="pt-4 mt-2 border-t border-gray-200 bg-white p-4 rounded-lg shadow-sm space-y-2">
+          {/* Ligne prime AVA */}
+          <div className="flex justify-between items-center">
+            <span className="text-gray-600 text-sm">Prime d'assurance AVA</span>
+            <div className="text-right">
+              {isLoadingQuote ? (
+                <span className="text-sm italic text-primary animate-pulse">Calcul en cours...</span>
+              ) : (
+                <span className="font-medium text-gray-900">
                   {quote ? `${quote.premium.toFixed(2)} €` : "-- €"}
                 </span>
-                {quote && (
-                  <span className="text-sm text-gray-400 font-normal">
-                    ≈ {toXPF(quote.premium)} XPF
-                  </span>
+              )}
+            </div>
+          </div>
+          {/* Ligne frais distribution */}
+          <div className="flex justify-between items-center">
+            <span className="text-gray-600 text-sm">Frais de distribution FENUASIM</span>
+            <span className="font-medium text-gray-900">{FRAIS_DISTRIBUTION_EUR.toFixed(2)} €</span>
+          </div>
+          {/* Séparateur */}
+          <div className="border-t border-dashed border-gray-200 pt-2 mt-1">
+            <div className="flex justify-between items-center">
+              <span className="font-bold text-lg text-gray-900">Total à payer</span>
+              <div className="text-right">
+                {isLoadingQuote ? (
+                  <span className="text-sm italic text-primary animate-pulse">Calcul en cours...</span>
+                ) : (
+                  <div className="text-right">
+                    <span className="font-bold text-3xl text-primary block">
+                      {quote ? `${(quote.premium + FRAIS_DISTRIBUTION_EUR).toFixed(2)} €` : "-- €"}
+                    </span>
+                    {quote && (
+                      <span className="text-sm text-gray-400 font-normal">
+                        ≈ {(toXPF(quote.premium + FRAIS_DISTRIBUTION_EUR))} XPF
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
+            </div>
           </div>
         </div>
 

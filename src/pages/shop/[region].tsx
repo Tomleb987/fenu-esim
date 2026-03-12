@@ -537,22 +537,40 @@ export default function RegionPage() {
               <div className="text-black font-semibold text-sm border rounded-xl text-center py-1 bg-gray-200 w-32">
                 Description
               </div>
-              <div className="flex items-start gap-2 max-w-xs sm:max-w-sm">
-                <svg
-                  className="w-5 h-5 mt-0.5 flex-shrink-0 text-purple-600"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z"
-                    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                  />
-                </svg>
-                <span className="text-gray-700 text-sm">
-                  {/* @ts-ignore */}
-                  {destinationInfo?.[0]?.description ?? "Description"}
-                </span>
+              <div className="max-w-lg">
+                {(() => {
+                  const raw = destinationInfo?.[0]?.description ?? "";
+                  if (!raw) return null;
+                  // Séparer intro (avant la liste de pays) du reste
+                  const dotIdx = raw.indexOf(". frique"); // coupure connue dans les données
+                  const commaCount = (raw.match(/,/g) || []).length;
+                  const isCountryList = commaCount > 10;
+                  if (isCountryList) {
+                    // Trouver où commence la liste de pays (mot avec virgule suivante)
+                    const parts = raw.split(/(?<=\.) /);
+                    const intro = parts.slice(0, -1).join(" ");
+                    const countryStr = parts[parts.length - 1] || raw;
+                    const countries = countryStr.split(",").map((c: string) => c.trim()).filter(Boolean);
+                    return (
+                      <div className="space-y-3">
+                        {intro && (
+                          <p className="text-gray-700 text-sm leading-relaxed">{intro}</p>
+                        )}
+                        <div>
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Pays couverts ({countries.length})</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {countries.map((country: string, i: number) => (
+                              <span key={i} className="inline-block bg-purple-50 text-purple-700 text-xs px-2 py-0.5 rounded-full border border-purple-100">
+                                {country}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return <p className="text-gray-700 text-sm leading-relaxed">{raw}</p>;
+                })()}
               </div>
             </div>
             <button

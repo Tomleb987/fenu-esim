@@ -384,10 +384,10 @@ export default function InsuranceForm() {
               })}
             </div>
             {/* Lien aide */}
-            <div className="text-center mt-2">
+            <div className="text-center mt-3">
               <button
                 onClick={() => setTooltip("compare")}
-                className="text-xs text-primary underline underline-offset-2 hover:opacity-70 transition-opacity"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-primary bg-primary/8 hover:bg-primary/15 border border-primary/20 px-4 py-2 rounded-full transition-all hover:scale-[1.02]"
               >
                 🤔 Quelle différence entre les deux ?
               </button>

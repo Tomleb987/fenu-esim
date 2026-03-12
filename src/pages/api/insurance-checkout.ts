@@ -8,14 +8,10 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2023-10-16",
 });
 
-type CheckoutSuccess = {
-  url: string | null;
-};
+const FRAIS_DISTRIBUTION = 10; // € — frais FENUASIM
 
-type CheckoutError = {
-  error: string;
-  details?: unknown;
-};
+type CheckoutSuccess = { url: string | null };
+type CheckoutError = { error: string; details?: unknown };
 
 export default async function handler(
   req: NextApiRequest,
@@ -63,21 +59,24 @@ export default async function handler(
       });
     }
 
-    // 2️⃣ Montant : priorité à ce que renvoie AVA, sinon fallback sur `amount` du front
-    let price = typeof avaResult.montant_total === "number"
+    // 2️⃣ Prime AVA : priorité à ce que renvoie AVA, sinon fallback sur `amount` du front
+    let premiumAva = typeof avaResult.montant_total === "number"
       ? avaResult.montant_total
       : amount;
 
-    price = Number(price);
+    premiumAva = Number(premiumAva);
 
-    if (!Number.isFinite(price) || price <= 0) {
+    if (!Number.isFinite(premiumAva) || premiumAva <= 0) {
       return res.status(400).json({
         error: "Montant de prime invalide",
         details: { montant_total: avaResult.montant_total, amount },
       });
     }
 
-    // 3️⃣ Enregistrement dans Supabase
+    // 3️⃣ Total = prime AVA + frais distribution
+    const totalTtc = premiumAva + FRAIS_DISTRIBUTION;
+
+    // 4️⃣ Enregistrement dans Supabase
     const { data: insertData, error: supaError } = await supabaseAdmin
       .from("insurances")
       .insert({
@@ -87,24 +86,24 @@ export default async function handler(
         product_type: quoteData.productType,
         adhesion_number: adhesionNumber,
         contract_number: contractNumber,
-        total_amount: price,
+        premium_ava: premiumAva,
+        frais_distribution: FRAIS_DISTRIBUTION,
+        total_amount: totalTtc,
         contract_link: contractLink,
         status: "pending_payment",
         start_date: quoteData.startDate ?? null,
         end_date: quoteData.endDate ?? null,
-        ava_raw: avaResult.raw ?? null, // optionnel si tu as une colonne JSON
+        ava_raw: avaResult.raw ?? null,
       })
       .select()
       .single();
 
     if (supaError) {
       console.error("❌ Supabase insert error:", supaError);
-      return res
-        .status(500)
-        .json({ error: "Erreur enregistrement Supabase", details: supaError });
+      return res.status(500).json({ error: "Erreur enregistrement Supabase", details: supaError });
     }
 
-    // 4️⃣ Création session Stripe Checkout
+    // 5️⃣ Création session Stripe Checkout (total TTC)
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
     if (!baseUrl) {
       return res.status(500).json({
@@ -121,11 +120,19 @@ export default async function handler(
             currency: "eur",
             product_data: {
               name: `Assurance AVA – ${adhesionNumber}`,
-              description: contractNumber
-                ? `Contrat ${contractNumber}`
-                : undefined,
+              description: contractNumber ? `Contrat ${contractNumber}` : undefined,
             },
-            unit_amount: Math.round(price * 100),
+            unit_amount: Math.round(premiumAva * 100),
+          },
+          quantity: 1,
+        },
+        {
+          price_data: {
+            currency: "eur",
+            product_data: {
+              name: "Frais de distribution FENUASIM",
+            },
+            unit_amount: Math.round(FRAIS_DISTRIBUTION * 100),
           },
           quantity: 1,
         },

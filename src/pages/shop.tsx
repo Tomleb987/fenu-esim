@@ -1,5 +1,6 @@
 "use client";
 
+import Head from "next/head";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router"; // ✅ Pages Router
 import { supabase } from "@/lib/supabaseClient";
@@ -536,6 +537,34 @@ export default function Shop() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-orange-50">
+      <Head>
+        <title>Acheter une eSIM de voyage — Boutique FENUA SIM | Polynésie française</title>
+        <meta name="description" content="Choisissez votre eSIM parmi 180+ destinations. Forfaits data pour USA, Europe, Japon, Australie et plus. Livraison instantanée par email. Idéal pour les voyageurs partant de Tahiti." />
+        <meta name="keywords" content="acheter eSIM, eSIM voyage Tahiti, eSIM USA Polynésie, eSIM Europe, eSIM Japon, forfait data étranger, eSIM pas cher" />
+        <link rel="canonical" href="https://www.fenuasim.com/shop" />
+        <meta property="og:title" content="Boutique eSIM — FENUA SIM | 180+ destinations depuis la Polynésie" />
+        <meta property="og:description" content="180+ destinations, activation instantanée, support 7j/7. L'eSIM pensée pour les résidents de Polynésie française." />
+        <meta property="og:url" content="https://www.fenuasim.com/shop" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "ItemList",
+            name: "Forfaits eSIM de voyage FENUA SIM",
+            description: "Boutique en ligne d'eSIM de voyage pour les résidents de Polynésie française",
+            url: "https://www.fenuasim.com/shop",
+            numberOfItems: 180,
+            itemListElement: [
+              { "@type": "ListItem", position: 1, name: "eSIM États-Unis", url: "https://www.fenuasim.com/shop/united-states" },
+              { "@type": "ListItem", position: 2, name: "eSIM Europe", url: "https://www.fenuasim.com/shop/europe" },
+              { "@type": "ListItem", position: 3, name: "eSIM Japon", url: "https://www.fenuasim.com/shop/japan" },
+              { "@type": "ListItem", position: 4, name: "eSIM Australie", url: "https://www.fenuasim.com/shop/australia" },
+              { "@type": "ListItem", position: 5, name: "eSIM Monde", url: "https://www.fenuasim.com/shop/discover-global" },
+            ]
+          })}}
+        />
+      </Head>
+
       {/* Hero Section */}
       <section className="relative py-12 sm:py-16 lg:py-20 px-4">
         <div className="max-w-7xl mx-auto text-center">
@@ -732,4 +761,3 @@ export default function Shop() {
     </div>
   );
 }
-

@@ -1,4 +1,5 @@
 "use client";
+import Head from "next/head";
 import { useState } from "react";
 import Link from "next/link";
 import {
@@ -44,6 +45,48 @@ export default function GuideCompatibilite() {
 
   return (
     <div className="max-w-4xl mx-auto py-16 px-4 space-y-12">
+      <Head>
+        <title>Compatibilité eSIM — iPhone, Samsung, Pixel | FENUA SIM Polynésie française</title>
+        <meta name="description" content="Vérifiez si votre téléphone est compatible eSIM en 30 secondes. Liste complète iPhone, Samsung Galaxy, Google Pixel. Guide de vérification par marque pour les voyageurs de Polynésie française." />
+        <meta name="keywords" content="compatibilité eSIM, iPhone eSIM compatible, Samsung eSIM, Google Pixel eSIM, téléphone compatible eSIM, vérifier eSIM, *#06#" />
+        <link rel="canonical" href="https://www.fenuasim.com/compatibilite" />
+        <meta property="og:title" content="Mon téléphone est-il compatible eSIM ? | FENUA SIM" />
+        <meta property="og:description" content="Vérifiez la compatibilité eSIM de votre iPhone, Samsung, Google Pixel en 30 secondes. Guide complet par marque." />
+        <meta property="og:url" content="https://www.fenuasim.com/compatibilite" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "HowTo",
+            name: "Comment vérifier si mon téléphone est compatible eSIM",
+            description: "Guide pour vérifier la compatibilité eSIM de votre smartphone en moins d'une minute",
+            totalTime: "PT1M",
+            step: [
+              {
+                "@type": "HowToStep",
+                position: 1,
+                name: "Composer le code universel",
+                text: "Ouvrez l'application Téléphone et composez *#06#. Ce code fonctionne sur iPhone, Samsung, Pixel et tous les autres smartphones."
+              },
+              {
+                "@type": "HowToStep",
+                position: 2,
+                name: "Vérifier la présence d'un EID",
+                text: "Si vous voyez une ligne 'EID' avec un numéro de 32 chiffres, votre téléphone est compatible eSIM. Si vous ne voyez que l'IMEI, il n'est pas compatible."
+              },
+              {
+                "@type": "HowToStep",
+                position: 3,
+                name: "Vérifier le déverrouillage opérateur",
+                text: "Sur iPhone : Réglages → Général → Informations → Verrouillage SIM. Sur Android : Paramètres → À propos → Statut → État du réseau SIM."
+              }
+            ],
+            tool: [
+              { "@type": "HowToTool", name: "Votre smartphone" }
+            ]
+          })}}
+        />
+      </Head>
 
       {/* ── EN-TÊTE ─────────────────────────────────────────────────────────── */}
       <div className="text-center">

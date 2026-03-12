@@ -456,7 +456,7 @@ export default function RegionPage() {
   const canonicalUrl = `https://www.fenuasim.com/shop/${canonicalSlug}`;
 
   return (
-    <>
+    <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 lg:py-8 space-y-6 sm:space-y-8 lg:space-y-10">
     <Head>
       <title>{seoTitle}</title>
       <meta name="description" content={seoDescription} />
@@ -488,7 +488,6 @@ export default function RegionPage() {
         })}}
       />
     </Head>
-    <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 lg:py-8 space-y-6 sm:space-y-8 lg:space-y-10">
 
       {/* ── Bloc 1 : Présentation destination ── */}
       <section className="bg-white rounded-xl sm:rounded-2xl shadow-sm p-4 sm:p-6 flex flex-col md:flex-row gap-4 sm:gap-6 lg:gap-8 items-start">
@@ -928,6 +927,5 @@ export default function RegionPage() {
         </div>
       )}
     </div>
-    </>
   );
 }

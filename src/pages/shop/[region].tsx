@@ -1,5 +1,22 @@
-export default function FenuaSimWorldPage() {
-  const countries = [
+type DestinationPageProps = {
+  title?: string;
+  subtitle?: string;
+  price?: string;
+  heroImage?: string;
+  countries?: string[];
+  featuredCountries?: string[];
+  coverageLabel?: string;
+  benefits?: string[];
+  ctaPrimary?: string;
+  ctaSecondary?: string;
+};
+
+export default function DestinationPage({
+  title = "Monde",
+  subtitle = "Une eSIM simple à activer, pensée pour voyager sans stress et rester connecté dès l’arrivée.",
+  price = "17,00 $",
+  heroImage = "https://images.unsplash.com/photo-1526778548025-fa2f459cd5ce?auto=format&fit=crop&w=1200&q=80",
+  countries = [
     "Afrique du Sud", "Albanie", "Algérie", "Allemagne", "Andorre", "Antilles", "Arabie saoudite",
     "Argentine", "Arménie", "Aruba", "Australie", "Autriche", "Azerbaïdjan", "Bahamas", "Bahreïn",
     "Bangladesh", "Belgique", "Belize", "Biélorussie", "Bolivie", "Botswana", "Brésil", "Bulgarie",
@@ -17,18 +34,21 @@ export default function FenuaSimWorldPage() {
     "Saint-Barthélemy", "Saint-Martin", "Salvador", "Serbie", "Singapour", "Slovaquie", "Slovénie",
     "Sri Lanka", "Suède", "Suisse", "Taïwan", "Tanzanie", "Thaïlande", "Tunisie", "Turquie",
     "Ukraine", "Uruguay", "Vietnam"
-  ];
-
-  const featuredCountries = [
-    "États-Unis",
-    "Japon",
-    "Australie",
-    "Nouvelle-Zélande",
-    "Thaïlande",
-    "Indonésie",
-    "Canada",
-    "Royaume-Uni"
-  ];
+  ],
+  featuredCountries = [],
+  coverageLabel,
+  benefits = [
+    "Connexion activable avant le départ ou à l’arrivée.",
+    "Parfait pour les voyages multi-destinations ou séjours urbains.",
+    "Aucune manipulation compliquée en boutique locale.",
+    "Idéal pour Maps, WhatsApp, mails et partage de connexion."
+  ],
+  ctaPrimary = "Acheter maintenant",
+  ctaSecondary = "Vérifier la compatibilité"
+}: DestinationPageProps) {
+  const sortedCountries = [...countries].sort((a, b) => a.localeCompare(b, "fr"));
+  const displayedFeatured = featuredCountries.length > 0 ? featuredCountries : sortedCountries.slice(0, 8);
+  const computedCoverageLabel = coverageLabel || `${sortedCountries.length}+ destinations`;
 
   return (
     <div className="min-h-screen bg-white text-slate-900">
@@ -37,8 +57,8 @@ export default function FenuaSimWorldPage() {
           <div className="order-1">
             <div className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-50 shadow-sm">
               <img
-                src="https://images.unsplash.com/photo-1526778548025-fa2f459cd5ce?auto=format&fit=crop&w=1200&q=80"
-                alt="Forfait eSIM Monde"
+                src={heroImage}
+                alt={`Forfait eSIM ${title}`}
                 className="h-[260px] w-full object-cover sm:h-[420px] lg:h-[640px]"
               />
             </div>
@@ -48,26 +68,25 @@ export default function FenuaSimWorldPage() {
             <div className="mb-4 flex items-start justify-between gap-4">
               <div>
                 <div className="mb-3 inline-flex items-center rounded-full bg-fuchsia-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-fuchsia-700">
-                  eSIM Monde
+                  eSIM {title}
                 </div>
                 <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                  Restez connecté dans le monde entier
+                  {title}
                 </h1>
                 <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
-                  Une seule eSIM pour voyager plus sereinement, sans chercher de carte SIM locale.
-                  Activation rapide par QR code, connexion fiable et service client en français.
+                  {subtitle}
                 </p>
               </div>
               <div className="shrink-0 rounded-2xl bg-fuchsia-600 px-4 py-3 text-right text-white shadow-sm">
                 <div className="text-xs uppercase tracking-wide text-fuchsia-100">À partir de</div>
-                <div className="text-2xl font-bold">17,00 $</div>
+                <div className="text-2xl font-bold">{price}</div>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <div className="rounded-2xl border border-slate-200 p-4">
-                <div className="text-sm font-semibold">130+ pays</div>
-                <div className="mt-1 text-xs text-slate-500">Couverture internationale</div>
+                <div className="text-sm font-semibold">{computedCoverageLabel}</div>
+                <div className="mt-1 text-xs text-slate-500">Couverture disponible</div>
               </div>
               <div className="rounded-2xl border border-slate-200 p-4">
                 <div className="text-sm font-semibold">QR code</div>
@@ -84,14 +103,9 @@ export default function FenuaSimWorldPage() {
             </div>
 
             <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-              <h2 className="text-lg font-semibold">Pourquoi ce forfait fonctionne mieux</h2>
+              <h2 className="text-lg font-semibold">Pourquoi choisir cette eSIM</h2>
               <div className="mt-4 grid gap-3">
-                {[
-                  "Connexion activable avant le départ ou à l’arrivée.",
-                  "Parfait pour les voyages multi-destinations.",
-                  "Aucune manipulation compliquée en boutique locale.",
-                  "Idéal pour Google Maps, WhatsApp, mails et partage de connexion."
-                ].map((item) => (
+                {benefits.map((item) => (
                   <div key={item} className="flex items-start gap-3 rounded-2xl bg-slate-50 p-3">
                     <div className="mt-1 h-2.5 w-2.5 rounded-full bg-fuchsia-600" />
                     <p className="text-sm leading-6 text-slate-700">{item}</p>
@@ -101,15 +115,13 @@ export default function FenuaSimWorldPage() {
             </div>
 
             <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-semibold">Destinations phares</h2>
-                  <p className="mt-1 text-sm text-slate-500">Les pays les plus recherchés par vos voyageurs</p>
-                </div>
+              <div>
+                <h2 className="text-lg font-semibold">Destinations mises en avant</h2>
+                <p className="mt-1 text-sm text-slate-500">Affichage court, efficace et très lisible sur smartphone</p>
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2">
-                {featuredCountries.map((country) => (
+                {displayedFeatured.map((country) => (
                   <span
                     key={country}
                     className="rounded-full border border-fuchsia-200 bg-fuchsia-50 px-3 py-1.5 text-sm font-medium text-fuchsia-700"
@@ -121,11 +133,11 @@ export default function FenuaSimWorldPage() {
             </div>
 
             <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-              <details open className="group">
+              <details className="group">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
                   <div>
-                    <h2 className="text-lg font-semibold">Tous les pays couverts</h2>
-                    <p className="mt-1 text-sm text-slate-500">Affichage optimisé mobile et lecture plus fluide</p>
+                    <h2 className="text-lg font-semibold">Voir la couverture complète</h2>
+                    <p className="mt-1 text-sm text-slate-500">Liste propre, classée alphabétiquement et scrollable</p>
                   </div>
                   <div className="rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 group-open:hidden">
                     Ouvrir
@@ -137,7 +149,7 @@ export default function FenuaSimWorldPage() {
 
                 <div className="mt-5 max-h-[340px] overflow-y-auto pr-1">
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-2">
-                    {countries.map((country) => (
+                    {sortedCountries.map((country) => (
                       <div
                         key={country}
                         className="flex items-center gap-2 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 text-sm text-slate-700"
@@ -153,15 +165,11 @@ export default function FenuaSimWorldPage() {
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <button className="inline-flex items-center justify-center rounded-2xl bg-fuchsia-600 px-5 py-4 text-sm font-semibold text-white shadow-sm transition hover:opacity-95">
-                Acheter maintenant
+                {ctaPrimary}
               </button>
               <button className="inline-flex items-center justify-center rounded-2xl border border-slate-300 px-5 py-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
-                Vérifier la compatibilité
+                {ctaSecondary}
               </button>
-            </div>
-
-            <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-              Astuce : sur mobile, l’utilisateur voit d’abord l’essentiel, puis peut dérouler la liste complète des pays sans se retrouver face à un gros bloc de texte.
             </div>
           </div>
         </div>

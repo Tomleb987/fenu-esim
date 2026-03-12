@@ -1,4 +1,5 @@
 "use client";
+import Head from "next/head";
 import { usePartnerCodes } from "@/hooks/usePartnerCodes";
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
@@ -436,7 +437,57 @@ export default function RegionPage() {
     return `${priceWithMargin.toFixed(2)} ${symbol}`;
   };
 
+  // ── SEO dynamique ──────────────────────────────────────────────────────
+  const seoTitle = regionName
+    ? `eSIM ${regionName} — Forfaits depuis Polynésie française | FENUA SIM`
+    : "Forfait eSIM — FENUA SIM";
+
+  const minPrice = packages.length > 0
+    ? Math.min(...packages.map(p => p.final_price_eur || 999)).toFixed(2)
+    : null;
+
+  const packageCount = packages.length;
+
+  const seoDescription = regionName && minPrice
+    ? `Achetez votre eSIM ${regionName} depuis Tahiti. ${packageCount} forfait${packageCount > 1 ? "s" : ""} disponible${packageCount > 1 ? "s" : ""} à partir de ${minPrice} €. Activation instantanée, couverture 4G/5G, support 7j/7.`
+    : `Forfait eSIM de voyage — Activation instantanée depuis la Polynésie française.`;
+
+  const canonicalSlug = Array.isArray(params?.region) ? params.region[0] : params?.region || "";
+  const canonicalUrl = `https://www.fenuasim.com/shop/${canonicalSlug}`;
+
   return (
+    <>
+    <Head>
+      <title>{seoTitle}</title>
+      <meta name="description" content={seoDescription} />
+      <meta name="keywords" content={regionName ? `eSIM ${regionName}, eSIM ${regionName} Polynésie, eSIM ${regionName} Tahiti, forfait data ${regionName}, acheter eSIM ${regionName}` : "eSIM voyage"} />
+      <link rel="canonical" href={canonicalUrl} />
+      <meta property="og:title" content={seoTitle} />
+      <meta property="og:description" content={seoDescription} />
+      <meta property="og:url" content={canonicalUrl} />
+      {packages[0]?.flag_url && (
+        <meta property="og:image" content={packages[0].flag_url} />
+      )}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "Product",
+          name: regionName ? `eSIM ${regionName} — FENUA SIM` : "eSIM de voyage FENUA SIM",
+          description: seoDescription,
+          brand: { "@type": "Brand", name: "FENUA SIM" },
+          url: canonicalUrl,
+          offers: packages.slice(0, 5).map(pkg => ({
+            "@type": "Offer",
+            name: pkg.package_id || pkg.operator_name || "Forfait eSIM",
+            price: pkg.final_price_eur?.toFixed(2) || "0",
+            priceCurrency: "EUR",
+            availability: "https://schema.org/InStock",
+            seller: { "@type": "Organization", name: "FENUA SIM" }
+          }))
+        })}}
+      />
+    </Head>
     <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 lg:py-8 space-y-6 sm:space-y-8 lg:space-y-10">
 
       {/* ── Bloc 1 : Présentation destination ── */}
@@ -877,5 +928,6 @@ export default function RegionPage() {
         </div>
       )}
     </div>
+    </>
   );
 }

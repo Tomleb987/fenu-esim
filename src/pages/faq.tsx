@@ -1,4 +1,5 @@
 "use client";
+import Head from "next/head";
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import {
@@ -246,6 +247,31 @@ export default function FAQ() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Head>
+        <title>FAQ eSIM — Toutes vos questions | FENUA SIM Polynésie française</title>
+        <meta name="description" content="Toutes les réponses sur les eSIM de voyage : compatibilité, installation, hotspot, dépannage. Guide complet pour les voyageurs résidents de Polynésie française." />
+        <meta name="keywords" content="FAQ eSIM, comment installer eSIM, eSIM compatible iPhone Samsung, hotspot eSIM, dépannage eSIM, eSIM Tahiti" />
+        <link rel="canonical" href="https://www.fenuasim.com/faq" />
+        <meta property="og:title" content="FAQ eSIM — Toutes vos questions | FENUA SIM" />
+        <meta property="og:description" content="Installation, compatibilité, hotspot, dépannage. Tout ce qu'il faut savoir pour utiliser votre eSIM FENUA SIM sans stress." />
+        <meta property="og:url" content="https://www.fenuasim.com/faq" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            mainEntity: [
+              { "@type": "Question", name: "Qu'est-ce qu'une eSIM exactement ?", acceptedAnswer: { "@type": "Answer", text: "Une eSIM est une carte SIM directement intégrée dans votre téléphone — pas de tiroir à ouvrir, pas de carte à insérer. Vous commandez en ligne, recevez un QR code par email, vous scannez, et vous êtes connecté en 2 minutes." } },
+              { "@type": "Question", name: "Mon téléphone est-il compatible avec l'eSIM ?", acceptedAnswer: { "@type": "Answer", text: "La plupart des smartphones récents sont compatibles : iPhone XR et ultérieurs, Samsung Galaxy S20+, Google Pixel 4 et plus. Tapez *#06# dans l'app Téléphone — si vous voyez un numéro EID, votre téléphone supporte l'eSIM." } },
+              { "@type": "Question", name: "Je garde mon numéro et WhatsApp avec une eSIM ?", acceptedAnswer: { "@type": "Answer", text: "Oui, absolument. L'eSIM gère uniquement vos données mobiles. Votre SIM principale reste en place — votre numéro habituel continue de recevoir appels et SMS, WhatsApp fonctionne normalement." } },
+              { "@type": "Question", name: "Quand installer mon eSIM avant le voyage ?", acceptedAnswer: { "@type": "Answer", text: "Avant de partir, chez vous, en Wi-Fi. La durée du forfait démarre uniquement à la première connexion à l'étranger, pas à l'installation." } },
+              { "@type": "Question", name: "Le partage de connexion (hotspot) fonctionne avec une eSIM FENUA SIM ?", acceptedAnswer: { "@type": "Answer", text: "Oui, sur la plupart de nos forfaits. Vous pouvez partager votre connexion avec un ordinateur ou d'autres téléphones. Prévoyez un forfait généreux si c'est votre usage principal." } },
+              { "@type": "Question", name: "Puis-je recharger mon eSIM en cours de voyage ?", acceptedAnswer: { "@type": "Answer", text: "Oui. Si vous manquez de data, connectez-vous à votre espace client FENUA SIM et achetez une recharge. Elle s'ajoute automatiquement à votre eSIM existante." } },
+              { "@type": "Question", name: "Je n'ai pas internet à l'arrivée, que faire ?", acceptedAnswer: { "@type": "Answer", text: "Vérifiez ces 3 points : 1) Données mobiles sur la ligne eSIM sélectionnée. 2) Itinérance (roaming) activée. 3) Mode avion 10 secondes puis OFF pour forcer la reconnexion." } },
+            ]
+          })}}
+        />
+      </Head>
       <div className="max-w-4xl mx-auto px-4 py-16">
 
         {/* ── EN-TÊTE ───────────────────────────────────────────────────────── */}

@@ -75,13 +75,27 @@ function buildTarificationPayload(data: any): URLSearchParams {
 
   const params = new URLSearchParams();
 
-  params.append('productType', CODE_PRODUIT);
+  const productType = data.productType || CODE_PRODUIT;
+  params.append('productType', productType);
   params.append('journeyStartDate', journeyStartDate);
   params.append('journeyEndDate', journeyEndDate);
   params.append('journeyAmount', String(costPerPerson));
-  params.append('journeyRegion', String(data.destinationRegion || "102"));
+  // journeyRegion uniquement pour ava_pass
+  if (productType === 'ava_pass') {
+    params.append('journeyRegion', String(data.destinationRegion || "102"));
+  }
   params.append('numberAdultCompanions', String(companions.length));
-  params.append('numberChildrenCompanions', "0");
+  // numberChildrenCompanions requis pour ava_carte_sante
+  if (productType === 'ava_carte_sante') {
+    const childCount = companions.filter((c: any) => {
+      const birth = new Date(c.birthDate);
+      const age = (new Date().getFullYear() - birth.getFullYear());
+      return age < 20;
+    }).length;
+    params.append('numberChildrenCompanions', String(childCount));
+  } else {
+    params.append('numberChildrenCompanions', "0");
+  }
   params.append('numberCompanions', String(companions.length));
 
   const sub = data.subscriber || {};
@@ -113,7 +127,8 @@ function buildTarificationPayload(data: any): URLSearchParams {
   
   if (data.options && Array.isArray(data.options)) {
       data.options.forEach((selectedId: string) => {
-          const parentOption = AVA_TOURIST_OPTIONS.find((opt: any) => 
+          const allOptions = getOptionsForProduct(data.productType || CODE_PRODUIT);
+          const parentOption = allOptions.find((opt: any) => 
               opt.id === selectedId || 
               opt.defaultSubOptionId === selectedId || 
               opt.subOptions?.some((sub: any) => sub.id === selectedId)

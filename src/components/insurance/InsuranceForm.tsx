@@ -24,12 +24,20 @@ const PRODUCTS = [
     label: "Tourist Card",
     description: "Assurance voyage tout risques",
     icon: "✈️",
+    tagline: "La plus complète",
+    color: "from-violet-500 to-purple-600",
+    highlights: ["Annulation & bagages", "Frais médicaux 500k€", "Aucune limite d'âge"],
+    price: "Dès 80 €",
   },
   {
     id: "ava_carte_sante",
     label: "Carte Santé",
     description: "Assurance santé à l'étranger",
     icon: "🏥",
+    tagline: "L'essentielle santé",
+    color: "from-emerald-500 to-teal-600",
+    highlights: ["Frais médicaux 500k€", "Sans franchise", "Attestation visa 24h"],
+    price: "Dès 5 €/jour",
   },
 ];
 
@@ -331,21 +339,49 @@ export default function InsuranceForm() {
         {currentStep === 1 && (
           <div className="mb-8">
             <div className="flex gap-3">
-              {PRODUCTS.map((product) => (
-                <button
-                  key={product.id}
-                  onClick={() => handleProductChange(product.id)}
-                  className={`flex-1 flex flex-col items-center gap-1 p-4 rounded-xl border-2 transition-all ${
-                    selectedProduct === product.id
-                      ? "border-primary bg-primary/5 text-primary"
-                      : "border-gray-200 text-gray-500 hover:border-gray-300"
-                  }`}
-                >
-                  <span className="text-2xl">{product.icon}</span>
-                  <span className="font-bold text-sm">{product.label}</span>
-                  <span className="text-xs opacity-70">{product.description}</span>
-                </button>
-              ))}
+              {PRODUCTS.map((product) => {
+                const isSelected = selectedProduct === product.id;
+                return (
+                  <button
+                    key={product.id}
+                    onClick={() => handleProductChange(product.id)}
+                    className={`flex-1 flex flex-col rounded-2xl border-2 transition-all overflow-hidden text-left ${
+                      isSelected
+                        ? "border-primary shadow-lg scale-[1.02]"
+                        : "border-gray-200 hover:border-gray-300 hover:shadow-md"
+                    }`}
+                  >
+                    {/* Header coloré */}
+                    <div className={`bg-gradient-to-r ${product.color} p-4 text-white`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-2xl">{product.icon}</span>
+                        {isSelected && (
+                          <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full font-medium">✓ Sélectionné</span>
+                        )}
+                      </div>
+                      <div className="font-bold text-base">{product.label}</div>
+                      <div className="text-xs opacity-80">{product.tagline}</div>
+                    </div>
+
+                    {/* Corps — visible seulement si sélectionné */}
+                    <div className={`px-4 transition-all duration-300 overflow-hidden ${isSelected ? "py-3 max-h-40" : "max-h-0 py-0"}`}>
+                      <ul className="space-y-1 mb-2">
+                        {product.highlights.map((h, i) => (
+                          <li key={i} className="text-xs text-gray-600 flex items-center gap-1.5">
+                            <span className="text-green-500 font-bold">✓</span> {h}
+                          </li>
+                        ))}
+                      </ul>
+                      <div className="text-xs font-bold text-primary">{product.price}</div>
+                    </div>
+
+                    {/* Prix visible si non sélectionné */}
+                    {!isSelected && (
+                      <div className="px-4 py-2 text-xs text-gray-400">{product.price}</div>
+                    )}
+                  </button>
+                );
+              })}
             </div>
             {/* Lien aide */}
             <div className="text-center mt-2">

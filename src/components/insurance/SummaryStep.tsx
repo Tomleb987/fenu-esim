@@ -328,7 +328,7 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProp
       `L'assurance ${productLabel} est distribuee par FENUASIM, mandataire d'ANSET ASSURANCES.`,
       "ANSET ASSURANCES - 5 avenue du Prince Hinoi, 98713 Papeete - Polynesie francaise.",
       "ANSET ASSURANCES - N° RUIA PF 26 010.",
-      "FENUASIM - N° RUIA PF 26 012 - Mandataire d'intermediaire d'assurance en Polynesie francaise.",
+      "FENUASIM - N° RUIA PF 26 012 - Mandataire d'intermediaire d'assurance.",
       "La souscription definitive est conditionnee au paiement et a la validation du contrat.",
     ];
     mentions.forEach((line, i) => {
@@ -348,7 +348,7 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProp
     doc.setFont("helvetica", "normal");
     doc.text("www.fenuasim.com", margin, pageH - 5);
     doc.text("contact@fenuasim.com", pageW / 2, pageH - 5, { align: "center" });
-    doc.text("Polynesie francaise", pageW - margin, pageH - 5, { align: "right" });
+    
 
     doc.save("Devis-Assurance-FENUASIM-" + format(new Date(), "ddMMyyyy") + ".pdf");
   };

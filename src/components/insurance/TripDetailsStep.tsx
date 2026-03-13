@@ -6,9 +6,11 @@ interface TripDetailsStepProps {
   formData: InsuranceFormData;
   updateFormData: (data: Partial<InsuranceFormData>) => void;
   errors: Record<string, string>;
+  productType?: string;
 }
 
-export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetailsStepProps) => {
+export const TripDetailsStep = ({ formData, updateFormData, errors, productType }: TripDetailsStepProps) => {
+  const isPOM = productType === "avantages_pom";
   const [today, setToday] = useState("");
 
   useEffect(() => {
@@ -112,7 +114,8 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
           </div>
         </div>
 
-        {/* PRIX */}
+        {/* PRIX — masqué pour AVAntages POM */}
+        {!isPOM && (
         <div>
           <label className={labelClass}>Prix total du voyage (€)</label>
           <input
@@ -123,6 +126,7 @@ export const TripDetailsStep = ({ formData, updateFormData, errors }: TripDetail
             onChange={(e) => updateFormData({ tripPrice: parseFloat(e.target.value) || 0 })}
           />
         </div>
+        )}
 
       </div>
     </div>

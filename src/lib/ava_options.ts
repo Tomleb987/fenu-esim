@@ -120,12 +120,19 @@ export const AVA_CARTE_SANTE_OPTIONS: AvaOption[] = [
 ];
 
 // =============================================
+// OPTIONS AVA AVANTAGES POM
+// =============================================
+export const AVA_AVANTAGES_POM_OPTIONS: AvaOption[] = [];
+
+// =============================================
 // HELPER
 // =============================================
 export function getOptionsForProduct(productType: string): AvaOption[] {
   switch (productType) {
     case "ava_carte_sante":
       return AVA_CARTE_SANTE_OPTIONS;
+    case "avantages_pom":
+      return AVA_AVANTAGES_POM_OPTIONS;
     case "ava_tourist_card":
     default:
       return AVA_TOURIST_OPTIONS;

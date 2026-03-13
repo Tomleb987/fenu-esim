@@ -10,9 +10,10 @@ interface SummaryStepProps {
   errors: Record<string, string>;
   quote: { premium: number } | null;
   isLoadingQuote: boolean;
+  productType?: string;
 }
 
-export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProps) => {
+export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: SummaryStepProps) => {
 
   const EUR_TO_XPF = 119.33;
   const toXPF = (eur: number) => Math.round(eur * EUR_TO_XPF).toLocaleString('fr-FR');
@@ -372,7 +373,7 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProp
   };
 
   // ─── Documents dynamiques selon produit et options ───────────────────────
-  const isCarteSante = formData.productType === "ava_carte_sante";
+  const isCarteSante = (productType ?? formData.productType) === "ava_carte_sante";
 
   // Documents contractuels : IPID + CG selon le produit
   const docs = isCarteSante

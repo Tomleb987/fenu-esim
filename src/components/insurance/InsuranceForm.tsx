@@ -39,6 +39,16 @@ const PRODUCTS = [
     highlights: ["Frais médicaux 500k€", "Sans franchise", "Attestation visa 24h"],
     price: "Dès 5 €/jour",
   },
+  {
+    id: "avantages_pom",
+    label: "AVAntages POM",
+    description: "Assurance multirisque annuelle",
+    icon: "🌺",
+    tagline: "Pour les résidents PF",
+    color: "from-orange-400 to-rose-500",
+    highlights: ["Couverture annuelle", "Famille & conjoint", "Assistance rapatriement"],
+    price: "Sur devis",
+  },
 ];
 
 const PRODUCT_DETAILS: Record<string, {
@@ -113,6 +123,26 @@ const PRODUCT_DETAILS: Record<string, {
       },
     ],
     ideal: "Idéal si vous avez déjà une assurance annulation. Couverture santé maximale à prix réduit.",
+  },
+  avantages_pom: {
+    title: "AVAntages POM",
+    subtitle: "Multirisque annuelle — résidents Polynésie française",
+    price: "Sur devis selon profil",
+    ageLimit: "Selon conditions",
+    duration: "Contrat annuel",
+    sections: [
+      {
+        label: "Couvertures incluses",
+        items: [
+          { text: "Frais médicaux à l'étranger", ok: true },
+          { text: "Rapatriement médical", ok: true },
+          { text: "Assistance 24h/24", ok: true },
+          { text: "Responsabilité civile", ok: true },
+          { text: "Couverture famille & conjoint", ok: true },
+        ],
+      },
+    ],
+    ideal: "Idéal pour les résidents polynésiens voyageant régulièrement. Couverture annuelle pour toute la famille.",
   },
 };
 
@@ -220,7 +250,7 @@ export default function InsuranceForm() {
         return;
       }
       if (!formData.destination) { setErrors({ destination: "Requis" }); return; }
-      if (!formData.tripPrice) { setErrors({ tripPrice: "Requis" }); return; }
+      if (selectedProduct !== "avantages_pom" && !formData.tripPrice) { setErrors({ tripPrice: "Requis" }); return; }
     }
 
     if (currentStep === 2) {
@@ -488,7 +518,7 @@ export default function InsuranceForm() {
         <StepIndicator currentStep={currentStep} totalSteps={5} steps={STEPS} />
 
         <div className="mt-8 min-h-[300px]">
-          {currentStep === 1 && <TripDetailsStep formData={formData} updateFormData={updateFormData} errors={errors} />}
+          {currentStep === 1 && <TripDetailsStep formData={formData} updateFormData={updateFormData} errors={errors} productType={selectedProduct} />}
           {currentStep === 2 && <PersonalInfoStep formData={formData} updateFormData={updateFormData} errors={errors} productType={selectedProduct} />}
           {currentStep === 3 && <TravelersStep formData={formData} updateFormData={updateFormData} errors={errors} />}
           {currentStep === 4 && (

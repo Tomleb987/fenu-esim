@@ -129,20 +129,42 @@ const PRODUCT_DETAILS: Record<string, {
     subtitle: "Multirisque annuelle — résidents Polynésie française",
     price: "Sur devis selon profil",
     ageLimit: "Selon conditions",
-    duration: "Contrat annuel",
+    duration: "Contrat annuel (12 mois)",
     sections: [
       {
-        label: "Couvertures incluses",
+        label: "Annulation & bagages",
         items: [
-          { text: "Frais médicaux à l'étranger", ok: true },
-          { text: "Rapatriement médical", ok: true },
-          { text: "Assistance 24h/24", ok: true },
-          { text: "Responsabilité civile", ok: true },
-          { text: "Couverture famille & conjoint", ok: true },
+          { text: "Annulation / modification — max 5.000 €/voyage, 10.000 €/an", ok: true },
+          { text: "Bagages perte/vol/détérioration — max 1.000 €/assuré, 2.000 €/événement", ok: true },
+          { text: "Retard bagages +24h — max 150 €", ok: true },
+          { text: "Retard avion +6h — max 150 €", ok: true },
+        ],
+      },
+      {
+        label: "Santé & rapatriement",
+        items: [
+          { text: "Frais médicaux à l'étranger — max 500.000 €", ok: true },
+          { text: "Soins dentaires d'urgence — max 250 €", ok: true },
+          { text: "Rapatriement médical — frais réels", ok: true },
+          { text: "Envoi médecin / médicaments — frais réels", ok: true },
+          { text: "Frais prolongation de séjour — max 500 €", ok: true },
+        ],
+      },
+      {
+        label: "Assistance & protection",
+        items: [
+          { text: "Frais de recherche & secours — max 10.000 €/assuré", ok: true },
+          { text: "Interruption de séjour — max 6.000 €/assuré", ok: true },
+          { text: "Assistance juridique — max 3.000 €", ok: true },
+          { text: "Caution pénale — max 7.500 €", ok: true },
+          { text: "Avance de fonds — max 500 €", ok: true },
+          { text: "Responsabilité civile — max 4.500.000 € corporels", ok: true },
+          { text: "Capital décès accidentel — 30.000 € (+ 30.000 € avion)", ok: true },
+          { text: "Capital invalidité permanente — jusqu'à 15.000 €", ok: true },
         ],
       },
     ],
-    ideal: "Idéal pour les résidents polynésiens voyageant régulièrement. Couverture annuelle pour toute la famille.",
+    ideal: "Idéal pour les résidents polynésiens voyageant régulièrement. Une seule cotisation annuelle couvre tous vos voyages.",
   },
 };
 
@@ -420,7 +442,7 @@ export default function InsuranceForm() {
                 onClick={() => setTooltip("compare")}
                 className="inline-flex items-center gap-2 text-sm font-semibold text-primary bg-primary/8 hover:bg-primary/15 border border-primary/20 px-4 py-2 rounded-full transition-all hover:scale-[1.02]"
               >
-                🤔 Quelle différence entre les deux ?
+                🤔 Quelle différence entre les trois ?
               </button>
             </div>
           </div>
@@ -435,9 +457,9 @@ export default function InsuranceForm() {
                 className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl font-bold z-10"
               >✕</button>
               <h3 className="text-lg font-bold text-gray-900 mb-1 text-center">Quelle assurance choisir ?</h3>
-              <p className="text-xs text-gray-400 text-center mb-5">Comparez les garanties pour faire le bon choix</p>
+              <p className="text-xs text-gray-400 text-center mb-5">Comparez les 3 formules pour faire le bon choix</p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[75vh] overflow-y-auto pr-1">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-h-[75vh] overflow-y-auto pr-1">
                 {PRODUCTS.map((product) => {
                   const details = PRODUCT_DETAILS[product.id];
                   const isSelected = selectedProduct === product.id;

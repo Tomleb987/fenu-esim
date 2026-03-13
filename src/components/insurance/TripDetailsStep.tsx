@@ -51,8 +51,12 @@ export const TripDetailsStep = ({ formData, updateFormData, errors, productType 
   return (
     <div className="space-y-6 animate-in fade-in">
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Détails de votre voyage</h2>
-        <p className="text-gray-500">Commençons par les informations sur votre séjour</p>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">
+          {isPOM ? "Votre contrat annuel" : "Détails de votre voyage"}
+        </h2>
+        <p className="text-gray-500">
+          {isPOM ? "Choisissez la date de prise d'effet de votre couverture" : "Commençons par les informations sur votre séjour"}
+        </p>
       </div>
 
       <div className="space-y-4">
@@ -67,65 +71,103 @@ export const TripDetailsStep = ({ formData, updateFormData, errors, productType 
           </div>
         </div>
 
-                {/* DESTINATION */}
-        <div>
-          <label className={labelClass}>Zone de destination *</label>
-          <div className="relative">
-            <select
-              className={`${selectClass} ${errors.destination ? "border-red-500 ring-red-200" : ""}`}
-              value={formData.destination}
-              onChange={(e) => updateFormData({ destination: e.target.value })}
-            >
-              <option value="" disabled>Sélectionnez votre zone...</option>
-              <option value="102">Monde Entier (Hors USA/Canada) 🌍</option>
-              <option value="58">USA & Canada 🇺🇸 🇨🇦</option>
-              <option value="53">Europe (Schengen) 🇪🇺</option>
-            </select>
-          </div>
-          {errors.destination && <p className="text-red-500 text-xs mt-1">{errors.destination}</p>}
-        </div>
+        {isPOM ? (
+          /* ---- MODE POM : contrat annuel, date d'effet uniquement ---- */
+          <>
+            <div className="rounded-lg bg-orange-50 border border-orange-200 px-4 py-3 text-sm text-orange-800">
+              🌺 <strong>AVAntages POM</strong> est un contrat annuel. Il démarre à la date d'effet choisie et couvre 12 mois consécutifs.
+            </div>
+            <div>
+              <label className={labelClass}>Date d'effet souhaitée *</label>
+              <input
+                type="date"
+                className={`${inputClass} ${errors.departureDate ? "border-red-500" : ""}`}
+                value={formData.departureDate}
+                onChange={(e) => {
+                  const d = e.target.value;
+                  // endDate = date d'effet + 1 an - 1 jour
+                  let endDate = "";
+                  if (d) {
+                    const end = new Date(d);
+                    end.setFullYear(end.getFullYear() + 1);
+                    end.setDate(end.getDate() - 1);
+                    endDate = end.toISOString().split("T")[0];
+                  }
+                  updateFormData({ departureDate: d, returnDate: endDate });
+                }}
+                min={today}
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                ⏱ Date minimum : le lendemain (traitement en heure de France)
+              </p>
+              {errors.departureDate && <p className="text-red-500 text-xs mt-1">{errors.departureDate}</p>}
+              {formData.returnDate && (
+                <p className="text-xs text-emerald-600 mt-1 font-medium">
+                  ✅ Couverture jusqu'au {new Date(formData.returnDate).toLocaleDateString("fr-FR")}
+                </p>
+              )}
+            </div>
+          </>
+        ) : (
+          /* ---- MODE NORMAL : destination + dates + prix ---- */
+          <>
+            {/* DESTINATION */}
+            <div>
+              <label className={labelClass}>Zone de destination *</label>
+              <div className="relative">
+                <select
+                  className={`${selectClass} ${errors.destination ? "border-red-500 ring-red-200" : ""}`}
+                  value={formData.destination}
+                  onChange={(e) => updateFormData({ destination: e.target.value })}
+                >
+                  <option value="" disabled>Sélectionnez votre zone...</option>
+                  <option value="102">Monde Entier (Hors USA/Canada) 🌍</option>
+                  <option value="58">USA & Canada 🇺🇸 🇨🇦</option>
+                  <option value="53">Europe (Schengen) 🇪🇺</option>
+                </select>
+              </div>
+              {errors.destination && <p className="text-red-500 text-xs mt-1">{errors.destination}</p>}
+            </div>
 
-        {/* DATES */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className={labelClass}>Date de départ</label>
-            <input
-              type="date"
-              className={inputClass}
-              value={formData.departureDate}
-              onChange={handleDepartureChange}
-              min={today}
-            />
-            <p className="text-xs text-gray-400 mt-1">
-              ⏱ Départ minimum : le lendemain (traitement en heure de France)
-            </p>
-          </div>
+            {/* DATES */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>Date de départ</label>
+                <input
+                  type="date"
+                  className={inputClass}
+                  value={formData.departureDate}
+                  onChange={handleDepartureChange}
+                  min={today}
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  ⏱ Départ minimum : le lendemain (traitement en heure de France)
+                </p>
+              </div>
+              <div>
+                <label className={labelClass}>Date de retour</label>
+                <input
+                  type="date"
+                  className={inputClass}
+                  value={formData.returnDate}
+                  onChange={(e) => updateFormData({ returnDate: e.target.value })}
+                  min={formData.departureDate || today}
+                />
+              </div>
+            </div>
 
-          <div>
-            <label className={labelClass}>Date de retour</label>
-            <input
-              type="date"
-              className={inputClass}
-              value={formData.returnDate}
-              onChange={(e) => updateFormData({ returnDate: e.target.value })}
-              // L'attribut min bloque la sélection dans le calendrier
-              min={formData.departureDate || today}
-            />
-          </div>
-        </div>
-
-        {/* PRIX — masqué pour AVAntages POM */}
-        {!isPOM && (
-        <div>
-          <label className={labelClass}>Prix total du voyage (€)</label>
-          <input
-            type="number"
-            placeholder="Ex: 2500"
-            className={`${inputClass} ${errors.tripPrice ? "border-red-500" : ""}`}
-            value={formData.tripPrice || ""}
-            onChange={(e) => updateFormData({ tripPrice: parseFloat(e.target.value) || 0 })}
-          />
-        </div>
+            {/* PRIX */}
+            <div>
+              <label className={labelClass}>Prix total du voyage (€)</label>
+              <input
+                type="number"
+                placeholder="Ex: 2500"
+                className={`${inputClass} ${errors.tripPrice ? "border-red-500" : ""}`}
+                value={formData.tripPrice || ""}
+                onChange={(e) => updateFormData({ tripPrice: parseFloat(e.target.value) || 0 })}
+              />
+            </div>
+          </>
         )}
 
       </div>

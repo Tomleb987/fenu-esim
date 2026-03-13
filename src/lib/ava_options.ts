@@ -122,7 +122,15 @@ export const AVA_CARTE_SANTE_OPTIONS: AvaOption[] = [
 // =============================================
 // OPTIONS AVA AVANTAGES POM
 // =============================================
-export const AVA_AVANTAGES_POM_OPTIONS: AvaOption[] = [];
+// ⚠️ ID option "garantie voyage" à confirmer avec AVA (Alexandre)
+export const AVA_AVANTAGES_POM_OPTIONS: AvaOption[] = [
+  {
+    id: "POM_VOYAGE", // TODO: remplacer par l'ID réel AVA
+    label: "Option Garantie Voyage",
+    type: "boolean",
+    description: "Extension couverture pour vos voyages (annulation, bagages, assistance)",
+  },
+];
 
 // =============================================
 // HELPER

@@ -249,7 +249,8 @@ export default function InsuranceForm() {
         toast.error("Cette assurance est réservée aux résidents de Polynésie française 🇵🇫");
         return;
       }
-      if (!formData.destination) { setErrors({ destination: "Requis" }); return; }
+      if (selectedProduct !== "avantages_pom" && !formData.destination) { setErrors({ destination: "Requis" }); return; }
+      if (!formData.departureDate) { setErrors({ departureDate: "Requis" }); return; }
       if (selectedProduct !== "avantages_pom" && !formData.tripPrice) { setErrors({ tripPrice: "Requis" }); return; }
     }
 

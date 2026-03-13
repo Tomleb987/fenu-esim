@@ -153,7 +153,7 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProp
     doc.setTextColor(...purple1);
     doc.setFontSize(13);
     doc.setFont("helvetica", "bold");
-    doc.text("AVA Tourist Card", margin + 5, y + 9);
+    doc.text(formData.productType === "ava_carte_sante" ? "AVA Carte Sante" : "AVA Tourist Card", margin + 5, y + 9);
     doc.setTextColor(...grayMd);
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
@@ -371,11 +371,19 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProp
     doc.save("Devis-Assurance-FENUASIM-" + format(new Date(), "ddMMyyyy") + ".pdf");
   };
 
-  const docs = [
-    { name: "IPID - Document d'Information", file: "/documents/IPID-TOURIST-CARD.pdf", icon: "📄" },
-    { name: "Conditions Générales (CG)", file: "/documents/CG-AVA-TOURIST-CARD.pdf", icon: "📄" },
-    { name: "Notice AVA TECH+ (Multimédia)", file: "/documents/NI-AVA-TECH-PLUS-1.pdf", icon: "📱" },
-  ];
+  // ─── Documents dynamiques selon produit et options ───────────────────────
+  const isCarteSante = formData.productType === "ava_carte_sante";
+
+  // Documents contractuels : IPID + CG selon le produit
+  const docs = isCarteSante
+    ? [
+        { name: "IPID – Carte Santé", file: "/documents/IPID-CARTE-SANTE.pdf", icon: "📄" },
+        { name: "Conditions Générales (CG)", file: "/documents/CG-AVA-CARTE-SANTE.pdf", icon: "📄" },
+      ]
+    : [
+        { name: "IPID – Tourist Card", file: "/documents/IPID-TOURIST-CARD.pdf", icon: "📄" },
+        { name: "Conditions Générales (CG)", file: "/documents/CG-AVA-TOURIST-CARD.pdf", icon: "📄" },
+      ];
 
   return (
     <div className="space-y-6 animate-in fade-in">
@@ -385,7 +393,7 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProp
           Vérifiez vos informations avant de payer.
         </p>
         <span className="inline-block mt-2 bg-primary/10 text-primary text-sm font-semibold px-4 py-1 rounded-full">
-          AVA Tourist Card
+          {isCarteSante ? "AVA Carte Santé" : "AVA Tourist Card"}
         </span>
       </div>
 

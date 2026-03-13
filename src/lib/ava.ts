@@ -79,12 +79,18 @@ function buildTarificationPayload(data: any): URLSearchParams {
   params.append('productType', productType);
   params.append('journeyStartDate', journeyStartDate);
   params.append('journeyEndDate', journeyEndDate);
-  params.append('journeyAmount', String(costPerPerson));
+  // journeyAmount non requis pour avantages_pom
+  if (productType !== 'avantages_pom') {
+    params.append('journeyAmount', String(costPerPerson));
+  }
   // journeyRegion uniquement pour ava_pass
   if (productType === 'ava_pass') {
     params.append('journeyRegion', String(data.destinationRegion || "102"));
   }
-  params.append('numberAdultCompanions', String(companions.length));
+  // numberAdultCompanions non requis pour avantages_pom
+  if (productType !== 'avantages_pom') {
+    params.append('numberAdultCompanions', String(companions.length));
+  }
   // numberChildrenCompanions requis pour ava_carte_sante
   if (productType === 'ava_carte_sante') {
     const childCount = companions.filter((c: any) => {

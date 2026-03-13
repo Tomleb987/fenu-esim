@@ -1,7 +1,7 @@
 import { InsuranceFormData } from "@/types/insurance";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { AVA_TOURIST_OPTIONS, getOptionsForProduct } from "@/lib/ava_options";
+import { AVA_TOURIST_OPTIONS } from "@/lib/ava_options";
 import { Download, FileText } from "lucide-react";
 
 interface SummaryStepProps {
@@ -10,15 +10,12 @@ interface SummaryStepProps {
   errors: Record<string, string>;
   quote: { premium: number } | null;
   isLoadingQuote: boolean;
-  productType?: string;
 }
 
-export const SummaryStep = ({ formData, quote, isLoadingQuote, productType = 'ava_tourist_card' }: SummaryStepProps) => {
+export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProps) => {
 
   const EUR_TO_XPF = 119.33;
   const toXPF = (eur: number) => Math.round(eur * EUR_TO_XPF).toLocaleString('fr-FR');
-  const FRAIS_DISTRIBUTION_EUR = 10;
-  const FRAIS_DISTRIBUTION_XPF = 1250;
 
   const getDestinationLabel = (code: string | number) => {
     const codeStr = String(code).trim();
@@ -43,8 +40,7 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType = 'av
   };
 
   // Résolution des noms d'options
-  const productOptions = getOptionsForProduct(productType);
-  const allOptions = productOptions.flatMap(opt => [
+  const allOptions = AVA_TOURIST_OPTIONS.flatMap(opt => [
     opt,
     ...(opt.subOptions?.map(sub => ({ ...sub, type: 'select' as const })) || [])
   ]);
@@ -75,6 +71,18 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType = 'av
       const logoRes = await fetch("/logo.png");
       if (logoRes.ok) {
         const blob = await logoRes.blob();
+        // Charger dimensions réelles pour respecter le ratio
+        const blobUrl = URL.createObjectURL(blob);
+        await new Promise<void>((res) => {
+          const img = new Image();
+          img.onload = () => {
+            (window as any)._logoNaturalW = img.naturalWidth;
+            (window as any)._logoNaturalH = img.naturalHeight;
+            URL.revokeObjectURL(blobUrl);
+            res();
+          };
+          img.src = blobUrl;
+        });
         logoBase64 = await new Promise<string>((resolve) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result as string);
@@ -90,47 +98,50 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType = 'av
       doc.saveGraphicsState();
       // @ts-ignore
       doc.setGState(new doc.GState({ opacity: 0.04 }));
-      doc.addImage(logoBase64, "PNG", 55, 100, 100, 40);
+      const natWf = (window as any)._logoNaturalW || 260;
+      const natHf = (window as any)._logoNaturalH || 80;
+      const filH = 40;
+      const filW = (natWf / natHf) * filH;
+      doc.addImage(logoBase64, "PNG", (pageW - filW) / 2, 100, filW, filH);
       doc.restoreGraphicsState();
     }
 
     // =============================================
-    // EN-TÊTE : gauche blanc (logo), droite violet
+    // EN-TÊTE : bande dégradée simulée (2 rects)
     // =============================================
-    // Fond blanc côté logo
-    doc.setFillColor(255, 255, 255);
-    doc.rect(0, 0, pageW * 0.5, 48, "F");
-    // Fond violet côté infos
     doc.setFillColor(...purple1);
-    doc.rect(pageW * 0.5, 0, pageW * 0.5, 48, "F");
-    // Bande orange fine en bas
+    doc.rect(0, 0, pageW * 0.6, 48, "F");
+    doc.setFillColor(...purple2);
+    doc.rect(pageW * 0.6, 0, pageW * 0.4, 48, "F");
+    // Bande orange fine en bas de l'entête
     doc.setFillColor(...orange);
     doc.rect(0, 46, pageW, 2, "F");
-    // Bordure fine séparatrice
-    doc.setDrawColor(230, 230, 230);
-    doc.setLineWidth(0.3);
-    doc.line(0, 48, pageW, 48);
 
-    // Logo sur fond blanc
+    // Logo ou texte
     if (logoBase64) {
-      doc.addImage(logoBase64, "PNG", margin, 10, 56, 24);
+      // Calcul ratio réel du logo
+      const natW = (window as any)._logoNaturalW || 260;
+      const natH = (window as any)._logoNaturalH || 80;
+      const logoH = 22; // hauteur cible dans l'entête
+      const logoW = (natW / natH) * logoH;
+      doc.addImage(logoBase64, "PNG", margin, (48 - logoH) / 2, logoW, logoH);
     } else {
-      doc.setTextColor(...purple1);
+      doc.setTextColor(...white);
       doc.setFontSize(22);
       doc.setFont("helvetica", "bold");
-      doc.text("FENUASIM", margin, 28);
+      doc.text("FENUASIM", margin, 22);
     }
 
-    // Titre + date sur fond violet
+    // Titre + date à droite
     doc.setTextColor(...white);
-    doc.setFontSize(11);
+    doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
     doc.text("ASSURANCE VOYAGE", pageW - margin, 16, { align: "right" });
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
-    doc.text("Devis personnalise", pageW - margin, 24, { align: "right" });
-    doc.text("Emis le " + format(new Date(), "dd/MM/yyyy", { locale: fr }), pageW - margin, 31, { align: "right" });
-    doc.text("Valable 30 jours", pageW - margin, 38, { align: "right" });
+    doc.text("Devis personnalise", pageW - margin, 23, { align: "right" });
+    doc.text("Emis le " + format(new Date(), "dd/MM/yyyy", { locale: fr }), pageW - margin, 30, { align: "right" });
+    doc.text("Valable 30 jours", pageW - margin, 37, { align: "right" });
 
     let y = 58;
 
@@ -142,7 +153,7 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType = 'av
     doc.setTextColor(...purple1);
     doc.setFontSize(13);
     doc.setFont("helvetica", "bold");
-    doc.text(productType === "ava_carte_sante" ? "AVA Carte Santé" : "AVA Tourist Card", margin + 5, y + 9);
+    doc.text("AVA Tourist Card", margin + 5, y + 9);
     doc.setTextColor(...grayMd);
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
@@ -266,37 +277,11 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType = 'av
     y += 4;
 
     // =============================================
-    // TOTAL — lignes détaillées + carte dégradée
+    // TOTAL — carte dégradée
     // =============================================
-    const EUR_TO_XPF_LOCAL = 119.33;
-    const FRAIS_PDF = 10;
-    const FRAIS_PDF_XPF = 1250;
-    const eurVal = quote ? quote.premium : 0;
-    const totalEur = eurVal + FRAIS_PDF;
-    const totalXpf = Math.round(eurVal * EUR_TO_XPF_LOCAL) + FRAIS_PDF_XPF;
-
-    // Ligne prime AVA
-    doc.setTextColor(...grayMd);
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.text("Prime d'assurance AVA", margin + 3, y);
-    doc.setTextColor(...grayDk);
-    doc.setFont("helvetica", "bold");
-    doc.text(eurVal.toFixed(2) + " EUR", pageW - margin - 3, y, { align: "right" });
-    y += 7;
-
-    // Ligne frais distribution
-    doc.setTextColor(...grayMd);
-    doc.setFont("helvetica", "normal");
-    doc.text("Frais de distribution FENUASIM", margin + 3, y);
-    doc.setTextColor(...grayDk);
-    doc.setFont("helvetica", "bold");
-    doc.text(FRAIS_PDF.toFixed(2) + " EUR", pageW - margin - 3, y, { align: "right" });
-    y += 9;
-
-    // Carte total
     doc.setFillColor(...purple1);
     doc.roundedRect(margin, y, colW, 22, 3, 3, "F");
+    // accent orange à droite
     doc.setFillColor(...orange);
     doc.roundedRect(margin + colW - 40, y, 40, 22, 3, 3, "F");
     doc.setFillColor(...orange);
@@ -308,15 +293,21 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType = 'av
     doc.text("TOTAL ESTIME TTC", margin + 5, y + 8);
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
-    doc.text("Prime + frais de distribution", margin + 5, y + 15);
+    doc.text("Cotisation annuelle tout compris", margin + 5, y + 15);
 
-    const xpfStr = totalXpf.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    const EUR_TO_XPF_LOCAL = 119.33;
+    const eurVal = quote ? quote.premium : 0;
+    const xpfVal = Math.round(eurVal * EUR_TO_XPF_LOCAL);
+    const xpfStr = xpfVal.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    const eurStr = eurVal.toFixed(2) + " EUR";
+    const xpfDisplay = "~ " + xpfStr + " XPF";
+
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.text(totalEur.toFixed(2) + " EUR", pageW - margin - 5, y + 10, { align: "right" });
+    doc.text(eurStr, pageW - margin - 5, y + 10, { align: "right" });
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    doc.text("~ " + xpfStr + " XPF", pageW - margin - 5, y + 17, { align: "right" });
+    doc.text(xpfDisplay, pageW - margin - 5, y + 17, { align: "right" });
     y += 30;
 
     // =============================================
@@ -331,12 +322,15 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType = 'av
     doc.setTextColor(...grayMd);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(6.5);
+    const productLabel = formData.productType === "ava_carte_sante" ? "AVA Carte Sante" : "AVA Tourist Card";
     const mentions = [
       "Ce document est un devis non contractuel etabli sur la base des informations fournies.",
-      `L'assurance ${productType === 'ava_carte_sante' ? 'AVA Carte Sante' : 'AVA Tourist Card'} est distribuee par FENUASIM, partenaire d'ANSET ASSURANCES.`,
-      "La souscription definitive est conditionnee au paiement et a la validation du contrat.",
+      `L'assurance ${productLabel} est distribuee par FENUASIM, mandataire d'ANSET ASSURANCES.`,
+      "ANSET ASSURANCES - 5 avenue du Prince Hinoi, 98713 Papeete - Polynesie francaise.",
+      "Registre des intermediaires d'assurance de Polynesie francaise n° PF 26 010.",
       "FENUASIM est enregistre au registre des intermediaires d'assurance de Polynesie francaise",
       "sous le numero PF 26 012 en qualite de mandataire d'intermediaire d'assurance.",
+      "La souscription definitive est conditionnee au paiement et a la validation du contrat.",
     ];
     mentions.forEach((line, i) => {
       doc.text(line, margin + 4, y + 12 + i * 4.5);
@@ -374,7 +368,7 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType = 'av
           Vérifiez vos informations avant de payer.
         </p>
         <span className="inline-block mt-2 bg-primary/10 text-primary text-sm font-semibold px-4 py-1 rounded-full">
-          {productType === 'ava_carte_sante' ? '🏥 AVA Carte Santé' : '✈️ AVA Tourist Card'}
+          AVA Tourist Card
         </span>
       </div>
 
@@ -458,46 +452,23 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType = 'av
         </div>
 
         {/* TOTAL */}
-        <div className="pt-4 mt-2 border-t border-gray-200 bg-white p-4 rounded-lg shadow-sm space-y-2">
-          {/* Ligne prime AVA */}
-          <div className="flex justify-between items-center">
-            <span className="text-gray-600 text-sm">Prime d'assurance AVA</span>
-            <div className="text-right">
-              {isLoadingQuote ? (
-                <span className="text-sm italic text-primary animate-pulse">Calcul en cours...</span>
-              ) : (
-                <span className="font-medium text-gray-900">
+        <div className="flex justify-between items-center pt-4 mt-2 border-t border-gray-200 bg-white p-4 rounded-lg shadow-sm">
+          <span className="font-bold text-lg text-gray-900">Total à payer</span>
+          <div className="text-right">
+            {isLoadingQuote ? (
+              <span className="text-sm italic text-primary animate-pulse">Calcul en cours...</span>
+            ) : (
+              <div className="text-right">
+                <span className="font-bold text-3xl text-primary block">
                   {quote ? `${quote.premium.toFixed(2)} €` : "-- €"}
                 </span>
-              )}
-            </div>
-          </div>
-          {/* Ligne frais distribution */}
-          <div className="flex justify-between items-center">
-            <span className="text-gray-600 text-sm">Frais de distribution FENUASIM</span>
-            <span className="font-medium text-gray-900">{FRAIS_DISTRIBUTION_EUR.toFixed(2)} €</span>
-          </div>
-          {/* Séparateur */}
-          <div className="border-t border-dashed border-gray-200 pt-2 mt-1">
-            <div className="flex justify-between items-center">
-              <span className="font-bold text-lg text-gray-900">Total à payer</span>
-              <div className="text-right">
-                {isLoadingQuote ? (
-                  <span className="text-sm italic text-primary animate-pulse">Calcul en cours...</span>
-                ) : (
-                  <div className="text-right">
-                    <span className="font-bold text-3xl text-primary block">
-                      {quote ? `${(quote.premium + FRAIS_DISTRIBUTION_EUR).toFixed(2)} €` : "-- €"}
-                    </span>
-                    {quote && (
-                      <span className="text-sm text-gray-400 font-normal">
-                        ≈ {(toXPF(quote.premium + FRAIS_DISTRIBUTION_EUR))} XPF
-                      </span>
-                    )}
-                  </div>
+                {quote && (
+                  <span className="text-sm text-gray-400 font-normal">
+                    ≈ {toXPF(quote.premium)} XPF
+                  </span>
                 )}
               </div>
-            </div>
+            )}
           </div>
         </div>
 

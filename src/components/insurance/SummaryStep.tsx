@@ -296,19 +296,37 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProp
     doc.text("Cotisation annuelle tout compris", margin + 5, y + 15);
 
     const EUR_TO_XPF_LOCAL = 119.33;
-    const eurVal = quote ? quote.premium : 0;
-    const xpfVal = Math.round(eurVal * EUR_TO_XPF_LOCAL);
-    const xpfStr = xpfVal.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-    const eurStr = eurVal.toFixed(2) + " EUR";
-    const xpfDisplay = "~ " + xpfStr + " XPF";
+    const FRAIS_DISTRIB_EUR = 10;
+    const premiumEur = quote ? quote.premium : 0;
+    const totalEur = premiumEur + FRAIS_DISTRIB_EUR;
+    const totalXpf = Math.round(totalEur * EUR_TO_XPF_LOCAL);
+    const totalXpfStr = totalXpf.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 
-    doc.setFontSize(14);
+    // Ligne 1 : Prime AVA
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...white);
+    doc.text("Prime d'assurance AVA", margin + 5, y + 10);
+    doc.text(premiumEur.toFixed(2) + " EUR", pageW - margin - 5, y + 10, { align: "right" });
+
+    // Ligne 2 : Frais de distribution
+    doc.text("Frais de distribution FENUASIM", margin + 5, y + 18);
+    doc.text(FRAIS_DISTRIB_EUR.toFixed(2) + " EUR", pageW - margin - 5, y + 18, { align: "right" });
+
+    // Séparateur
+    doc.setDrawColor(...orange);
+    doc.setLineWidth(0.4);
+    doc.line(margin + 5, y + 21, pageW - margin - 5, y + 21);
+
+    // Ligne 3 : Total
+    doc.setFontSize(13);
     doc.setFont("helvetica", "bold");
-    doc.text(eurStr, pageW - margin - 5, y + 10, { align: "right" });
+    doc.text("TOTAL TTC", margin + 5, y + 28);
+    doc.text(totalEur.toFixed(2) + " EUR", pageW - margin - 5, y + 28, { align: "right" });
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    doc.text(xpfDisplay, pageW - margin - 5, y + 17, { align: "right" });
-    y += 30;
+    doc.text("~ " + totalXpfStr + " XPF", pageW - margin - 5, y + 35, { align: "right" });
+    y += 45;
 
     // =============================================
     // MENTIONS LÉGALES — encart gris
@@ -451,24 +469,39 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote }: SummaryStepProp
         </div>
 
         {/* TOTAL */}
-        <div className="flex justify-between items-center pt-4 mt-2 border-t border-gray-200 bg-white p-4 rounded-lg shadow-sm">
-          <span className="font-bold text-lg text-gray-900">Total à payer</span>
-          <div className="text-right">
-            {isLoadingQuote ? (
-              <span className="text-sm italic text-primary animate-pulse">Calcul en cours...</span>
-            ) : (
-              <div className="text-right">
-                <span className="font-bold text-3xl text-primary block">
-                  {quote ? `${quote.premium.toFixed(2)} €` : "-- €"}
-                </span>
-                {quote && (
-                  <span className="text-sm text-gray-400 font-normal">
-                    ≈ {toXPF(quote.premium)} XPF
-                  </span>
-                )}
+        <div className="pt-4 mt-2 border-t border-gray-200 bg-white p-4 rounded-lg shadow-sm space-y-2">
+          {isLoadingQuote ? (
+            <span className="text-sm italic text-primary animate-pulse">Calcul en cours...</span>
+          ) : (
+            <>
+              {/* Ligne prime */}
+              <div className="flex justify-between items-center text-sm text-gray-600">
+                <span>Prime d&apos;assurance AVA</span>
+                <span>{quote ? `${quote.premium.toFixed(2)} €` : "-- €"}</span>
               </div>
-            )}
-          </div>
+              {/* Ligne frais */}
+              <div className="flex justify-between items-center text-sm text-gray-600">
+                <span>Frais de distribution FENUASIM</span>
+                <span>10.00 €</span>
+              </div>
+              {/* Séparateur */}
+              <div className="border-t border-orange-300 pt-2">
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-lg text-gray-900">Total TTC</span>
+                  <div className="text-right">
+                    <span className="font-bold text-3xl text-primary block">
+                      {quote ? `${(quote.premium + 10).toFixed(2)} €` : "-- €"}
+                    </span>
+                    {quote && (
+                      <span className="text-sm text-gray-400 font-normal">
+                        ≈ {toXPF(quote.premium + 10)} XPF
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
       </div>

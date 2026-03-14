@@ -394,21 +394,32 @@ export default function InsuranceForm() {
             <div className="flex gap-3">
               {PRODUCTS.map((product) => {
                 const isSelected = selectedProduct === product.id;
+                const isPOM = product.id === "avantages_pom";
                 return (
                   <button
                     key={product.id}
-                    onClick={() => handleProductChange(product.id)}
-                    className={`flex-1 flex flex-col rounded-2xl border-2 transition-all overflow-hidden text-left ${
-                      isSelected
+                    onClick={() => { if (!isPOM) handleProductChange(product.id); }}
+                    disabled={isPOM}
+                    className={`flex-1 flex flex-col rounded-2xl border-2 transition-all overflow-hidden text-left relative ${
+                      isPOM
+                        ? "border-gray-200 opacity-70 cursor-not-allowed"
+                        : isSelected
                         ? "border-primary shadow-lg scale-[1.02]"
                         : "border-gray-200 hover:border-gray-300 hover:shadow-md"
                     }`}
                   >
+                    {/* Bannière Prochainement */}
+                    {isPOM && (
+                      <div className="absolute top-2 right-2 z-10 bg-amber-400 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded-full shadow">
+                        🔜 Prochainement
+                      </div>
+                    )}
+
                     {/* Header coloré */}
                     <div className={`bg-gradient-to-r ${product.color} p-4 text-white`}>
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-2xl">{product.icon}</span>
-                        {isSelected && (
+                        {isSelected && !isPOM && (
                           <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full font-medium">✓ Sélectionné</span>
                         )}
                       </div>
@@ -417,7 +428,7 @@ export default function InsuranceForm() {
                     </div>
 
                     {/* Corps — visible seulement si sélectionné */}
-                    <div className={`px-4 transition-all duration-300 overflow-hidden ${isSelected ? "py-3 max-h-40" : "max-h-0 py-0"}`}>
+                    <div className={`px-4 transition-all duration-300 overflow-hidden ${isSelected && !isPOM ? "py-3 max-h-40" : "max-h-0 py-0"}`}>
                       <ul className="space-y-1 mb-2">
                         {product.highlights.map((h, i) => (
                           <li key={i} className="text-xs text-gray-600 flex items-center gap-1.5">
@@ -429,8 +440,10 @@ export default function InsuranceForm() {
                     </div>
 
                     {/* Prix visible si non sélectionné */}
-                    {!isSelected && (
-                      <div className="px-4 py-2 text-xs text-gray-400">{product.price}</div>
+                    {(!isSelected || isPOM) && (
+                      <div className="px-4 py-2 text-xs text-gray-400">
+                        {isPOM ? "Disponible bientôt" : product.price}
+                      </div>
                     )}
                   </button>
                 );
@@ -463,13 +476,21 @@ export default function InsuranceForm() {
                 {PRODUCTS.map((product) => {
                   const details = PRODUCT_DETAILS[product.id];
                   const isSelected = selectedProduct === product.id;
+                  const isPOM = product.id === "avantages_pom";
                   return (
                     <div
                       key={product.id}
-                      className={`rounded-xl border-2 p-4 flex flex-col transition-all ${
-                        isSelected ? "border-primary bg-primary/5" : "border-gray-200"
+                      className={`rounded-xl border-2 p-4 flex flex-col transition-all relative ${
+                        isPOM ? "border-amber-200 bg-amber-50/50" : isSelected ? "border-primary bg-primary/5" : "border-gray-200"
                       }`}
                     >
+                      {/* Badge prochainement */}
+                      {isPOM && (
+                        <div className="absolute top-3 right-3 bg-amber-400 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                          🔜 Prochainement
+                        </div>
+                      )}
+
                       {/* Header */}
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex items-center gap-2">
@@ -479,7 +500,7 @@ export default function InsuranceForm() {
                             <div className="text-xs text-gray-400">{details.subtitle}</div>
                           </div>
                         </div>
-                        {isSelected && <span className="text-xs bg-primary text-white px-2 py-0.5 rounded-full whitespace-nowrap">✓ Sélectionné</span>}
+                        {isSelected && !isPOM && <span className="text-xs bg-primary text-white px-2 py-0.5 rounded-full whitespace-nowrap">✓ Sélectionné</span>}
                       </div>
 
                       {/* Badges critères */}
@@ -511,14 +532,17 @@ export default function InsuranceForm() {
 
                       {/* Bouton sélection */}
                       <button
-                        onClick={() => { handleProductChange(product.id); setTooltip(null); }}
+                        onClick={() => { if (!isPOM) { handleProductChange(product.id); setTooltip(null); } }}
+                        disabled={isPOM}
                         className={`w-full py-2 rounded-lg text-xs font-bold transition-all ${
-                          isSelected
+                          isPOM
+                            ? "bg-amber-100 text-amber-600 border border-amber-300 cursor-not-allowed"
+                            : isSelected
                             ? "bg-primary/10 text-primary border border-primary cursor-default"
                             : "bg-primary text-white hover:bg-primary/90 cursor-pointer"
                         }`}
                       >
-                        {isSelected ? "✓ Sélectionné" : `Choisir ${details.title}`}
+                        {isPOM ? "🔜 Disponible prochainement" : isSelected ? "✓ Sélectionné" : `Choisir ${details.title}`}
                       </button>
                     </div>
                   );

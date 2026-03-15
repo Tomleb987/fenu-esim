@@ -1,47 +1,69 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { CheckCircle, Home, Mail, ShieldCheck, XCircle, Loader2, FileText, Download } from "lucide-react";
+import { CheckCircle, Home, Mail, ShieldCheck, XCircle, Loader2, FileText, Download, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+const POLL_INTERVAL = 3000;  // 3s entre chaque essai
+const POLL_MAX      = 8;     // max 8 essais = ~24s
 
 export default function AssuranceSuccessPage() {
   const router = useRouter();
-  const { session_id } = router.query;
 
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [mounted, setMounted]           = useState(false);
+  const [status, setStatus]             = useState<'loading' | 'success' | 'error'>('loading');
   const [adhesionNumber, setAdhesionNumber] = useState<string | null>(null);
   const [contractLink, setContractLink] = useState<string | null>(null);
   const [attestationUrl, setAttestationUrl] = useState<string | null>(null);
+  const [docsLoading, setDocsLoading]   = useState(false); // polling en cours
+  const [pollCount, setPollCount]       = useState(0);
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    setMounted(true);
     document.body.classList.add("assurance-mode");
-    return () => { document.body.classList.remove("assurance-mode"); };
+    return () => {
+      document.body.classList.remove("assurance-mode");
+      if (pollRef.current) clearTimeout(pollRef.current);
+    };
   }, []);
 
   useEffect(() => {
-    if (!router.isReady) return;
-    if (!session_id || typeof session_id !== 'string') return;
+    if (!mounted || !router.isReady) return;
+
+    const session_id = router.query.session_id;
+    if (!session_id || typeof session_id !== 'string') {
+      setStatus('error');
+      return;
+    }
 
     async function handleSession() {
       try {
-        // 🛡️ Un seul appel côté serveur — Stripe vérifie le paiement, pas le client
         const resMark = await fetch(`/api/assurance/mark-paid`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ session_id }),
         });
-
         const markResult = await resMark.json();
 
-        if (markResult.success) {
-          setAdhesionNumber(markResult.adhesion_number || null);
+        if (!markResult.success) {
+          setStatus('error');
+          return;
+        }
+
+        setAdhesionNumber(markResult.adhesion_number || null);
+
+        if (markResult.contract_link || markResult.attestation_url) {
+          // Documents déjà disponibles (webhook déjà passé)
           setContractLink(markResult.contract_link || null);
           setAttestationUrl(markResult.attestation_url || null);
           setStatus('success');
         } else {
-          console.error("Erreur mark-paid:", markResult);
-          setStatus('error');
+          // Paiement OK mais docs pas encore prêts → on affiche success + on poll
+          setStatus('success');
+          setDocsLoading(true);
+          schedulePoll(markResult.adhesion_number, 1);
         }
       } catch (err) {
         console.error("💥 Erreur success:", err);
@@ -50,7 +72,32 @@ export default function AssuranceSuccessPage() {
     }
 
     handleSession();
-  }, [router.isReady, session_id]);
+  }, [mounted, router.isReady, router.query.session_id]);
+
+  function schedulePoll(adhesionNum: string, attempt: number) {
+    if (attempt > POLL_MAX) {
+      setDocsLoading(false); // abandon — l'email prendra le relais
+      return;
+    }
+    pollRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/assurance/get-documents?adhesion_number=${adhesionNum}`);
+        const data = await res.json();
+        setPollCount(attempt);
+        if (data.contract_link || data.attestation_url) {
+          setContractLink(data.contract_link || null);
+          setAttestationUrl(data.attestation_url || null);
+          setDocsLoading(false);
+        } else {
+          schedulePoll(adhesionNum, attempt + 1);
+        }
+      } catch {
+        schedulePoll(adhesionNum, attempt + 1);
+      }
+    }, POLL_INTERVAL);
+  }
+
+  if (!mounted) return null;
 
   return (
     <>
@@ -62,10 +109,10 @@ export default function AssuranceSuccessPage() {
       <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-4 font-sans text-foreground">
 
         {status === 'loading' && (
-          <div className="text-center text-white animate-pulse">
+          <div className="text-center text-white">
             <Loader2 className="w-16 h-16 mx-auto mb-4 animate-spin text-white/80" />
             <h2 className="text-2xl font-semibold">Vérification du paiement...</h2>
-            <p className="text-white/70">Merci de ne pas fermer cette page.</p>
+            <p className="text-white/70 mt-2">Merci de ne pas fermer cette page.</p>
           </div>
         )}
 
@@ -98,12 +145,14 @@ export default function AssuranceSuccessPage() {
 
             <div className="text-lg text-gray-600 mb-6 leading-relaxed">
               <p>Votre assurance est active.</p>
-              <p className="mt-2 text-sm bg-gray-100 py-2 px-4 rounded-full inline-block font-mono text-gray-800">
-                N° Adhésion : <strong>{adhesionNumber}</strong>
-              </p>
+              {adhesionNumber && (
+                <p className="mt-2 text-sm bg-gray-100 py-2 px-4 rounded-full inline-block font-mono text-gray-800">
+                  N° Adhésion : <strong>{adhesionNumber}</strong>
+                </p>
+              )}
             </div>
 
-            {/* Documents téléchargeables */}
+            {/* Documents disponibles */}
             {(contractLink || attestationUrl) && (
               <div className="bg-purple-50 p-5 rounded-xl border border-purple-100 text-left mb-6 shadow-sm space-y-3">
                 <h3 className="font-bold text-gray-900 flex items-center gap-2">
@@ -135,18 +184,31 @@ export default function AssuranceSuccessPage() {
               </div>
             )}
 
-            {/* Si pas encore de documents (webhook pas encore passé) */}
-            {!contractLink && !attestationUrl && (
+            {/* Polling en cours — documents pas encore prêts */}
+            {docsLoading && !contractLink && !attestationUrl && (
+              <div className="bg-purple-50 p-5 rounded-xl border border-purple-100 text-left mb-6 shadow-sm">
+                <div className="flex items-center gap-3 text-primary">
+                  <RefreshCw className="w-5 h-5 animate-spin flex-shrink-0" />
+                  <div>
+                    <p className="font-semibold text-gray-900 text-sm">Récupération de vos documents...</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Validation du contrat chez AVA en cours ({pollCount}/{POLL_MAX})</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Polling terminé sans documents — email en fallback */}
+            {!docsLoading && !contractLink && !attestationUrl && (
               <div className="bg-purple-50 p-5 rounded-xl border border-purple-100 text-left mb-6 shadow-sm">
                 <div className="flex items-start gap-4">
-                  <div className="bg-white p-2 rounded-full shadow-sm">
+                  <div className="bg-white p-2 rounded-full shadow-sm flex-shrink-0">
                     <Mail className="w-6 h-6 text-primary" />
                   </div>
                   <div>
                     <h3 className="font-bold text-gray-900 mb-1">Vérifiez vos emails</h3>
                     <p className="text-sm text-gray-600">
                       Votre <strong>certificat d'assurance</strong> et votre contrat signé
-                      vous seront envoyés dans quelques instants.
+                      vous seront envoyés dans quelques instants par AVA Assurances.
                     </p>
                   </div>
                 </div>
@@ -171,9 +233,4 @@ export default function AssuranceSuccessPage() {
       </div>
     </>
   );
-}
-
-// Désactive le prérendu statique — cette page nécessite session_id en query param
-export async function getServerSideProps() {
-  return { props: {} };
 }

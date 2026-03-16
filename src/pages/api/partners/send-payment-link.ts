@@ -1,8 +1,8 @@
 // src/pages/api/partner/send-payment-link.ts
-// Envoie l'email du lien de paiement au client via Brevo (même config que send-esim-email.ts)
-
 import type { NextApiRequest, NextApiResponse } from "next";
 import nodemailer from "nodemailer";
+
+export const config = { api: { bodyParser: true } };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
@@ -52,18 +52,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   });
 
   try {
-    await transporter.sendMail({
+    const info = await transporter.sendMail({
       from: `"FENUA SIM" <hello@fenuasim.com>`,
       to: clientEmail,
+      bcc: "clients@fenua-sim.odoo.com",
       replyTo: `"FENUA SIM" <hello@fenuasim.com>`,
       subject: `Votre lien de paiement eSIM — ${destination || packageName}`,
       html: emailHTML,
       text: `Bonjour ${clientFirstName},\n\nVoici votre lien de paiement sécurisé pour votre eSIM :\n${paymentUrl}\n\nMontant : ${formattedAmount}\n\nCe lien est valable 24h.\n\nL'équipe FENUA SIM`,
     });
 
-    return res.status(200).json({ success: true });
+    console.log("✅ Email lien paiement envoyé:", info.messageId, "→", clientEmail);
+    return res.status(200).json({ success: true, messageId: info.messageId });
   } catch (error: any) {
-    console.error("Erreur envoi email lien paiement:", error);
+    console.error("❌ Erreur envoi email lien paiement:", error);
     return res.status(500).json({ error: error.message });
   }
 }
@@ -97,7 +99,6 @@ function createPaymentLinkEmailHTML({
   <title>Votre lien de paiement eSIM</title>
 </head>
 <body style="margin:0;padding:0;background-color:#f4f6f9;font-family:'Helvetica Neue',Arial,sans-serif;">
-
   <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f6f9;padding:40px 20px;">
     <tr>
       <td align="center">
@@ -118,94 +119,79 @@ function createPaymentLinkEmailHTML({
           <!-- Body -->
           <tr>
             <td style="padding:40px;">
-
-              <!-- Greeting -->
               <p style="font-size:18px;font-weight:600;color:#1a1a2e;margin:0 0 8px;">
                 Bonjour ${clientFirstName} ${clientLastName} 👋
               </p>
               <p style="font-size:15px;color:#4a5568;margin:0 0 32px;line-height:1.6;">
-                ${advisorName || "Votre conseiller FenuaSIM"} vous a préparé un lien de paiement sécurisé pour votre eSIM. Il vous suffit de cliquer ci-dessous pour finaliser votre commande en quelques secondes.
+                ${advisorName || "Votre conseiller FenuaSIM"} vous a préparé un lien de paiement sécurisé pour votre eSIM. Cliquez ci-dessous pour finaliser votre commande en quelques secondes.
               </p>
 
               <!-- Package Card -->
               <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f7ff;border-radius:12px;border:1.5px solid #bfdbfe;margin-bottom:32px;">
                 <tr>
                   <td style="padding:24px;">
-                    <div style="font-size:11px;font-weight:600;color:#0e6899;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">
-                      📦 Votre forfait
-                    </div>
-                    <div style="font-size:20px;font-weight:700;color:#0a4a6e;margin-bottom:16px;">
-                      ${packageName}
-                    </div>
+                    <div style="font-size:11px;font-weight:600;color:#0e6899;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">📦 Votre forfait</div>
+                    <div style="font-size:20px;font-weight:700;color:#0a4a6e;margin-bottom:16px;">${packageName}</div>
                     <table width="100%" cellpadding="0" cellspacing="0">
-                      <tr>
-                        <td style="padding:6px 0;border-bottom:1px solid #dbeafe;">
-                          <table width="100%"><tr>
-                            <td style="font-size:13px;color:#64748b;">🌍 Destination</td>
-                            <td style="font-size:13px;font-weight:600;color:#1a1a2e;text-align:right;">${destination || "—"}</td>
-                          </tr></table>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style="padding:6px 0;border-bottom:1px solid #dbeafe;">
-                          <table width="100%"><tr>
-                            <td style="font-size:13px;color:#64748b;">📶 Données</td>
-                            <td style="font-size:13px;font-weight:600;color:#1a1a2e;text-align:right;">${dataAmount || "—"}</td>
-                          </tr></table>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style="padding:6px 0;border-bottom:1px solid #dbeafe;">
-                          <table width="100%"><tr>
-                            <td style="font-size:13px;color:#64748b;">📅 Validité</td>
-                            <td style="font-size:13px;font-weight:600;color:#1a1a2e;text-align:right;">${validityDays || "—"}</td>
-                          </tr></table>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style="padding:10px 0 0;">
-                          <table width="100%"><tr>
-                            <td style="font-size:14px;font-weight:600;color:#0a4a6e;">💰 Montant total</td>
-                            <td style="font-size:20px;font-weight:700;color:#0a4a6e;text-align:right;">${formattedAmount}</td>
-                          </tr></table>
-                        </td>
-                      </tr>
+                      <tr><td style="padding:6px 0;border-bottom:1px solid #dbeafe;">
+                        <table width="100%"><tr>
+                          <td style="font-size:13px;color:#64748b;">🌍 Destination</td>
+                          <td style="font-size:13px;font-weight:600;color:#1a1a2e;text-align:right;">${destination || "—"}</td>
+                        </tr></table>
+                      </td></tr>
+                      <tr><td style="padding:6px 0;border-bottom:1px solid #dbeafe;">
+                        <table width="100%"><tr>
+                          <td style="font-size:13px;color:#64748b;">📶 Données</td>
+                          <td style="font-size:13px;font-weight:600;color:#1a1a2e;text-align:right;">${dataAmount || "—"}</td>
+                        </tr></table>
+                      </td></tr>
+                      <tr><td style="padding:6px 0;border-bottom:1px solid #dbeafe;">
+                        <table width="100%"><tr>
+                          <td style="font-size:13px;color:#64748b;">📅 Validité</td>
+                          <td style="font-size:13px;font-weight:600;color:#1a1a2e;text-align:right;">${validityDays || "—"}</td>
+                        </tr></table>
+                      </td></tr>
+                      <tr><td style="padding:10px 0 0;">
+                        <table width="100%"><tr>
+                          <td style="font-size:14px;font-weight:600;color:#0a4a6e;">💰 Montant total</td>
+                          <td style="font-size:20px;font-weight:700;color:#0a4a6e;text-align:right;">${formattedAmount}</td>
+                        </tr></table>
+                      </td></tr>
                     </table>
                   </td>
                 </tr>
               </table>
 
-              <!-- CTA Button -->
+              <!-- CTA -->
               <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:32px;">
                 <tr>
                   <td align="center">
-                    <a href="${paymentUrl}" style="display:inline-block;background:linear-gradient(135deg,#0a4a6e,#0e6899);color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;padding:16px 48px;border-radius:10px;letter-spacing:0.3px;">
+                    <a href="${paymentUrl}" style="display:inline-block;background:#0a4a6e;color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;padding:16px 48px;border-radius:10px;">
                       💳 Payer maintenant
                     </a>
                   </td>
                 </tr>
               </table>
 
-              <!-- Link fallback -->
-              <div style="background:#f8fafc;border-radius:8px;padding:16px;margin-bottom:32px;border:1px solid #e2e8f0;">
+              <!-- Lien texte -->
+              <div style="background:#f8fafc;border-radius:8px;padding:16px;margin-bottom:24px;border:1px solid #e2e8f0;">
                 <p style="font-size:12px;color:#94a3b8;margin:0 0 6px;">Ou copiez ce lien dans votre navigateur :</p>
                 <p style="font-size:11px;color:#0e6899;margin:0;word-break:break-all;font-family:monospace;">${paymentUrl}</p>
               </div>
 
-              <!-- Security note -->
-              <div style="display:flex;align-items:flex-start;gap:12px;background:#f0fdf4;border-radius:8px;padding:16px;border:1px solid #bbf7d0;margin-bottom:32px;">
-                <span style="font-size:20px;">🔒</span>
-                <div>
-                  <p style="font-size:13px;font-weight:600;color:#15803d;margin:0 0 2px;">Paiement 100% sécurisé</p>
-                  <p style="font-size:12px;color:#4ade80;color:#166534;margin:0;">Votre paiement est traité par Stripe, leader mondial des paiements en ligne. Vos données bancaires ne sont jamais partagées.</p>
-                </div>
-              </div>
+              <!-- Sécurité -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0;margin-bottom:24px;">
+                <tr>
+                  <td style="padding:16px;">
+                    <p style="font-size:13px;font-weight:600;color:#15803d;margin:0 0 4px;">🔒 Paiement 100% sécurisé</p>
+                    <p style="font-size:12px;color:#166534;margin:0;">Votre paiement est traité par Stripe. Vos données bancaires ne sont jamais partagées.</p>
+                  </td>
+                </tr>
+              </table>
 
-              <!-- Expiry note -->
               <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0;">
                 ⏱ Ce lien est valable <strong>24 heures</strong>. Passé ce délai, contactez votre conseiller.
               </p>
-
             </td>
           </tr>
 
@@ -226,7 +212,6 @@ function createPaymentLinkEmailHTML({
       </td>
     </tr>
   </table>
-
 </body>
 </html>`;
 }

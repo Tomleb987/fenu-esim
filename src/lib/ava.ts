@@ -2,6 +2,7 @@
 import axios from 'axios';
 import { format, isValid } from 'date-fns';
 import { AVA_TOURIST_OPTIONS } from './ava_options';
+import { supabaseAdmin } from './supabaseAdmin';
 
 const AVA_API_URL = process.env.AVA_API_URL || "https://api-ava.fr/api";
 const PARTNER_ID = process.env.AVA_PARTNER_ID;
@@ -48,8 +49,7 @@ export async function getAvaToken() {
 const toFrDate = (d: string | undefined | null) => {
     if (!d) return undefined;
     try {
-        // Parser manuellement pour éviter le décalage UTC → PF (UTC-10)
-        const dateStr = d.split("T")[0]; // prend "2026-02-21" de "2026-02-21T00:00:00Z"
+        const dateStr = d.split("T")[0];
         const [year, month, day] = dateStr.split("-").map(Number);
         if (!year || !month || !day) return undefined;
         const date = new Date(year, month - 1, day);
@@ -79,19 +79,15 @@ function buildTarificationPayload(data: any): URLSearchParams {
   params.append('productType', productType);
   params.append('journeyStartDate', journeyStartDate);
   params.append('journeyEndDate', journeyEndDate);
-  // journeyAmount non requis pour avantages_pom
   if (productType !== 'avantages_pom') {
     params.append('journeyAmount', String(costPerPerson));
   }
-  // journeyRegion uniquement pour ava_pass
   if (productType === 'ava_pass') {
     params.append('journeyRegion', String(data.destinationRegion || "102"));
   }
-  // numberAdultCompanions non requis pour avantages_pom
   if (productType !== 'avantages_pom') {
     params.append('numberAdultCompanions', String(companions.length));
   }
-  // numberChildrenCompanions requis pour ava_carte_sante
   if (productType === 'ava_carte_sante') {
     const childCount = companions.filter((c: any) => {
       const birth = new Date(c.birthDate);
@@ -166,6 +162,57 @@ function buildTarificationPayload(data: any): URLSearchParams {
   console.log(`📦 Payload AVA — prod=${IS_PROD}, region=${data.destinationRegion}, montant=${costPerPerson}€/pax, options=${JSON.stringify(optionsJson)}`);
 
   return params;
+}
+
+/* --- FETCH + UPLOAD ATTESTATION PDF → Supabase Storage --- */
+async function fetchAndStoreAttestation(
+  attestationUrl: string,
+  adhesionNumber: string,
+  token: string
+): Promise<string | null> {
+  try {
+    console.log(`📥 Fetch attestation PDF: ${attestationUrl}`);
+
+    const pdfResponse = await axios.get(attestationUrl, {
+      headers: { 'Authorization': `Bearer ${token}` },
+      responseType: 'arraybuffer',
+      timeout: 15000,
+    });
+
+    const contentType = pdfResponse.headers['content-type'] || '';
+    if (!contentType.includes('pdf')) {
+      console.warn(`⚠️ Attestation non-PDF reçue (${contentType}) — URL AVA nécessite auth navigateur`);
+      return null;
+    }
+
+    const pdfBuffer = Buffer.from(pdfResponse.data);
+    const fileName = `attestations/${adhesionNumber}-${Date.now()}.pdf`;
+
+    const { error: uploadError } = await supabaseAdmin
+      .storage
+      .from('insurance-documents')
+      .upload(fileName, pdfBuffer, {
+        contentType: 'application/pdf',
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error("❌ Erreur upload Supabase Storage:", uploadError.message);
+      return null;
+    }
+
+    const { data: publicUrlData } = supabaseAdmin
+      .storage
+      .from('insurance-documents')
+      .getPublicUrl(fileName);
+
+    console.log(`✅ Attestation stockée: ${publicUrlData.publicUrl}`);
+    return publicUrlData.publicUrl;
+
+  } catch (error: any) {
+    console.error("❌ Erreur fetch/upload attestation:", error.message);
+    return null;
+  }
 }
 
 /* --- 2. CALCUL DU PRIX --- */
@@ -263,10 +310,21 @@ export async function validateAvaAdhesion(adhesionNumber: string) {
         console.log("📥 Réponse Validation AVA (brut):", JSON.stringify(d));
 
         const certificatUrl = d?.["Certificat de garantie"] || d?.certificat || d?.certificate_url || null;
-        const attestationUrl = d?.["Attestation d'assurance"] || d?.attestation || null;
+        const attestationUrlRaw = d?.["Attestation d'assurance"] || d?.attestation || null;
         const message = d?.message || d?.Message || null;
 
-        console.log(`✅ Validation OK | Certificat: ${certificatUrl} | Attestation: ${attestationUrl}`);
+        console.log(`✅ Validation OK | Certificat: ${certificatUrl} | Attestation brute: ${attestationUrlRaw}`);
+
+        // 📎 Fetch + upload attestation dans Supabase Storage
+        let attestationUrl: string | null = null;
+        if (attestationUrlRaw) {
+            attestationUrl = await fetchAndStoreAttestation(attestationUrlRaw, adhesionNumber, token);
+            // Fallback : si le fetch échoue, on garde l'URL AVA directe
+            if (!attestationUrl) {
+                console.warn("⚠️ Fallback : utilisation URL AVA directe pour l'attestation");
+                attestationUrl = attestationUrlRaw;
+            }
+        }
 
         return {
             success: true,

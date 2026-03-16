@@ -90,7 +90,7 @@ export default function PartnerDashboard() {
       .select("id, name, data_amount, data_unit, validity_days, price_xpf, final_price_xpf, price_eur, final_price_eur, currency, status, country, region, region_fr")
       .eq("status", "active")
       .order("price_eur", { ascending: true })
-      .limit(12);
+      .limit(500);
     if (data) setPackages(data);
   };
 
@@ -251,17 +251,20 @@ export default function PartnerDashboard() {
   };
 
   const getDestinationFR = (pkg: AiraloPackage) => {
-    if (pkg.region_fr) return pkg.region_fr;
     const raw = pkg.region || pkg.country || "";
+    // Si region_fr existe ET est différent de region (vraiment traduit), on l'utilise
+    if (pkg.region_fr && pkg.region_fr !== raw) return pkg.region_fr;
+    // Sinon on traduit via notre map
     return regionTranslations[raw] || raw || "—";
   };
 
   const filteredPackages = packages.filter(pkg => {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
-    const dest = getDestinationFR(pkg).toLowerCase();
+    const destFR = getDestinationFR(pkg).toLowerCase();
+    const destEN = (pkg.region || pkg.country || "").toLowerCase();
     const name = pkg.name.toLowerCase();
-    return dest.includes(q) || name.includes(q);
+    return destFR.includes(q) || destEN.includes(q) || name.includes(q);
   });
 
   const statusLabel: Record<string, { label: string; style: string }> = {

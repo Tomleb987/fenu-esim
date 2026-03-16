@@ -11,8 +11,8 @@ interface AiraloPackage {
   id: string;
   name: string;
   description?: string;
-  data_amount: string;
-  data_unit: string;
+  data_amount?: string;
+  data_unit?: string;
   validity_days?: number;
   price_xpf?: number;
   final_price_xpf?: number;
@@ -20,6 +20,9 @@ interface AiraloPackage {
   final_price_eur?: number;
   currency?: string;
   status?: string;
+  country?: string;
+  region?: string;
+  region_fr?: string;
 }
 
 interface PartnerOrder {
@@ -81,8 +84,8 @@ export default function PartnerDashboard() {
   const loadPackages = async () => {
     const { data } = await supabase
       .from("airalo_packages")
-      .select("id, name, description, data_amount, data_unit, validity_days, price_xpf, final_price_xpf, price_eur, final_price_eur, currency, status")
-      .eq("status", "active")
+      .select("id, name, data_amount, data_unit, validity_days, price_xpf, final_price_xpf, price_eur, final_price_eur, currency, status, country, region, region_fr")
+      .eq("status", "available")
       .order("price_xpf", { ascending: true })
       .limit(12);
     if (data) setPackages(data);
@@ -156,10 +159,30 @@ export default function PartnerDashboard() {
   };
 
   const formatPrice = (pkg: AiraloPackage) => {
+    // price_eur contient en réalité le prix XPF dans votre base
     const price = pkg.price_xpf || pkg.final_price_xpf || pkg.price_eur || pkg.final_price_eur || 0;
-    const currency = (pkg.currency || "EUR").toUpperCase();
-    if (currency === "XPF") return `${Math.round(price).toLocaleString("fr")} XPF`;
-    return `${price.toFixed(2)} €`;
+    return `${Math.round(price).toLocaleString("fr")} XPF`;
+  };
+
+  const getDestination = (pkg: AiraloPackage) => {
+    return pkg.region_fr || pkg.region || pkg.country || "—";
+  };
+
+  const getValidity = (pkg: AiraloPackage) => {
+    if (pkg.validity_days) return `${pkg.validity_days} jours`;
+    // Extraire la validité depuis le nom ex: "illimité - 3 jours"
+    const match = pkg.name.match(/(\d+)\s*jours?/i);
+    if (match) return `${match[1]} jours`;
+    const matchDays = pkg.name.match(/(\d+)\s*days?/i);
+    if (matchDays) return `${matchDays[1]} jours`;
+    return "";
+  };
+
+  const getData = (pkg: AiraloPackage) => {
+    if (pkg.data_amount && pkg.data_amount !== "illimité") return `${pkg.data_amount} ${pkg.data_unit || "Go"}`;
+    if (pkg.data_unit === "illimité" || pkg.data_unit === "unlimited") return "Illimité";
+    if (pkg.data_amount) return `${pkg.data_amount} ${pkg.data_unit || "Go"}`;
+    return pkg.data_unit || "Illimité";
   };
 
   const statusLabel: Record<string, { label: string; style: string }> = {
@@ -265,11 +288,9 @@ export default function PartnerDashboard() {
                             <button key={pkg.id} onClick={() => setSelectedPackage(pkg)}
                               className={`relative text-left border-2 rounded-xl p-4 transition-all ${selectedPackage?.id === pkg.id ? "border-[#0a4a6e] bg-blue-50" : "border-gray-200 hover:border-gray-300"}`}>
                               {selectedPackage?.id === pkg.id && <span className="absolute top-2 right-2 text-[#0a4a6e] font-bold text-sm">✓</span>}
-                              <p className="font-semibold text-gray-800 text-sm mb-0.5 pr-4">{pkg.name}</p>
-                              <p className="text-2xl font-bold text-[#0a4a6e] leading-none">
-                                {pkg.data_amount}<span className="text-sm font-normal text-gray-500 ml-1">{pkg.data_unit}</span>
-                              </p>
-                              <p className="text-xs text-gray-400 mt-0.5">{pkg.validity_days} jours</p>
+                              <p className="font-semibold text-gray-800 text-sm mb-0.5 pr-4">{getDestination(pkg)}</p>
+                              <p className="text-lg font-bold text-[#0a4a6e] leading-none">{getData(pkg)}</p>
+                              <p className="text-xs text-gray-400 mt-0.5">{getValidity(pkg)}</p>
                               <p className="text-sm font-semibold text-[#0a4a6e] mt-2 pt-2 border-t border-gray-100">{formatPrice(pkg)}</p>
                             </button>
                           ))}
@@ -343,8 +364,9 @@ export default function PartnerDashboard() {
                           ["Email", clientForm.email],
                           ["Téléphone", clientForm.phone || "—"],
                           ["Forfait", selectedPackage.name],
-                          ["Données", `${selectedPackage.data_amount} ${selectedPackage.data_unit}`],
-                          ["Validité", `${selectedPackage.validity_days} jours`],
+                          ["Destination", getDestination(selectedPackage)],
+                          ["Données", getData(selectedPackage)],
+                          ["Validité", getValidity(selectedPackage)],
                         ].map(([label, value]) => (
                           <div key={label} className="flex justify-between py-2.5 text-sm">
                             <span className="text-gray-400">{label}</span>

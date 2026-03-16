@@ -110,7 +110,6 @@ export default async function handler(
     success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/`,
     // Lien valable 24h
-    expires_at: Math.floor(Date.now() / 1000) + 86400,
   });
 
   // ── 7. Logger la commande partenaire dans Supabase (statut : pending)

@@ -56,6 +56,8 @@ export default function PartnerDashboard() {
   const [orders, setOrders] = useState<PartnerOrder[]>([]);
   const [activeTab, setActiveTab] = useState<"new" | "orders">("new");
   const [searchQuery, setSearchQuery] = useState("");
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -149,6 +151,37 @@ export default function PartnerDashboard() {
     const subject = "Votre lien de paiement eSIM FenuaSIM";
     const body = `Bonjour ${clientForm.firstName},\n\nVoici votre lien de paiement sécurisé pour votre forfait eSIM :\n${generatedLink}\n\nCordialement,\n${partnerProfile?.advisor_name || "L'équipe FenuaSIM"}`;
     window.location.href = `mailto:${clientForm.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  };
+
+  const sendPaymentLinkEmail = async () => {
+    if (!generatedLink || !clientForm.email) return;
+    setSendingEmail(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      await fetch("/api/partner/send-payment-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({
+          clientEmail: clientForm.email,
+          clientFirstName: clientForm.firstName,
+          clientLastName: clientForm.lastName,
+          packageName: selectedPackage?.name,
+          destination: selectedPackage ? getDestinationFR(selectedPackage) : "",
+          dataAmount: selectedPackage ? getData(selectedPackage) : "",
+          validityDays: selectedPackage ? getValidity(selectedPackage) : "",
+          amount: selectedPackage?.price_xpf || selectedPackage?.price_eur || 0,
+          currency: "xpf",
+          paymentUrl: generatedLink,
+          advisorName: partnerProfile?.advisor_name,
+        }),
+      });
+      setEmailSent(true);
+      setTimeout(() => setEmailSent(false), 3000);
+    } catch (err) {
+      console.error("Erreur envoi email:", err);
+    } finally {
+      setSendingEmail(false);
+    }
   };
 
   const resetForm = () => {
@@ -340,11 +373,10 @@ export default function PartnerDashboard() {
                           <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
                         )}
                       </div>
-                      {filteredPackages.length === 0 ? (
-                        <p className="text-gray-400 text-sm py-8 text-center">Aucun forfait trouvé pour "{searchQuery}"</p>
-                      ) : null}
                       {packages.length === 0 ? (
                         <p className="text-gray-400 text-sm py-8 text-center">Chargement des forfaits...</p>
+                      ) : filteredPackages.length === 0 ? (
+                        <p className="text-gray-400 text-sm py-8 text-center">Aucun forfait trouvé pour « {searchQuery} »</p>
                       ) : (
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
                           {filteredPackages.map((pkg) => (
@@ -475,9 +507,15 @@ export default function PartnerDashboard() {
                         </button>
                       </div>
                       <div className="flex gap-3 justify-center flex-wrap mb-6">
-                        <button onClick={sendViaEmail} className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:border-[#0a4a6e] hover:text-[#0a4a6e] transition-colors">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                          Envoyer par email
+                        <button onClick={sendPaymentLinkEmail} disabled={sendingEmail}
+                          className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm font-medium transition-all ${emailSent ? "border-green-500 text-green-600 bg-green-50" : "border-gray-300 text-gray-700 hover:border-[#0a4a6e] hover:text-[#0a4a6e]"} disabled:opacity-60`}>
+                          {emailSent ? (
+                            <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><polyline points="20 6 9 17 4 12" strokeLinecap="round" strokeLinejoin="round"/></svg>Email envoyé !</>
+                          ) : sendingEmail ? (
+                            <><div className="w-4 h-4 border-2 border-gray-300 border-t-[#0a4a6e] rounded-full animate-spin"/>Envoi...</>
+                          ) : (
+                            <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Envoyer par email</>
+                          )}
                         </button>
                         {clientForm.phone && (
                           <button onClick={sendViaWhatsApp} className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:border-green-500 hover:text-green-600 transition-colors">

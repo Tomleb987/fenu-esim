@@ -85,8 +85,8 @@ export default function PartnerDashboard() {
     const { data } = await supabase
       .from("airalo_packages")
       .select("id, name, data_amount, data_unit, validity_days, price_xpf, final_price_xpf, price_eur, final_price_eur, currency, status, country, region, region_fr")
-      .eq("status", "available")
-      .order("price_xpf", { ascending: true })
+      .eq("status", "active")
+      .order("price_eur", { ascending: true })
       .limit(12);
     if (data) setPackages(data);
   };

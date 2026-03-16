@@ -55,6 +55,7 @@ export default function PartnerDashboard() {
   const [formError, setFormError] = useState("");
   const [orders, setOrders] = useState<PartnerOrder[]>([]);
   const [activeTab, setActiveTab] = useState<"new" | "orders">("new");
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -110,7 +111,7 @@ export default function PartnerDashboard() {
     setGenerating(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const response = await fetch("/api/partner/create-payment-link", {
+      const response = await fetch("/api/create-payment-link", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
         body: JSON.stringify({
@@ -184,6 +185,51 @@ export default function PartnerDashboard() {
     if (pkg.data_amount) return `${pkg.data_amount} ${pkg.data_unit || "Go"}`;
     return pkg.data_unit || "Illimité";
   };
+
+  // Traductions destinations EN → FR
+  const regionTranslations: Record<string, string> = {
+    "United States": "États-Unis", "France": "France", "Japan": "Japon",
+    "Australia": "Australie", "United Kingdom": "Royaume-Uni", "Germany": "Allemagne",
+    "Spain": "Espagne", "Italy": "Italie", "Canada": "Canada", "Mexico": "Mexique",
+    "Brazil": "Brésil", "China": "Chine", "South Korea": "Corée du Sud",
+    "Thailand": "Thaïlande", "Singapore": "Singapour", "Indonesia": "Indonésie",
+    "Malaysia": "Malaisie", "Vietnam": "Vietnam", "Philippines": "Philippines",
+    "India": "Inde", "Turkey": "Turquie", "Egypt": "Égypte", "Morocco": "Maroc",
+    "South Africa": "Afrique du Sud", "United Arab Emirates": "Émirats arabes unis",
+    "New Zealand": "Nouvelle-Zélande", "Switzerland": "Suisse", "Netherlands": "Pays-Bas",
+    "Portugal": "Portugal", "Greece": "Grèce", "Sweden": "Suède", "Norway": "Norvège",
+    "Denmark": "Danemark", "Finland": "Finlande", "Poland": "Pologne",
+    "Czech Republic": "République tchèque", "Austria": "Autriche", "Belgium": "Belgique",
+    "Hungary": "Hongrie", "Romania": "Roumanie", "Croatia": "Croatie",
+    "Argentina": "Argentine", "Chile": "Chili", "Colombia": "Colombie", "Peru": "Pérou",
+    "Hong Kong": "Hong Kong", "Taiwan": "Taïwan", "Sri Lanka": "Sri Lanka",
+    "Nepal": "Népal", "Bangladesh": "Bangladesh", "Pakistan": "Pakistan",
+    "Israel": "Israël", "Jordan": "Jordanie", "Saudi Arabia": "Arabie saoudite",
+    "Kuwait": "Koweït", "Qatar": "Qatar", "Bahrain": "Bahreïn", "Oman": "Oman",
+    "Kenya": "Kenya", "Tanzania": "Tanzanie", "Ghana": "Ghana", "Nigeria": "Nigeria",
+    "Ethiopia": "Éthiopie", "Rwanda": "Rwanda", "Uganda": "Ouganda",
+    "Asia": "Asie", "Europe": "Europe", "Africa": "Afrique",
+    "North America": "Amérique du Nord", "South America": "Amérique du Sud",
+    "Oceania": "Océanie", "Middle East": "Moyen-Orient", "Global": "Mondial",
+    "Caribbean": "Caraïbes", "Southeast Asia": "Asie du Sud-Est",
+    "Central America": "Amérique centrale", "Balkans": "Balkans",
+    "Scandinavia": "Scandinavie", "Baltic States": "États baltes",
+    "French Polynesia": "Polynésie française", "Pacific Islands": "Îles du Pacifique",
+  };
+
+  const getDestinationFR = (pkg: AiraloPackage) => {
+    if (pkg.region_fr) return pkg.region_fr;
+    const raw = pkg.region || pkg.country || "";
+    return regionTranslations[raw] || raw || "—";
+  };
+
+  const filteredPackages = packages.filter(pkg => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    const dest = getDestinationFR(pkg).toLowerCase();
+    const name = pkg.name.toLowerCase();
+    return dest.includes(q) || name.includes(q);
+  });
 
   const statusLabel: Record<string, { label: string; style: string }> = {
     pending:   { label: "⏳ En attente", style: "bg-amber-100 text-amber-700" },
@@ -280,15 +326,32 @@ export default function PartnerDashboard() {
                   {step === "forfait" && (
                     <div className="p-6">
                       <h2 className="font-semibold text-gray-800 mb-4">Choisissez un forfait</h2>
+                      {/* Barre de recherche */}
+                      <div className="relative mb-4">
+                        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                        <input
+                          type="text"
+                          value={searchQuery}
+                          onChange={e => setSearchQuery(e.target.value)}
+                          placeholder="Rechercher une destination... (ex: Japon, Europe)"
+                          className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-[#0a4a6e]"
+                        />
+                        {searchQuery && (
+                          <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
+                        )}
+                      </div>
+                      {filteredPackages.length === 0 ? (
+                        <p className="text-gray-400 text-sm py-8 text-center">Aucun forfait trouvé pour "{searchQuery}"</p>
+                      ) : null}
                       {packages.length === 0 ? (
                         <p className="text-gray-400 text-sm py-8 text-center">Chargement des forfaits...</p>
                       ) : (
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
-                          {packages.map((pkg) => (
+                          {filteredPackages.map((pkg) => (
                             <button key={pkg.id} onClick={() => setSelectedPackage(pkg)}
                               className={`relative text-left border-2 rounded-xl p-4 transition-all ${selectedPackage?.id === pkg.id ? "border-[#0a4a6e] bg-blue-50" : "border-gray-200 hover:border-gray-300"}`}>
                               {selectedPackage?.id === pkg.id && <span className="absolute top-2 right-2 text-[#0a4a6e] font-bold text-sm">✓</span>}
-                              <p className="font-semibold text-gray-800 text-sm mb-0.5 pr-4">{getDestination(pkg)}</p>
+                              <p className="font-semibold text-gray-800 text-sm mb-0.5 pr-4">{getDestinationFR(pkg)}</p>
                               <p className="text-lg font-bold text-[#0a4a6e] leading-none">{getData(pkg)}</p>
                               <p className="text-xs text-gray-400 mt-0.5">{getValidity(pkg)}</p>
                               <p className="text-sm font-semibold text-[#0a4a6e] mt-2 pt-2 border-t border-gray-100">{formatPrice(pkg)}</p>
@@ -364,7 +427,7 @@ export default function PartnerDashboard() {
                           ["Email", clientForm.email],
                           ["Téléphone", clientForm.phone || "—"],
                           ["Forfait", selectedPackage.name],
-                          ["Destination", getDestination(selectedPackage)],
+                          ["Destination", getDestinationFR(selectedPackage)],
                           ["Données", getData(selectedPackage)],
                           ["Validité", getValidity(selectedPackage)],
                         ].map(([label, value]) => (

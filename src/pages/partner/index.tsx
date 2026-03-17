@@ -127,7 +127,6 @@ export default function PartnerDashboard() {
       .from("airalo_packages")
       .select("id, name, data_amount, data_unit, validity_days, validity, price_xpf, final_price_xpf, price_eur, final_price_eur, currency, status, country, region, region_fr, operator_name, flag_url, type")
       .eq("status", "active")
-      .order("price_xpf", { ascending: true, nullsFirst: false })
       .limit(2000);
     if (data) setPackages(data);
   };
@@ -158,7 +157,13 @@ export default function PartnerDashboard() {
   const filteredRegions = allRegions.filter(r => !searchQuery || r.toLowerCase().includes(searchQuery.toLowerCase()));
   const topRegions = filteredRegions.filter(r => TOP_DESTINATIONS.some(t => t.toLowerCase() === r.toLowerCase()));
   const otherRegions = filteredRegions.filter(r => !TOP_DESTINATIONS.some(t => t.toLowerCase() === r.toLowerCase()));
-  const regionPackages = selectedRegion ? (packagesByRegion[selectedRegion] || []) : [];
+  const regionPackages = selectedRegion 
+    ? (packagesByRegion[selectedRegion] || []).sort((a, b) => {
+        const pa = a.price_xpf || a.final_price_xpf || a.price_eur || 0;
+        const pb = b.price_xpf || b.final_price_xpf || b.price_eur || 0;
+        return pa - pb;
+      })
+    : [];
 
   const getValidity = (pkg: AiraloPackage) => {
     if (pkg.validity_days) return `${pkg.validity_days} jours`;

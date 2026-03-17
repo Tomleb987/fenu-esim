@@ -203,7 +203,7 @@ export default function PartnerDashboard() {
       const response = await fetch("/api/create-payment-link", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ packageId: selectedPackage.id, clientFirstName: clientForm.firstName, clientLastName: clientForm.lastName, clientEmail: clientForm.email, clientPhone: clientForm.phone }),
+        body: JSON.stringify({ packageId: selectedPackage.id, clientFirstName: clientForm.firstName, clientLastName: clientForm.lastName, clientEmail: clientForm.email, clientPhone: clientForm.phone, destination: selectedRegion }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Erreur serveur");

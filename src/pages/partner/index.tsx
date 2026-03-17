@@ -235,8 +235,11 @@ export default function PartnerDashboard() {
       });
       setEmailSent(true);
       setTimeout(() => setEmailSent(false), 3000);
-    } catch (err) { console.error("Erreur envoi email:", err); }
-    finally { setSendingEmail(false); }
+    } catch (err) {
+      console.error("Erreur envoi email:", err);
+    } finally {
+      setSendingEmail(false);
+    }
   };
 
   const resendPaymentLink = async (order: PartnerOrder) => {

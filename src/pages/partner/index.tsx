@@ -40,7 +40,6 @@ interface PartnerOrder {
 
 type Step = "destination" | "forfait" | "client" | "recap" | "lien";
 
-// ── Traductions (même map que shop.tsx)
 const REGION_TRANSLATIONS: Record<string, string> = {
   "Discover Global": "Monde", "Asia": "Asie", "Europe": "Europe",
   "Japan": "Japon", "Canary Islands": "Îles Canaries", "South Korea": "Corée du Sud",
@@ -60,27 +59,23 @@ const REGION_TRANSLATIONS: Record<string, string> = {
   "Saudi Arabia": "Arabie saoudite", "Israel": "Israël", "Jordan": "Jordanie",
   "Qatar": "Qatar", "Kuwait": "Koweït", "Bahrain": "Bahreïn", "Oman": "Oman",
   "Canada": "Canada", "France": "France", "Lebanon": "Liban",
-  "Albania": "Albanie", "Algeria": "Algérie", "Angola": "Angola",
-  "Armenia": "Arménie", "Bangladesh": "Bangladesh", "Belarus": "Biélorussie",
-  "Bolivia": "Bolivie", "Bosnia and Herzegovina": "Bosnie-Herzégovine",
-  "Bulgaria": "Bulgarie", "Cambodia": "Cambodge", "Cameroon": "Cameroun",
-  "Croatia": "Croatie", "Cuba": "Cuba", "Cyprus": "Chypre",
-  "Denmark": "Danemark", "Dominican Republic": "République dominicaine",
+  "Albania": "Albanie", "Algeria": "Algérie", "Armenia": "Arménie",
+  "Bangladesh": "Bangladesh", "Bulgaria": "Bulgarie", "Cambodia": "Cambodge",
+  "Croatia": "Croatie", "Cyprus": "Chypre", "Denmark": "Danemark",
   "Ecuador": "Équateur", "Estonia": "Estonie", "Ethiopia": "Éthiopie",
   "Finland": "Finlande", "Georgia": "Géorgie", "Ghana": "Ghana",
-  "Guatemala": "Guatemala", "Hungary": "Hongrie", "Iceland": "Islande",
-  "Ireland": "Irlande", "Kazakhstan": "Kazakhstan", "Kenya": "Kenya",
-  "Laos": "Laos", "Latvia": "Lettonie", "Lithuania": "Lituanie",
-  "Luxembourg": "Luxembourg", "Madagascar": "Madagascar", "Maldives": "Maldives",
-  "Malta": "Malte", "Mauritius": "Maurice", "Moldova": "Moldavie",
-  "Mongolia": "Mongolie", "Montenegro": "Monténégro", "Myanmar": "Myanmar",
-  "Namibia": "Namibie", "Nepal": "Népal", "Nigeria": "Nigeria",
-  "Norway": "Norvège", "Pakistan": "Pakistan", "Panama": "Panama",
-  "Romania": "Roumanie", "Russia": "Russie", "Rwanda": "Rwanda",
-  "Senegal": "Sénégal", "Serbia": "Serbie", "Slovakia": "Slovaquie",
-  "Slovenia": "Slovénie", "Sri Lanka": "Sri Lanka", "Sweden": "Suède",
-  "Tanzania": "Tanzanie", "Tunisia": "Tunisie", "Ukraine": "Ukraine",
-  "Uruguay": "Uruguay", "Venezuela": "Venezuela", "Zambia": "Zambie",
+  "Hungary": "Hongrie", "Iceland": "Islande", "Ireland": "Irlande",
+  "Kazakhstan": "Kazakhstan", "Kenya": "Kenya", "Laos": "Laos",
+  "Latvia": "Lettonie", "Lithuania": "Lituanie", "Luxembourg": "Luxembourg",
+  "Madagascar": "Madagascar", "Maldives": "Maldives", "Malta": "Malte",
+  "Mauritius": "Maurice", "Mongolia": "Mongolie", "Montenegro": "Monténégro",
+  "Myanmar": "Myanmar", "Namibia": "Namibie", "Nepal": "Népal",
+  "Nigeria": "Nigeria", "Norway": "Norvège", "Pakistan": "Pakistan",
+  "Panama": "Panama", "Romania": "Roumanie", "Russia": "Russie",
+  "Rwanda": "Rwanda", "Senegal": "Sénégal", "Serbia": "Serbie",
+  "Slovakia": "Slovaquie", "Slovenia": "Slovénie", "Sri Lanka": "Sri Lanka",
+  "Sweden": "Suède", "Tanzania": "Tanzanie", "Tunisia": "Tunisie",
+  "Ukraine": "Ukraine", "Uruguay": "Uruguay", "Venezuela": "Venezuela",
   "Oceania": "Océanie", "North America": "Amérique du Nord",
   "Middle East and North Africa": "Moyen-Orient et Afrique du Nord",
   "French Polynesia": "Polynésie française",
@@ -100,7 +95,7 @@ export default function PartnerDashboard() {
   const [loading, setLoading] = useState(true);
   const [step, setStep] = useState<Step>("destination");
   const [packages, setPackages] = useState<AiraloPackage[]>([]);
-  const [selectedRegion, setSelectedRegion] = useState<string>("");
+  const [selectedRegion, setSelectedRegion] = useState("");
   const [selectedPackage, setSelectedPackage] = useState<AiraloPackage | null>(null);
   const [clientForm, setClientForm] = useState({ firstName: "", lastName: "", email: "", phone: "" });
   const [generatedLink, setGeneratedLink] = useState("");
@@ -141,7 +136,6 @@ export default function PartnerDashboard() {
     if (data) setOrders(data as PartnerOrder[]);
   };
 
-  // ── Grouper les packages par destination (comme shop.tsx)
   const packagesByRegion = packages.reduce((acc, pkg) => {
     const region = getFrenchName(pkg);
     if (!acc[region]) acc[region] = [];
@@ -150,27 +144,19 @@ export default function PartnerDashboard() {
   }, {} as Record<string, AiraloPackage[]>);
 
   const regionStats = Object.entries(packagesByRegion).reduce((acc, [region, pkgs]) => {
-    const prices = pkgs.map(p => p.price_eur || p.final_price_eur || 0).filter(p => p > 0);
-    const pricesXpf = pkgs.map(p => p.price_xpf || p.final_price_xpf || 0).filter(p => p > 0);
+    const pricesXpf = pkgs.map(p => p.price_xpf || p.final_price_xpf || p.price_eur || 0).filter(p => p > 0);
     acc[region] = {
       minPriceXpf: pricesXpf.length > 0 ? Math.min(...pricesXpf) : 0,
       packageCount: pkgs.length,
       operatorName: pkgs[0]?.operator_name || "—",
-      flagUrl: pkgs[0]?.flag_url || "",
-      maxDays: Math.max(...pkgs.map(p => parseInt((p.validity || p.validity_days?.toString() || "0").split(' ')[0]) || 0)),
     };
     return acc;
-  }, {} as Record<string, { minPriceXpf: number; packageCount: number; operatorName: string; flagUrl: string; maxDays: number }>);
+  }, {} as Record<string, { minPriceXpf: number; packageCount: number; operatorName: string }>);
 
   const allRegions = Object.keys(packagesByRegion).sort((a, b) => (regionStats[a]?.minPriceXpf || 0) - (regionStats[b]?.minPriceXpf || 0));
-
-  const filteredRegions = allRegions.filter(region =>
-    !searchQuery || region.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
+  const filteredRegions = allRegions.filter(r => !searchQuery || r.toLowerCase().includes(searchQuery.toLowerCase()));
   const topRegions = filteredRegions.filter(r => TOP_DESTINATIONS.some(t => t.toLowerCase() === r.toLowerCase()));
   const otherRegions = filteredRegions.filter(r => !TOP_DESTINATIONS.some(t => t.toLowerCase() === r.toLowerCase()));
-
   const regionPackages = selectedRegion ? (packagesByRegion[selectedRegion] || []) : [];
 
   const getValidity = (pkg: AiraloPackage) => {
@@ -234,145 +220,191 @@ export default function PartnerDashboard() {
   };
 
   const copyLink = async () => { await navigator.clipboard.writeText(generatedLink); setCopied(true); setTimeout(() => setCopied(false), 2500); };
-
   const sendViaWhatsApp = () => {
     const msg = `Bonjour ${clientForm.firstName}, voici votre lien de paiement sécurisé pour votre eSIM FenuaSIM :\n${generatedLink}`;
     window.open(`https://wa.me/${clientForm.phone?.replace(/\s/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
   };
-
   const resetForm = () => { setStep("destination"); setSelectedRegion(""); setSelectedPackage(null); setClientForm({ firstName: "", lastName: "", email: "", phone: "" }); setGeneratedLink(""); setFormError(""); setSearchQuery(""); };
 
-  const stepLabels = ["Destination", "Forfait", "Client", "Récap", "Lien"];
   const stepKeys: Step[] = ["destination", "forfait", "client", "recap", "lien"];
+  const stepLabels = ["Destination", "Forfait", "Client", "Récap", "Lien"];
   const currentStepIdx = stepKeys.indexOf(step);
 
-  const statusLabel: Record<string, { label: string; style: string }> = {
-    pending: { label: "⏳ En attente", style: "bg-amber-100 text-amber-700" },
-    paid: { label: "💳 Payé", style: "bg-blue-100 text-blue-700" },
-    esim_sent: { label: "✓ eSIM envoyée", style: "bg-green-100 text-green-700" },
-    error: { label: "✗ Erreur", style: "bg-red-100 text-red-700" },
+  const statusConfig: Record<string, { label: string; bg: string; text: string }> = {
+    pending:   { label: "En attente", bg: "#FFF7ED", text: "#C2410C" },
+    paid:      { label: "Payé",        bg: "#EDE9FE", text: "#7C3AED" },
+    esim_sent: { label: "eSIM envoyée", bg: "#F0FDF4", text: "#15803D" },
+    error:     { label: "Erreur",       bg: "#FEF2F2", text: "#DC2626" },
   };
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="text-center"><div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" /><p className="text-gray-500 text-sm">Chargement...</p></div>
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#fafafa" }}>
+      <div style={{ textAlign: "center" }}>
+        <div style={{ width: 44, height: 44, border: "3px solid #f3e8ff", borderTopColor: "#A020F0", borderRadius: "50%", animation: "spin .7s linear infinite", margin: "0 auto 12px" }} />
+        <p style={{ color: "#888", fontSize: 14 }}>Chargement...</p>
+      </div>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   );
 
+  const G = "linear-gradient(135deg, #A020F0 0%, #FF4D6D 50%, #FF7F11 100%)";
+  const Gsoft = "linear-gradient(135deg, #f3e8ff 0%, #ffe4e6 50%, #fff7ed 100%)";
+
   return (
     <>
-      <Head><title>Espace Partenaire — FenuaSIM</title></Head>
-      <div className="min-h-screen bg-gray-50 flex">
+      <Head><title>Espace Partenaire — FENUA SIM</title></Head>
+      <style>{`
+        @keyframes spin{to{transform:rotate(360deg)}}
+        @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+        .ani{animation:fadein .2s ease}
+        .dest-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(160,32,240,0.12)}
+        .pkg-card:hover{border-color:#A020F0 !important}
+        .nav-btn:hover{background:rgba(255,255,255,0.08)}
+        input:focus,select:focus{outline:none;border-color:#A020F0 !important;box-shadow:0 0 0 3px rgba(160,32,240,0.1)}
+        ::-webkit-scrollbar{width:6px;height:6px}
+        ::-webkit-scrollbar-track{background:transparent}
+        ::-webkit-scrollbar-thumb{background:#e5e7eb;border-radius:3px}
+      `}</style>
 
-        {/* Sidebar */}
-        <aside className="w-56 bg-[#0a4a6e] flex flex-col shrink-0">
-          <div className="px-5 py-6 border-b border-white/10">
-            <span className="text-white font-semibold text-lg">Fenua<span className="text-cyan-400">SIM</span></span>
-            <p className="text-white/50 text-xs mt-1">Espace partenaire</p>
+      <div style={{ minHeight: "100vh", display: "flex", background: "#f8f7ff", fontFamily: "Arial, Helvetica, sans-serif" }}>
+
+        {/* ── SIDEBAR */}
+        <aside style={{ width: 220, background: "#1a0533", display: "flex", flexDirection: "column", flexShrink: 0, position: "relative", overflow: "hidden" }}>
+          {/* Gradient overlay */}
+          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(160,32,240,0.3) 0%, transparent 60%)", pointerEvents: "none" }} />
+
+          {/* Logo */}
+          <div style={{ padding: "24px 20px 20px", borderBottom: "1px solid rgba(255,255,255,0.08)", position: "relative" }}>
+            <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-0.3px" }}>
+              <span style={{ background: G, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>FENUA</span>
+              <span style={{ color: "rgba(255,255,255,0.3)", margin: "0 2px" }}>•</span>
+              <span style={{ background: "linear-gradient(135deg, #FF4D6D, #FF7F11)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>SIM</span>
+            </div>
+            <p style={{ color: "rgba(255,255,255,0.35)", fontSize: 11, marginTop: 2, letterSpacing: "0.5px", textTransform: "uppercase" }}>Espace partenaire</p>
           </div>
-          <div className="px-5 py-4 border-b border-white/10">
-            <p className="text-white text-sm font-medium">{partnerProfile?.advisor_name}</p>
-            <p className="text-white/50 text-xs mt-0.5">Code : {partnerProfile?.partner_code}</p>
+
+          {/* Profil */}
+          <div style={{ padding: "14px 20px", borderBottom: "1px solid rgba(255,255,255,0.06)", position: "relative" }}>
+            <div style={{ width: 36, height: 36, borderRadius: "50%", background: G, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 8, fontSize: 14, fontWeight: 700, color: "#fff" }}>
+              {(partnerProfile?.advisor_name || "?")[0].toUpperCase()}
+            </div>
+            <p style={{ color: "#fff", fontSize: 13, fontWeight: 600, margin: 0 }}>{partnerProfile?.advisor_name}</p>
+            <p style={{ color: "rgba(255,255,255,0.35)", fontSize: 11, marginTop: 2 }}>Code : {partnerProfile?.partner_code}</p>
           </div>
-          <nav className="flex-1 py-3">
-            <button onClick={() => { setActiveTab("new"); resetForm(); }} className={`w-full text-left px-5 py-2.5 text-sm flex items-center gap-2.5 border-l-2 transition-all ${activeTab === "new" ? "border-cyan-400 bg-white/10 text-white font-medium" : "border-transparent text-white/60 hover:text-white hover:bg-white/5"}`}>
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd"/></svg>
-              Nouvelle commande
-            </button>
-            <button onClick={() => setActiveTab("orders")} className={`w-full text-left px-5 py-2.5 text-sm flex items-center gap-2.5 border-l-2 transition-all ${activeTab === "orders" ? "border-cyan-400 bg-white/10 text-white font-medium" : "border-transparent text-white/60 hover:text-white hover:bg-white/5"}`}>
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd"/></svg>
-              Mes commandes
-            </button>
+
+          {/* Nav */}
+          <nav style={{ flex: 1, padding: "12px 0", position: "relative" }}>
+            {[
+              { key: "new", label: "Nouvelle commande", icon: "+" },
+              { key: "orders", label: "Mes commandes", icon: "≡" },
+            ].map(item => (
+              <button key={item.key} onClick={() => { setActiveTab(item.key as any); if (item.key === "new") resetForm(); }}
+                className="nav-btn"
+                style={{ width: "100%", textAlign: "left", padding: "10px 20px", fontSize: 13, fontWeight: activeTab === item.key ? 600 : 400, color: activeTab === item.key ? "#fff" : "rgba(255,255,255,0.5)", background: activeTab === item.key ? "rgba(160,32,240,0.2)" : "transparent", border: "none", borderLeft: `3px solid ${activeTab === item.key ? "#A020F0" : "transparent"}`, cursor: "pointer", display: "flex", alignItems: "center", gap: 10, transition: "all .15s" }}>
+                <span style={{ fontSize: 16, opacity: 0.8 }}>{item.icon}</span>
+                {item.label}
+              </button>
+            ))}
           </nav>
-          <div className="p-4">
-            <button onClick={async () => { await supabase.auth.signOut(); router.push("/partner/login"); }} className="w-full py-2 text-xs text-white/50 hover:text-white border border-white/10 rounded-lg transition-colors">Déconnexion</button>
+
+          <div style={{ padding: 16, position: "relative" }}>
+            <button onClick={async () => { await supabase.auth.signOut(); router.push("/partner/login"); }}
+              style={{ width: "100%", padding: "8px", fontSize: 12, color: "rgba(255,255,255,0.4)", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, cursor: "pointer" }}>
+              Déconnexion
+            </button>
           </div>
         </aside>
 
-        {/* Main */}
-        <main className="flex-1 flex flex-col overflow-auto">
-          <header className="bg-white border-b border-gray-200 px-8 h-14 flex items-center justify-between shrink-0">
-            <h1 className="font-semibold text-gray-800">{activeTab === "new" ? "Nouvelle commande" : "Mes commandes"}</h1>
-            <span className="text-xs text-green-600 font-medium flex items-center gap-1.5"><span className="w-2 h-2 bg-green-500 rounded-full inline-block" />Connecté</span>
+        {/* ── MAIN */}
+        <main style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "auto" }}>
+
+          {/* Topbar */}
+          <header style={{ background: "#fff", padding: "0 32px", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #f0e8ff", flexShrink: 0 }}>
+            <h1 style={{ fontSize: 17, fontWeight: 700, margin: 0, color: "#1a0533" }}>
+              {activeTab === "new" ? "Nouvelle commande" : "Mes commandes"}
+            </h1>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#16a34a", fontWeight: 500 }}>
+              <span style={{ width: 7, height: 7, background: "#16a34a", borderRadius: "50%", display: "inline-block" }} />
+              Connecté
+            </div>
           </header>
 
-          <div className="p-8 flex-1">
+          <div style={{ padding: 32, flex: 1 }}>
 
-            {/* ── TAB NOUVELLE COMMANDE */}
+            {/* ══ TAB NOUVELLE COMMANDE ══ */}
             {activeTab === "new" && (
-              <div className="max-w-4xl mx-auto">
+              <div style={{ maxWidth: 860, margin: "0 auto" }}>
 
                 {/* Stepper */}
-                <div className="flex items-center mb-8">
+                <div style={{ display: "flex", alignItems: "center", marginBottom: 28 }}>
                   {stepKeys.map((s, i) => {
                     const done = i < currentStepIdx;
                     const active = i === currentStepIdx;
                     return (
-                      <div key={s} className="flex items-center">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold border-2 transition-all ${done ? "bg-[#0a4a6e] border-[#0a4a6e] text-white" : active ? "bg-cyan-400 border-cyan-400 text-white" : "border-gray-300 text-gray-400"}`}>
+                      <div key={s} style={{ display: "flex", alignItems: "center" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div style={{ width: 30, height: 30, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, background: done ? G : active ? G : "#e5e7eb", color: done || active ? "#fff" : "#9ca3af", flexShrink: 0, transition: "all .3s" }}>
                             {done ? "✓" : i + 1}
                           </div>
-                          <span className={`text-sm hidden sm:block ${active ? "text-[#0a4a6e] font-medium" : done ? "text-gray-600" : "text-gray-400"}`}>{stepLabels[i]}</span>
+                          <span style={{ fontSize: 13, fontWeight: active ? 600 : 400, color: active ? "#A020F0" : done ? "#6b7280" : "#9ca3af", display: window.innerWidth < 500 ? "none" : "block" }}>{stepLabels[i]}</span>
                         </div>
-                        {i < stepKeys.length - 1 && <div className={`mx-3 h-0.5 w-8 sm:w-12 flex-shrink-0 ${done ? "bg-[#0a4a6e]" : "bg-gray-200"}`} />}
+                        {i < stepKeys.length - 1 && <div style={{ width: 36, height: 2, margin: "0 10px", background: done ? G : "#e5e7eb", flexShrink: 0, borderRadius: 1 }} />}
                       </div>
                     );
                   })}
                 </div>
 
-                <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+                <div style={{ background: "#fff", borderRadius: 16, boxShadow: "0 2px 16px rgba(160,32,240,0.06)", border: "1px solid #f0e8ff" }}>
 
                   {/* ── ÉTAPE 1 : DESTINATION */}
                   {step === "destination" && (
-                    <div className="p-6">
-                      <h2 className="font-semibold text-gray-800 mb-4">Choisissez une destination</h2>
+                    <div className="ani" style={{ padding: 28 }}>
+                      <h2 style={{ fontSize: 17, fontWeight: 700, color: "#1a0533", marginBottom: 20 }}>🌍 Choisissez une destination</h2>
 
-                      {/* Barre de recherche */}
-                      <div className="relative mb-6">
-                        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-                        <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Rechercher une destination... (ex: Japon, Europe, États-Unis)"
-                          className="w-full pl-9 pr-8 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-[#0a4a6e]" />
-                        {searchQuery && <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg">×</button>}
+                      {/* Recherche */}
+                      <div style={{ position: "relative", marginBottom: 24 }}>
+                        <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#A020F0", fontSize: 16 }}>🔍</span>
+                        <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                          placeholder="Rechercher une destination... (ex: Japon, Europe, États-Unis)"
+                          style={{ width: "100%", padding: "11px 36px 11px 38px", border: "1.5px solid #e9d5ff", borderRadius: 10, fontSize: 14, color: "#1a0533", background: "#faf5ff", boxSizing: "border-box" }} />
+                        {searchQuery && <button onClick={() => setSearchQuery("")} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#9ca3af" }}>×</button>}
                       </div>
 
                       {packages.length === 0 ? (
-                        <p className="text-gray-400 text-sm py-8 text-center">Chargement...</p>
+                        <p style={{ textAlign: "center", color: "#9ca3af", padding: "40px 0", fontSize: 14 }}>Chargement...</p>
                       ) : filteredRegions.length === 0 ? (
-                        <p className="text-gray-400 text-sm py-8 text-center">Aucune destination trouvée pour « {searchQuery} »</p>
+                        <p style={{ textAlign: "center", color: "#9ca3af", padding: "40px 0", fontSize: 14 }}>Aucune destination trouvée pour « {searchQuery} »</p>
                       ) : (
                         <>
                           {/* Top destinations */}
                           {topRegions.length > 0 && !searchQuery && (
-                            <div className="mb-6">
-                              <p className="text-xs font-600 text-[#0a4a6e] uppercase tracking-wide mb-3">⭐ Destinations populaires</p>
-                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                            <div style={{ marginBottom: 28 }}>
+                              <p style={{ fontSize: 11, fontWeight: 700, color: "#A020F0", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 12 }}>⭐ Destinations populaires</p>
+                              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10 }}>
                                 {topRegions.map(region => (
                                   <button key={region} onClick={() => { setSelectedRegion(region); setStep("forfait"); }}
-                                    className="text-left border-2 border-[#0a4a6e]/20 bg-blue-50 rounded-xl p-3 hover:border-[#0a4a6e] hover:bg-blue-100 transition-all">
-                                    <p className="font-semibold text-[#0a4a6e] text-sm">{region}</p>
-                                    <p className="text-xs text-gray-500 mt-0.5">{regionStats[region]?.packageCount} forfaits</p>
-                                    <p className="text-xs font-semibold text-[#0a4a6e] mt-1">
-                                      dès {Math.round(regionStats[region]?.minPriceXpf || 0).toLocaleString("fr")} XPF
-                                    </p>
+                                    className="dest-card"
+                                    style={{ textAlign: "left", border: "2px solid #e9d5ff", borderRadius: 12, padding: "14px 12px", background: Gsoft, cursor: "pointer", transition: "all .2s" }}>
+                                    <p style={{ fontWeight: 700, fontSize: 13, color: "#6b21a8", margin: "0 0 4px" }}>{region}</p>
+                                    <p style={{ fontSize: 11, color: "#9333ea", margin: "0 0 6px" }}>{regionStats[region]?.packageCount} forfaits</p>
+                                    <p style={{ fontSize: 12, fontWeight: 700, color: "#A020F0", margin: 0 }}>dès {Math.round(regionStats[region]?.minPriceXpf || 0).toLocaleString("fr")} XPF</p>
                                   </button>
                                 ))}
                               </div>
                             </div>
                           )}
 
-                          {/* Toutes les destinations */}
+                          {/* Toutes destinations */}
                           <div>
-                            {!searchQuery && <p className="text-xs font-500 text-gray-500 uppercase tracking-wide mb-3">🌍 Toutes les destinations ({otherRegions.length})</p>}
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                            {!searchQuery && <p style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 12 }}>🌍 Toutes les destinations ({otherRegions.length})</p>}
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 8 }}>
                               {(searchQuery ? filteredRegions : otherRegions).map(region => (
                                 <button key={region} onClick={() => { setSelectedRegion(region); setStep("forfait"); }}
-                                  className="text-left border border-gray-200 rounded-lg p-3 hover:border-[#0a4a6e] hover:bg-gray-50 transition-all">
-                                  <p className="font-medium text-gray-800 text-sm">{region}</p>
-                                  <p className="text-xs text-gray-400 mt-0.5">{regionStats[region]?.packageCount} forfaits</p>
-                                  <p className="text-xs font-semibold text-[#0a4a6e] mt-1">
-                                    dès {Math.round(regionStats[region]?.minPriceXpf || 0).toLocaleString("fr")} XPF
-                                  </p>
+                                  className="dest-card"
+                                  style={{ textAlign: "left", border: "1.5px solid #e5e7eb", borderRadius: 10, padding: "12px", background: "#fff", cursor: "pointer", transition: "all .2s" }}>
+                                  <p style={{ fontWeight: 600, fontSize: 12, color: "#1a0533", margin: "0 0 3px" }}>{region}</p>
+                                  <p style={{ fontSize: 11, color: "#9ca3af", margin: "0 0 4px" }}>{regionStats[region]?.packageCount} forfaits</p>
+                                  <p style={{ fontSize: 11, fontWeight: 700, color: "#A020F0", margin: 0 }}>dès {Math.round(regionStats[region]?.minPriceXpf || 0).toLocaleString("fr")} XPF</p>
                                 </button>
                               ))}
                             </div>
@@ -384,35 +416,31 @@ export default function PartnerDashboard() {
 
                   {/* ── ÉTAPE 2 : FORFAIT */}
                   {step === "forfait" && (
-                    <div className="p-6">
-                      <div className="flex items-center gap-3 mb-5">
-                        <button onClick={() => setStep("destination")} className="text-gray-400 hover:text-gray-600">
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/></svg>
-                        </button>
-                        <h2 className="font-semibold text-gray-800">Forfaits — {selectedRegion}</h2>
-                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{regionPackages.length} forfaits</span>
+                    <div className="ani" style={{ padding: 28 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+                        <button onClick={() => setStep("destination")} style={{ background: "#f3e8ff", border: "none", borderRadius: 8, width: 32, height: 32, cursor: "pointer", fontSize: 16, color: "#A020F0", display: "flex", alignItems: "center", justifyContent: "center" }}>←</button>
+                        <h2 style={{ fontSize: 17, fontWeight: 700, color: "#1a0533", margin: 0 }}>Forfaits — {selectedRegion}</h2>
+                        <span style={{ fontSize: 12, background: "#f3e8ff", color: "#A020F0", padding: "3px 10px", borderRadius: 20, fontWeight: 600 }}>{regionPackages.length} forfaits</span>
                       </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6 max-h-96 overflow-y-auto pr-1">
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10, maxHeight: 420, overflowY: "auto", paddingRight: 4, marginBottom: 20 }}>
                         {regionPackages.map(pkg => (
-                          <button key={pkg.id} onClick={() => setSelectedPackage(pkg)}
-                            className={`relative text-left border-2 rounded-xl p-4 transition-all ${selectedPackage?.id === pkg.id ? "border-[#0a4a6e] bg-blue-50" : "border-gray-200 hover:border-gray-300"}`}>
-                            {selectedPackage?.id === pkg.id && <span className="absolute top-2 right-2 text-[#0a4a6e] font-bold">✓</span>}
-                            <div className="flex items-start justify-between pr-6">
+                          <button key={pkg.id} onClick={() => setSelectedPackage(pkg)} className="pkg-card"
+                            style={{ textAlign: "left", border: `2px solid ${selectedPackage?.id === pkg.id ? "#A020F0" : "#e5e7eb"}`, borderRadius: 12, padding: 16, background: selectedPackage?.id === pkg.id ? "#faf5ff" : "#fff", cursor: "pointer", transition: "all .15s", position: "relative" }}>
+                            {selectedPackage?.id === pkg.id && <span style={{ position: "absolute", top: 10, right: 12, color: "#A020F0", fontWeight: 800, fontSize: 16 }}>✓</span>}
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", paddingRight: selectedPackage?.id === pkg.id ? 20 : 0 }}>
                               <div>
-                                <p className="font-semibold text-gray-800 text-sm">{getData(pkg)}</p>
-                                <p className="text-xs text-gray-400 mt-0.5">{getValidity(pkg)}</p>
-                                {pkg.operator_name && <p className="text-xs text-gray-400 mt-0.5">{pkg.operator_name}</p>}
+                                <p style={{ fontWeight: 700, fontSize: 15, color: "#1a0533", margin: "0 0 4px" }}>{getData(pkg)}</p>
+                                <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 2px" }}>{getValidity(pkg)}</p>
+                                {pkg.operator_name && <p style={{ fontSize: 11, color: "#9ca3af", margin: 0 }}>{pkg.operator_name}</p>}
                               </div>
-                              <p className="text-sm font-bold text-[#0a4a6e] shrink-0">{formatPrice(pkg)}</p>
+                              <p style={{ fontWeight: 800, fontSize: 14, color: "#A020F0", margin: 0, flexShrink: 0 }}>{formatPrice(pkg)}</p>
                             </div>
                           </button>
                         ))}
                       </div>
-
-                      <div className="flex justify-end">
+                      <div style={{ display: "flex", justifyContent: "flex-end" }}>
                         <button onClick={() => setStep("client")} disabled={!selectedPackage}
-                          className="bg-[#0a4a6e] text-white px-6 py-2.5 rounded-lg text-sm font-medium disabled:opacity-40 hover:bg-[#0e6899] transition-colors">
+                          style={{ background: selectedPackage ? G : "#e5e7eb", color: selectedPackage ? "#fff" : "#9ca3af", border: "none", borderRadius: 10, padding: "11px 28px", fontSize: 14, fontWeight: 600, cursor: selectedPackage ? "pointer" : "not-allowed" }}>
                           Suivant →
                         </button>
                       </div>
@@ -421,52 +449,52 @@ export default function PartnerDashboard() {
 
                   {/* ── ÉTAPE 3 : CLIENT */}
                   {step === "client" && (
-                    <div className="p-6">
-                      <h2 className="font-semibold text-gray-800 mb-4">Informations du client</h2>
-                      <div className="grid grid-cols-2 gap-4 mb-4">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-500 mb-1.5">Prénom *</label>
-                          <input type="text" value={clientForm.firstName} onChange={e => setClientForm(f => ({ ...f, firstName: e.target.value }))} placeholder="Marie" className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#0a4a6e]" />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-500 mb-1.5">Nom *</label>
-                          <input type="text" value={clientForm.lastName} onChange={e => setClientForm(f => ({ ...f, lastName: e.target.value }))} placeholder="Dupont" className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#0a4a6e]" />
-                        </div>
-                        <div className="col-span-2">
-                          <label className="block text-xs font-medium text-gray-500 mb-1.5">Email *</label>
-                          <input type="email" value={clientForm.email} onChange={e => setClientForm(f => ({ ...f, email: e.target.value }))} placeholder="marie.dupont@email.com" className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#0a4a6e]" />
-                        </div>
-                        <div className="col-span-2">
-                          <label className="block text-xs font-medium text-gray-500 mb-1.5">Téléphone <span className="text-gray-400">(optionnel, pour WhatsApp)</span></label>
-                          <input type="tel" value={clientForm.phone} onChange={e => setClientForm(f => ({ ...f, phone: e.target.value }))} placeholder="+689 87 XX XX XX" className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#0a4a6e]" />
-                        </div>
+                    <div className="ani" style={{ padding: 28 }}>
+                      <h2 style={{ fontSize: 17, fontWeight: 700, color: "#1a0533", marginBottom: 20 }}>👤 Informations du client</h2>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+                        {[
+                          { label: "Prénom *", key: "firstName", placeholder: "Marie", type: "text", full: false },
+                          { label: "Nom *", key: "lastName", placeholder: "Dupont", type: "text", full: false },
+                          { label: "Email *", key: "email", placeholder: "marie.dupont@email.com", type: "email", full: true },
+                          { label: "Téléphone (optionnel, pour WhatsApp)", key: "phone", placeholder: "+689 87 XX XX XX", type: "tel", full: true },
+                        ].map(f => (
+                          <div key={f.key} style={{ gridColumn: f.full ? "1 / -1" : "auto" }}>
+                            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#6b7280", marginBottom: 6 }}>{f.label}</label>
+                            <input type={f.type} value={(clientForm as any)[f.key]} onChange={e => setClientForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                              placeholder={f.placeholder} style={{ width: "100%", padding: "10px 14px", border: "1.5px solid #e5e7eb", borderRadius: 9, fontSize: 14, color: "#1a0533", boxSizing: "border-box" }} />
+                          </div>
+                        ))}
                       </div>
-                      <div className="border-2 border-[#0a4a6e] rounded-xl p-4 bg-blue-50 mb-4">
-                        <div className="flex items-start gap-3">
-                          <input type="radio" checked readOnly className="mt-0.5 accent-[#0a4a6e]" />
+
+                      <div style={{ background: "#faf5ff", border: "2px solid #e9d5ff", borderRadius: 12, padding: 16, marginBottom: 16 }}>
+                        <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                          <input type="radio" checked readOnly style={{ marginTop: 3, accentColor: "#A020F0" }} />
                           <div>
-                            <p className="text-sm font-semibold text-gray-800">🔗 Lien de paiement sécurisé (Stripe)</p>
-                            <p className="text-xs text-gray-500 mt-0.5">Un lien est généré et envoyé au client. Il règle depuis son appareil. Aucune carte bancaire ne transite par vous.</p>
+                            <p style={{ fontWeight: 700, fontSize: 14, color: "#1a0533", margin: "0 0 4px" }}>🔗 Lien de paiement sécurisé (Stripe)</p>
+                            <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>Un lien est généré et envoyé au client. Il règle depuis son appareil. Aucune carte bancaire ne transite par vous.</p>
                           </div>
                         </div>
                       </div>
-                      {formError && <p className="text-red-500 text-xs mb-3">{formError}</p>}
-                      <div className="flex justify-between">
-                        <button onClick={() => setStep("forfait")} className="px-5 py-2.5 text-sm text-gray-500 border border-gray-300 rounded-lg hover:border-gray-400 transition-colors">← Retour</button>
+
+                      {formError && <p style={{ color: "#dc2626", fontSize: 13, marginBottom: 12 }}>{formError}</p>}
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <button onClick={() => setStep("forfait")} style={{ background: "#f3f4f6", border: "none", borderRadius: 9, padding: "10px 20px", fontSize: 13, color: "#374151", cursor: "pointer" }}>← Retour</button>
                         <button onClick={() => {
                           if (!clientForm.firstName || !clientForm.lastName || !clientForm.email) { setFormError("Prénom, nom et email sont obligatoires."); return; }
                           if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientForm.email)) { setFormError("Email invalide."); return; }
                           setFormError(""); setStep("recap");
-                        }} className="bg-[#0a4a6e] text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-[#0e6899] transition-colors">Suivant →</button>
+                        }} style={{ background: G, color: "#fff", border: "none", borderRadius: 10, padding: "11px 28px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+                          Suivant →
+                        </button>
                       </div>
                     </div>
                   )}
 
                   {/* ── ÉTAPE 4 : RÉCAPITULATIF */}
                   {step === "recap" && selectedPackage && (
-                    <div className="p-6">
-                      <h2 className="font-semibold text-gray-800 mb-4">Récapitulatif</h2>
-                      <div className="bg-gray-50 rounded-xl p-4 mb-5 divide-y divide-gray-200">
+                    <div className="ani" style={{ padding: 28 }}>
+                      <h2 style={{ fontSize: 17, fontWeight: 700, color: "#1a0533", marginBottom: 20 }}>📋 Récapitulatif</h2>
+                      <div style={{ background: "#faf5ff", borderRadius: 12, padding: 4, marginBottom: 20 }}>
                         {[
                           ["Client", `${clientForm.firstName} ${clientForm.lastName}`],
                           ["Email", clientForm.email],
@@ -475,24 +503,24 @@ export default function PartnerDashboard() {
                           ["Forfait", selectedPackage.name],
                           ["Données", getData(selectedPackage)],
                           ["Validité", getValidity(selectedPackage)],
-                        ].map(([label, value]) => (
-                          <div key={label} className="flex justify-between py-2.5 text-sm">
-                            <span className="text-gray-400">{label}</span>
-                            <span className="text-gray-700 font-medium">{value}</span>
+                        ].map(([label, value], i) => (
+                          <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "11px 16px", borderBottom: "1px solid #f0e8ff", fontSize: 14 }}>
+                            <span style={{ color: "#6b7280" }}>{label}</span>
+                            <span style={{ fontWeight: 500, color: "#1a0533" }}>{value}</span>
                           </div>
                         ))}
-                        <div className="flex justify-between py-3 text-base">
-                          <span className="text-gray-500 font-medium">Total</span>
-                          <span className="font-bold text-[#0a4a6e]">{formatPrice(selectedPackage)}</span>
+                        <div style={{ display: "flex", justifyContent: "space-between", padding: "14px 16px", fontSize: 16 }}>
+                          <span style={{ fontWeight: 600, color: "#1a0533" }}>Total</span>
+                          <span style={{ fontWeight: 800, background: G, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontSize: 18 }}>{formatPrice(selectedPackage)}</span>
                         </div>
                       </div>
-                      <p className="text-xs text-gray-400 mb-5">Un lien de paiement Stripe sera généré instantanément, valable 24h. Une fois payé, le QR code eSIM sera envoyé automatiquement à {clientForm.email}.</p>
-                      {formError && <p className="text-red-500 text-xs mb-3">{formError}</p>}
-                      <div className="flex justify-between">
-                        <button onClick={() => setStep("client")} className="px-5 py-2.5 text-sm text-gray-500 border border-gray-300 rounded-lg hover:border-gray-400 transition-colors">← Retour</button>
+                      <p style={{ fontSize: 12, color: "#9ca3af", marginBottom: 20 }}>Un lien Stripe sera généré instantanément, valable 24h. Après paiement, le QR code eSIM est envoyé automatiquement à {clientForm.email}.</p>
+                      {formError && <p style={{ color: "#dc2626", fontSize: 13, marginBottom: 12 }}>{formError}</p>}
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <button onClick={() => setStep("client")} style={{ background: "#f3f4f6", border: "none", borderRadius: 9, padding: "10px 20px", fontSize: 13, color: "#374151", cursor: "pointer" }}>← Retour</button>
                         <button onClick={generateLink} disabled={generating}
-                          className="bg-[#0a4a6e] text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-[#0e6899] transition-colors disabled:opacity-60 flex items-center gap-2">
-                          {generating ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/>Génération...</> : "Générer le lien de paiement"}
+                          style={{ background: generating ? "#e5e7eb" : G, color: "#fff", border: "none", borderRadius: 10, padding: "11px 24px", fontSize: 14, fontWeight: 600, cursor: generating ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 8 }}>
+                          {generating ? <><div style={{ width: 16, height: 16, border: "2px solid rgba(255,255,255,.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin .7s linear infinite" }} />Génération...</> : "Générer le lien de paiement"}
                         </button>
                       </div>
                     </div>
@@ -500,73 +528,87 @@ export default function PartnerDashboard() {
 
                   {/* ── ÉTAPE 5 : LIEN GÉNÉRÉ */}
                   {step === "lien" && (
-                    <div className="p-8 text-center">
-                      <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><polyline points="20 6 9 17 4 12" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      </div>
-                      <h2 className="text-xl font-semibold text-gray-800 mb-1">Lien de paiement prêt !</h2>
-                      <p className="text-gray-500 text-sm mb-6">Partagez ce lien avec <strong>{clientForm.firstName} {clientForm.lastName}</strong>.<br/>Une fois payé, l'eSIM sera envoyée automatiquement à {clientForm.email}.</p>
-                      <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 mb-5 max-w-lg mx-auto">
-                        <span className="flex-1 font-mono text-xs text-[#0a4a6e] truncate text-left">{generatedLink}</span>
-                        <button onClick={copyLink} className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${copied ? "bg-green-600 text-white" : "bg-[#0a4a6e] text-white hover:bg-[#0e6899]"}`}>
+                    <div className="ani" style={{ padding: 40, textAlign: "center" }}>
+                      <div style={{ width: 72, height: 72, borderRadius: "50%", background: "linear-gradient(135deg, #f3e8ff, #ffe4e6)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: 32 }}>✓</div>
+                      <h2 style={{ fontSize: 22, fontWeight: 800, color: "#1a0533", marginBottom: 8 }}>Lien de paiement prêt !</h2>
+                      <p style={{ fontSize: 14, color: "#6b7280", marginBottom: 28, lineHeight: 1.6 }}>
+                        Partagez ce lien avec <strong style={{ color: "#1a0533" }}>{clientForm.firstName} {clientForm.lastName}</strong>.<br />
+                        Une fois payé, l'eSIM sera envoyée automatiquement à {clientForm.email}.
+                      </p>
+
+                      {/* Lien */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#faf5ff", border: "1.5px solid #e9d5ff", borderRadius: 12, padding: "12px 16px", maxWidth: 560, margin: "0 auto 24px" }}>
+                        <span style={{ flex: 1, fontFamily: "monospace", fontSize: 12, color: "#7c3aed", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left" }}>{generatedLink}</span>
+                        <button onClick={copyLink} style={{ background: copied ? "#16a34a" : G, color: "#fff", border: "none", borderRadius: 8, padding: "7px 16px", fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0, transition: "all .2s" }}>
                           {copied ? "✓ Copié" : "Copier"}
                         </button>
                       </div>
-                      <div className="flex gap-3 justify-center flex-wrap mb-6">
+
+                      {/* Boutons envoi */}
+                      <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap", marginBottom: 28 }}>
                         <button onClick={sendPaymentLinkEmail} disabled={sendingEmail}
-                          className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm font-medium transition-all ${emailSent ? "border-green-500 text-green-600 bg-green-50" : "border-gray-300 text-gray-700 hover:border-[#0a4a6e] hover:text-[#0a4a6e]"} disabled:opacity-60`}>
-                          {emailSent ? <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><polyline points="20 6 9 17 4 12" strokeLinecap="round" strokeLinejoin="round"/></svg>Email envoyé !</>
-                            : sendingEmail ? <><div className="w-4 h-4 border-2 border-gray-300 border-t-[#0a4a6e] rounded-full animate-spin"/>Envoi...</>
-                            : <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Envoyer par email</>}
+                          style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 20px", border: `2px solid ${emailSent ? "#16a34a" : "#e9d5ff"}`, borderRadius: 10, fontSize: 13, fontWeight: 500, background: emailSent ? "#f0fdf4" : "#fff", color: emailSent ? "#16a34a" : "#1a0533", cursor: sendingEmail ? "not-allowed" : "pointer", opacity: sendingEmail ? 0.7 : 1, transition: "all .2s" }}>
+                          {emailSent ? "✓ Email envoyé !" : sendingEmail ? <><div style={{ width: 14, height: 14, border: "2px solid #e9d5ff", borderTopColor: "#A020F0", borderRadius: "50%", animation: "spin .7s linear infinite" }} />Envoi...</> : "📧 Envoyer par email"}
                         </button>
                         {clientForm.phone && (
-                          <button onClick={sendViaWhatsApp} className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:border-green-500 hover:text-green-600 transition-colors">
-                            <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.117 1.525 5.847L.057 24l6.306-1.54A11.944 11.944 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 0 1-5.007-1.374l-.36-.214-3.722.909.944-3.619-.234-.372A9.818 9.818 0 0 1 2.18 12 9.82 9.82 0 0 1 12 2.182 9.82 9.82 0 0 1 21.818 12 9.82 9.82 0 0 1 12 21.818z"/></svg>
-                            WhatsApp
+                          <button onClick={sendViaWhatsApp}
+                            style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 20px", border: "2px solid #dcfce7", borderRadius: 10, fontSize: 13, fontWeight: 500, background: "#fff", color: "#16a34a", cursor: "pointer" }}>
+                            💬 WhatsApp
                           </button>
                         )}
                       </div>
-                      <button onClick={resetForm} className="bg-[#0a4a6e] text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-[#0e6899] transition-colors">+ Nouvelle commande</button>
+
+                      <button onClick={resetForm} style={{ background: G, color: "#fff", border: "none", borderRadius: 10, padding: "12px 28px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+                        + Nouvelle commande
+                      </button>
                     </div>
                   )}
-
                 </div>
               </div>
             )}
 
-            {/* ── TAB COMMANDES */}
+            {/* ══ TAB COMMANDES ══ */}
             {activeTab === "orders" && (
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-                  <h2 className="font-semibold text-gray-800">Historique des commandes</h2>
-                  <button onClick={() => loadOrders(partnerProfile?.partner_code)} className="text-xs text-gray-400 hover:text-gray-600">↻ Actualiser</button>
+              <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #f0e8ff", boxShadow: "0 2px 16px rgba(160,32,240,0.06)", overflow: "hidden" }}>
+                <div style={{ padding: "18px 24px", borderBottom: "1px solid #f0e8ff", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <h2 style={{ fontSize: 16, fontWeight: 700, color: "#1a0533", margin: 0 }}>Historique des commandes</h2>
+                  <button onClick={() => loadOrders(partnerProfile?.partner_code)} style={{ fontSize: 12, color: "#A020F0", background: "none", border: "none", cursor: "pointer", fontWeight: 500 }}>↻ Actualiser</button>
                 </div>
                 {orders.length === 0 ? (
-                  <div className="py-16 text-center text-gray-400 text-sm">Aucune commande pour l'instant</div>
+                  <div style={{ padding: "60px 0", textAlign: "center", color: "#9ca3af", fontSize: 14 }}>Aucune commande pour l'instant</div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                       <thead>
-                        <tr className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
-                          <th className="text-left px-5 py-3 font-medium">Client</th>
-                          <th className="text-left px-5 py-3 font-medium">Forfait</th>
-                          <th className="text-left px-5 py-3 font-medium">Montant</th>
-                          <th className="text-left px-5 py-3 font-medium">Statut</th>
-                          <th className="text-left px-5 py-3 font-medium">ICCID</th>
-                          <th className="text-left px-5 py-3 font-medium">Date</th>
+                        <tr style={{ background: "#faf5ff" }}>
+                          {["Client", "Forfait", "Montant", "Statut", "ICCID", "Date"].map(h => (
+                            <th key={h} style={{ textAlign: "left", padding: "10px 18px", fontSize: 11, fontWeight: 700, color: "#A020F0", textTransform: "uppercase", letterSpacing: "0.5px", borderBottom: "1px solid #f0e8ff" }}>{h}</th>
+                          ))}
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100">
+                      <tbody>
                         {orders.map(order => {
-                          const s = statusLabel[order.status] || { label: order.status, style: "bg-gray-100 text-gray-600" };
+                          const s = statusConfig[order.status] || { label: order.status, bg: "#f3f4f6", text: "#374151" };
+                          const iccid = (order as any).esim_iccid;
                           return (
-                            <tr key={order.id} className="hover:bg-gray-50 transition-colors">
-                              <td className="px-5 py-3.5"><p className="font-medium text-gray-800">{order.client_name}</p><p className="text-xs text-gray-400">{order.client_email}</p></td>
-                              <td className="px-5 py-3.5 text-gray-600">{order.package_name}</td>
-                              <td className="px-5 py-3.5 font-medium text-gray-700">{order.currency === "xpf" ? `${order.amount.toLocaleString("fr")} XPF` : `${(order.amount / 100).toFixed(2)} €`}</td>
-                              <td className="px-5 py-3.5"><span className={`px-2.5 py-1 rounded-full text-xs font-medium ${s.style}`}>{s.label}</span></td>
-                              <td className="px-5 py-3.5 font-mono text-xs text-gray-500">{(order as any).esim_iccid || "—"}</td>
-                              <td className="px-5 py-3.5 text-xs text-gray-400">{new Date(order.created_at).toLocaleDateString("fr-FR")}</td>
+                            <tr key={order.id} style={{ borderBottom: "1px solid #faf5ff" }}>
+                              <td style={{ padding: "13px 18px" }}>
+                                <p style={{ fontWeight: 600, color: "#1a0533", margin: "0 0 2px" }}>{order.client_name}</p>
+                                <p style={{ fontSize: 11, color: "#9ca3af", margin: 0 }}>{order.client_email}</p>
+                              </td>
+                              <td style={{ padding: "13px 18px", color: "#374151" }}>{order.package_name}</td>
+                              <td style={{ padding: "13px 18px", fontWeight: 700, color: "#1a0533" }}>
+                                {order.currency === "xpf" ? `${order.amount.toLocaleString("fr")} XPF` : `${(order.amount / 100).toFixed(2)} €`}
+                              </td>
+                              <td style={{ padding: "13px 18px" }}>
+                                <span style={{ background: s.bg, color: s.text, padding: "4px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600 }}>{s.label}</span>
+                              </td>
+                              <td style={{ padding: "13px 18px", fontFamily: "monospace", fontSize: 12, color: "#6b7280" }}>
+                                {iccid ? `••••••••••••••••${iccid.toString().slice(-4)}` : "—"}
+                              </td>
+                              <td style={{ padding: "13px 18px", fontSize: 12, color: "#9ca3af" }}>
+                                {new Date(order.created_at).toLocaleDateString("fr-FR")}
+                              </td>
                             </tr>
                           );
                         })}

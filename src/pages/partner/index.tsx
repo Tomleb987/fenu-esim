@@ -123,12 +123,24 @@ export default function PartnerDashboard() {
   }, []);
 
   const loadPackages = async () => {
-    const { data } = await supabase
-      .from("airalo_packages")
-      .select("id, name, data_amount, data_unit, validity_days, validity, price_xpf, final_price_xpf, price_eur, final_price_eur, currency, status, country, region, region_fr, operator_name, flag_url, type")
-      .eq("status", "active")
-      .limit(2000);
-    if (data) setPackages(data);
+    let allData: AiraloPackage[] = [];
+    let from = 0;
+    const pageSize = 1000;
+    
+    while (true) {
+      const { data, error } = await supabase
+        .from("airalo_packages")
+        .select("id, name, data_amount, data_unit, validity_days, validity, price_xpf, final_price_xpf, price_eur, final_price_eur, currency, status, country, region, region_fr, operator_name, flag_url, type")
+        .eq("status", "active")
+        .range(from, from + pageSize - 1);
+      
+      if (error || !data || data.length === 0) break;
+      allData = [...allData, ...data];
+      if (data.length < pageSize) break;
+      from += pageSize;
+    }
+    
+    setPackages(allData);
   };
 
   const loadOrders = async (partnerCode: string) => {

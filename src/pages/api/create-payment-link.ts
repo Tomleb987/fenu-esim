@@ -80,7 +80,25 @@ L'équipe FENUA SIM`,
 
   if (packageError || !packageData) return res.status(404).json({ error: "Forfait introuvable" });
 
-  const rawPrice = packageData.price_xpf || packageData.final_price_xpf || packageData.price_eur || packageData.final_price_eur || 0;
+  const basePrice = packageData.price_xpf || packageData.final_price_xpf || packageData.price_eur || packageData.final_price_eur || 0;
+
+  // ── Appliquer la remise du code promo si présent
+  let rawPrice = basePrice;
+  if (partner.promo_code) {
+    const { data: promoData } = await supabaseAdmin
+      .from("promo_codes")
+      .select("discount_percentage, discount_amount, is_active")
+      .eq("code", partner.promo_code)
+      .maybeSingle();
+
+    if (promoData?.is_active) {
+      if (promoData.discount_percentage) {
+        rawPrice = basePrice * (1 - promoData.discount_percentage / 100);
+      } else if (promoData.discount_amount) {
+        rawPrice = Math.max(0, basePrice - promoData.discount_amount);
+      }
+    }
+  }
 
   // ── Créer la session Stripe
   const session = await stripe.checkout.sessions.create({

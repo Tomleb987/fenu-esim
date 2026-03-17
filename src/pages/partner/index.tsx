@@ -287,18 +287,20 @@ export default function PartnerDashboard() {
     error:     { label: "Erreur",       bg: "#FEF2F2", text: "#DC2626" },
   };
 
-  if (loading) return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#fafafa" }}>
-      <div style={{ textAlign: "center" }}>
-        <div style={{ width: 44, height: 44, border: "3px solid #f3e8ff", borderTopColor: "#A020F0", borderRadius: "50%", animation: "spin .7s linear infinite", margin: "0 auto 12px" }} />
-        <p style={{ color: "#888", fontSize: 14 }}>Chargement...</p>
-      </div>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-    </div>
-  );
-
   const G = "linear-gradient(135deg, #A020F0 0%, #FF4D6D 50%, #FF7F11 100%)";
   const Gsoft = "linear-gradient(135deg, #f3e8ff 0%, #ffe4e6 50%, #fff7ed 100%)";
+
+  if (loading) return (
+    <>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#fafafa" }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ width: 44, height: 44, border: "3px solid #f3e8ff", borderTopColor: "#A020F0", borderRadius: "50%", animation: "spin .7s linear infinite", margin: "0 auto 12px" }} />
+          <p style={{ color: "#888", fontSize: 14 }}>Chargement...</p>
+        </div>
+      </div>
+    </>
+  );
 
   return (
     <>

@@ -127,7 +127,7 @@ export default function PartnerDashboard() {
       .from("airalo_packages")
       .select("id, name, data_amount, data_unit, validity_days, validity, price_xpf, final_price_xpf, price_eur, final_price_eur, currency, status, country, region, region_fr, operator_name, flag_url, type")
       .eq("status", "active")
-      .order("final_price_eur", { ascending: true })
+      .order("price_xpf", { ascending: true, nullsFirst: false })
       .limit(2000);
     if (data) setPackages(data);
   };

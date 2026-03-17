@@ -84,18 +84,26 @@ L'équipe FENUA SIM`,
 
   // ── Appliquer la remise du code promo si présent
   let rawPrice = basePrice;
+  console.log("partner.promo_code:", partner.promo_code);
+  console.log("basePrice:", basePrice);
+
   if (partner.promo_code) {
-    const { data: promoData } = await supabaseAdmin
+    const { data: promoData, error: promoError } = await supabaseAdmin
       .from("promo_codes")
       .select("discount_percentage, discount_amount, is_active")
       .eq("code", partner.promo_code)
       .maybeSingle();
 
+    console.log("promoData:", JSON.stringify(promoData));
+    console.log("promoError:", JSON.stringify(promoError));
+
     if (promoData?.is_active) {
       if (promoData.discount_percentage) {
         rawPrice = basePrice * (1 - promoData.discount_percentage / 100);
+        console.log("Applied discount_percentage:", promoData.discount_percentage, "-> rawPrice:", rawPrice);
       } else if (promoData.discount_amount) {
         rawPrice = Math.max(0, basePrice - promoData.discount_amount);
+        console.log("Applied discount_amount:", promoData.discount_amount, "-> rawPrice:", rawPrice);
       }
     }
   }

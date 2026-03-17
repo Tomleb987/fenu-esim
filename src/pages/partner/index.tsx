@@ -1464,7 +1464,7 @@ export default function PartnerDashboard() {
                       </div>
 
                       <p style={{ fontSize: 12, color: "#9ca3af", marginBottom: 20 }}>
-                        Un lien Stripe sera généré instantanément, valable 24h. Après paiement,
+                        Un lien Stripe sera généré instantanément, valable 72h. Après paiement,
                         le QR code eSIM est envoyé automatiquement à {clientForm.email}.
                       </p>
 

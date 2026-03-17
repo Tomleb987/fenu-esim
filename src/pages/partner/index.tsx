@@ -107,6 +107,8 @@ export default function PartnerDashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sendingEmail, setSendingEmail] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const [resendingId, setResendingId] = useState<string | null>(null);
+  const [resentId, setResentId] = useState<string | null>(null);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -235,6 +237,36 @@ export default function PartnerDashboard() {
       setTimeout(() => setEmailSent(false), 3000);
     } catch (err) { console.error("Erreur envoi email:", err); }
     finally { setSendingEmail(false); }
+  };
+
+  const resendPaymentLink = async (order: PartnerOrder) => {
+    const paymentUrl = (order as any).payment_url;
+    if (!paymentUrl) return;
+    setResendingId(order.id);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      await fetch("/api/create-payment-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({
+          resendOnly: true,
+          paymentUrl,
+          clientEmail: order.client_email,
+          clientFirstName: order.client_name.split(" ")[0],
+          clientLastName: order.client_name.split(" ").slice(1).join(" "),
+          packageName: order.package_name,
+          amount: order.amount,
+          currency: order.currency,
+          advisorName: partnerProfile?.advisor_name,
+        }),
+      });
+      setResentId(order.id);
+      setTimeout(() => setResentId(null), 3000);
+    } catch (err) {
+      console.error("Erreur renvoi lien:", err);
+    } finally {
+      setResendingId(null);
+    }
   };
 
   const copyLink = async () => { await navigator.clipboard.writeText(generatedLink); setCopied(true); setTimeout(() => setCopied(false), 2500); };
@@ -549,6 +581,13 @@ export default function PartnerDashboard() {
                     <div className="ani" style={{ padding: 40, textAlign: "center" }}>
                       <div style={{ width: 72, height: 72, borderRadius: "50%", background: "linear-gradient(135deg, #f3e8ff, #ffe4e6)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: 32 }}>✓</div>
                       <h2 style={{ fontSize: 22, fontWeight: 800, color: "#1a0533", marginBottom: 8 }}>Lien de paiement prêt !</h2>
+                      
+                      {/* Notification email automatique */}
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, padding: "10px 16px", marginBottom: 20 }}>
+                        <span style={{ fontSize: 16 }}>📧</span>
+                        <span style={{ fontSize: 13, color: "#15803d", fontWeight: 500 }}>Email envoyé automatiquement à <strong>{clientForm.email}</strong></span>
+                      </div>
+
                       <p style={{ fontSize: 14, color: "#6b7280", marginBottom: 28, lineHeight: 1.6 }}>
                         Partagez ce lien avec <strong style={{ color: "#1a0533" }}>{clientForm.firstName} {clientForm.lastName}</strong>.<br />
                         Une fois payé, l'eSIM sera envoyée automatiquement à {clientForm.email}.
@@ -599,7 +638,7 @@ export default function PartnerDashboard() {
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                       <thead>
                         <tr style={{ background: "#faf5ff" }}>
-                          {["Client", "Forfait", "Montant", "Statut", "ICCID", "Date"].map(h => (
+                          {["Client", "Forfait", "Montant", "Statut", "ICCID", "Date", "Action"].map(h => (
                             <th key={h} style={{ textAlign: "left", padding: "10px 18px", fontSize: 11, fontWeight: 700, color: "#A020F0", textTransform: "uppercase", letterSpacing: "0.5px", borderBottom: "1px solid #f0e8ff" }}>{h}</th>
                           ))}
                         </tr>
@@ -627,7 +666,14 @@ export default function PartnerDashboard() {
                               <td style={{ padding: "13px 18px", fontSize: 12, color: "#9ca3af" }}>
                                 {new Date(order.created_at).toLocaleDateString("fr-FR")}
                               </td>
-                            </tr>
+                              <td style={{ padding: "13px 18px" }}>
+                                {order.status === "pending" && (
+                                  <button onClick={() => resendPaymentLink(order)} disabled={resendingId === order.id}
+                                    style={{ fontSize: 12, fontWeight: 600, color: resentId === order.id ? "#15803d" : "#A020F0", background: resentId === order.id ? "#f0fdf4" : "#faf5ff", border: `1px solid ${resentId === order.id ? "#bbf7d0" : "#e9d5ff"}`, borderRadius: 7, padding: "5px 12px", cursor: "pointer", whiteSpace: "nowrap", opacity: resendingId === order.id ? 0.6 : 1 }}>
+                                    {resentId === order.id ? "✓ Envoyé" : resendingId === order.id ? "..." : "↩ Renvoyer"}
+                                  </button>
+                                )}
+                              </td>
                           );
                         })}
                       </tbody>

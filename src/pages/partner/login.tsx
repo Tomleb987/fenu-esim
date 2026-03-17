@@ -41,7 +41,7 @@ export default function PartnerLogin() {
   return (
     <>
       <Head>
-        <title>Connexion Partenaire — FENUA SIM</title>
+        <title>Connexion Partenaire - FENUA SIM</title>
         <meta name="robots" content="noindex" />
       </Head>
 

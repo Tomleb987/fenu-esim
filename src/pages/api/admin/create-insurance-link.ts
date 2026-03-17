@@ -89,6 +89,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           quantity: 1,
         },
       ],
+      expires_at: Math.floor(Date.now() / 1000) + (72 * 60 * 60), // 72 heures
       success_url: `${baseUrl}/assurance/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/assurance`,
       metadata: {

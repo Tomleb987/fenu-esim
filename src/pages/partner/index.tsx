@@ -293,11 +293,8 @@ export default function PartnerDashboard() {
 
   const G = "linear-gradient(135deg, #A020F0 0%, #FF4D6D 50%, #FF7F11 100%)";
   const Gsoft = "linear-gradient(135deg, #f3e8ff 0%, #ffe4e6 50%, #fff7ed 100%)";
-  const cssStyles = "@keyframes spin{to{transform:rotate(360deg)}} @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}} .ani{animation:fadein .2s ease} .dest-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(160,32,240,0.12)} .pkg-card:hover{border-color:#A020F0 !important} .nav-btn:hover{background:rgba(255,255,255,0.08)} input:focus,select:focus{outline:none;border-color:#A020F0 !important;box-shadow:0 0 0 3px rgba(160,32,240,0.1)} ::-webkit-scrollbar{width:6px;height:6px} ::-webkit-scrollbar-track{background:transparent} ::-webkit-scrollbar-thumb{background:#e5e7eb;border-radius:3px}";
-
   if (loading) return (
     <>
-      <style dangerouslySetInnerHTML={{ __html: "@keyframes spin{to{transform:rotate(360deg)}}" }} />
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#fafafa" }}>
         <div style={{ textAlign: "center" }}>
           <div style={{ width: 44, height: 44, border: "3px solid #f3e8ff", borderTopColor: "#A020F0", borderRadius: "50%", animation: "spin .7s linear infinite", margin: "0 auto 12px" }} />
@@ -309,9 +306,18 @@ export default function PartnerDashboard() {
 
   return (
     <>
-      <Head><title>Espace Partenaire - FENUA SIM</title></Head>
-      <style dangerouslySetInnerHTML={{ __html: cssStyles }} />
-
+      <Head>
+        <title>Espace Partenaire - FENUA SIM</title>
+        <style>{`
+          @keyframes spin{to{transform:rotate(360deg)}}
+          @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+          .ani{animation:fadein .2s ease}
+          .dest-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(160,32,240,0.12)}
+          .pkg-card:hover{border-color:#A020F0!important}
+          .nav-btn:hover{background:rgba(255,255,255,0.08)}
+          input:focus,select:focus{outline:none;border-color:#A020F0!important;box-shadow:0 0 0 3px rgba(160,32,240,0.1)}
+        `}</style>
+      </Head>
       <div style={{ minHeight: "100vh", display: "flex", background: "#f8f7ff", fontFamily: "Arial, Helvetica, sans-serif" }}>
 
         {/* ── SIDEBAR */}

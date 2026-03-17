@@ -133,6 +133,7 @@ L'équipe FENUA SIM`,
       partner_code: partner.partner_code,
       origin: "partner_dashboard",
     },
+    expires_at: Math.floor(Date.now() / 1000) + (72 * 60 * 60), // 72 heures
     success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/`,
   });

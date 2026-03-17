@@ -86,7 +86,7 @@ const TOP_DESTINATIONS = ["France", "Canada", "États-Unis", "Australie", "Nouve
 function getFrenchName(pkg: AiraloPackage): string {
   const raw = pkg.region || pkg.country || "";
   if (pkg.region_fr && pkg.region_fr !== raw) return pkg.region_fr;
-  return REGION_TRANSLATIONS[raw] || raw || "—";
+  return REGION_TRANSLATIONS[raw] || raw || "-";
 }
 
 export default function PartnerDashboard() {
@@ -162,7 +162,7 @@ export default function PartnerDashboard() {
     acc[region] = {
       minPriceXpf: pricesXpf.length > 0 ? Math.min(...pricesXpf) : 0,
       packageCount: pkgs.length,
-      operatorName: pkgs[0]?.operator_name || "—",
+      operatorName: pkgs[0]?.operator_name || "-",
     };
     return acc;
   }, {} as Record<string, { minPriceXpf: number; packageCount: number; operatorName: string }>);
@@ -280,7 +280,7 @@ export default function PartnerDashboard() {
   const stepLabels = ["Destination", "Forfait", "Client", "Récap", "Lien"];
   const currentStepIdx = stepKeys.indexOf(step);
 
-  const statusConfig: Record<string, { label: string; bg: string; text: string }> = {
+  const statusConfig: {[key: string]: { label: string; bg: string; text: string }} = {
     pending:   { label: "En attente", bg: "#FFF7ED", text: "#C2410C" },
     paid:      { label: "Payé",        bg: "#EDE9FE", text: "#7C3AED" },
     esim_sent: { label: "eSIM envoyée", bg: "#F0FDF4", text: "#15803D" },
@@ -305,7 +305,7 @@ export default function PartnerDashboard() {
 
   return (
     <>
-      <Head><title>Espace Partenaire — FENUA SIM</title></Head>
+      <Head><title>Espace Partenaire - FENUA SIM</title></Head>
       <style dangerouslySetInnerHTML={{ __html: cssStyles }} />
 
       <div style={{ minHeight: "100vh", display: "flex", background: "#f8f7ff", fontFamily: "Arial, Helvetica, sans-serif" }}>
@@ -461,7 +461,7 @@ export default function PartnerDashboard() {
                     <div className="ani" style={{ padding: 28 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
                         <button onClick={() => setStep("destination")} style={{ background: "#f3e8ff", border: "none", borderRadius: 8, width: 32, height: 32, cursor: "pointer", fontSize: 16, color: "#A020F0", display: "flex", alignItems: "center", justifyContent: "center" }}>←</button>
-                        <h2 style={{ fontSize: 17, fontWeight: 700, color: "#1a0533", margin: 0 }}>Forfaits — {selectedRegion}</h2>
+                        <h2 style={{ fontSize: 17, fontWeight: 700, color: "#1a0533", margin: 0 }}>Forfaits - {selectedRegion}</h2>
                         <span style={{ fontSize: 12, background: "#f3e8ff", color: "#A020F0", padding: "3px 10px", borderRadius: 20, fontWeight: 600 }}>{regionPackages.length} forfaits</span>
                       </div>
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10, maxHeight: 420, overflowY: "auto", paddingRight: 4, marginBottom: 20 }}>
@@ -540,7 +540,7 @@ export default function PartnerDashboard() {
                         {[
                           ["Client", `${clientForm.firstName} ${clientForm.lastName}`],
                           ["Email", clientForm.email],
-                          ["Téléphone", clientForm.phone || "—"],
+                          ["Téléphone", clientForm.phone || "-"],
                           ["Destination", selectedRegion],
                           ["Forfait", selectedPackage.name],
                           ["Données", getData(selectedPackage)],
@@ -653,7 +653,7 @@ export default function PartnerDashboard() {
                                 <span style={{ background: s.bg, color: s.text, padding: "4px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600 }}>{s.label}</span>
                               </td>
                               <td style={{ padding: "13px 18px", fontFamily: "monospace", fontSize: 12, color: "#6b7280" }}>
-                                {iccid ? `••••••••••••••••${iccid.toString().slice(-4)}` : "—"}
+                                {iccid ? `••••••••••••••••${iccid.toString().slice(-4)}` : "-"}
                               </td>
                               <td style={{ padding: "13px 18px", fontSize: 12, color: "#9ca3af" }}>
                                 {new Date(order.created_at).toLocaleDateString("fr-FR")}

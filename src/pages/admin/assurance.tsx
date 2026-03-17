@@ -23,6 +23,7 @@ interface InsuranceOrder {
   start_date: string;
   end_date: string;
   contract_link: string;
+  attestation_url?: string;
   created_at: string;
 }
 
@@ -106,7 +107,7 @@ export default function AdminAssurance() {
   }, []);
 
   const loadOrders = async () => {
-    const { data } = await supabase.from("insurances").select("*").order("created_at", { ascending: false }).limit(100);
+    const { data } = await supabase.from("insurances").select("id, user_email, subscriber_first_name, subscriber_last_name, product_type, adhesion_number, contract_number, premium_ava, total_amount, status, start_date, end_date, contract_link, attestation_url, created_at").order("created_at", { ascending: false }).limit(100);
     if (data) setOrders(data as InsuranceOrder[]);
   };
 
@@ -613,7 +614,7 @@ export default function AdminAssurance() {
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                       <thead>
                         <tr style={{ background: "#faf5ff" }}>
-                          {["Client", "Produit", "Adhesion", "Montant", "Statut", "Debut", "Fin", "Date", "Contrat"].map(h => (
+                          {["Client", "Produit", "Adhesion", "Montant", "Statut", "Debut", "Fin", "Date", "Documents"].map(h => (
                             <th key={h} style={{ textAlign: "left", padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#A020F0", textTransform: "uppercase", letterSpacing: "0.5px", borderBottom: "1px solid #f0e8ff", whiteSpace: "nowrap" }}>{h}</th>
                           ))}
                         </tr>
@@ -637,12 +638,23 @@ export default function AdminAssurance() {
                               <td style={{ padding: "11px 16px", fontSize: 11, color: "#9ca3af" }}>{order.end_date ? new Date(order.end_date).toLocaleDateString("fr-FR") : "-"}</td>
                               <td style={{ padding: "11px 16px", fontSize: 11, color: "#9ca3af", whiteSpace: "nowrap" }}>{new Date(order.created_at).toLocaleDateString("fr-FR")}</td>
                               <td style={{ padding: "11px 16px" }}>
-                                {order.contract_link ? (
-                                  <a href={order.contract_link} target="_blank" rel="noopener noreferrer"
-                                    style={{ fontSize: 12, color: "#A020F0", fontWeight: 600, textDecoration: "none", background: "#faf5ff", padding: "4px 10px", borderRadius: 6, border: "1px solid #e9d5ff" }}>
-                                    📄 Voir
-                                  </a>
-                                ) : <span style={{ color: "#9ca3af", fontSize: 11 }}>—</span>}
+                                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                  {order.contract_link ? (
+                                    <a href={order.contract_link} target="_blank" rel="noopener noreferrer"
+                                      style={{ fontSize: 11, color: "#A020F0", fontWeight: 600, textDecoration: "none", background: "#faf5ff", padding: "3px 8px", borderRadius: 5, border: "1px solid #e9d5ff", whiteSpace: "nowrap" }}>
+                                      📄 Certificat
+                                    </a>
+                                  ) : null}
+                                  {(order as any).attestation_url ? (
+                                    <a href={(order as any).attestation_url} target="_blank" rel="noopener noreferrer"
+                                      style={{ fontSize: 11, color: "#7c3aed", fontWeight: 600, textDecoration: "none", background: "#f5f3ff", padding: "3px 8px", borderRadius: 5, border: "1px solid #ddd6fe", whiteSpace: "nowrap" }}>
+                                      📋 Attestation
+                                    </a>
+                                  ) : null}
+                                  {!order.contract_link && !(order as any).attestation_url && (
+                                    <span style={{ color: "#9ca3af", fontSize: 11 }}>En attente</span>
+                                  )}
+                                </div>
                               </td>
                             </tr>
                           );

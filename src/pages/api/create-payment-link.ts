@@ -29,7 +29,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (partnerError || !partner || !partner.is_active)
     return res.status(403).json({ error: "Compte partenaire introuvable ou inactif" });
 
-  const { packageId, clientFirstName, clientLastName, clientEmail, clientPhone, destination } = req.body;
+  const { packageId, clientFirstName, clientLastName, clientEmail, clientPhone, destination,
+    resendOnly, paymentUrl: resendPaymentUrl, packageName: resendPackageName,
+    amount: resendAmount, currency: resendCurrency, advisorName: resendAdvisorName } = req.body;
+
+  // ── Mode renvoi email uniquement (pas de nouvelle session Stripe)
+  if (resendOnly && resendPaymentUrl && clientEmail) {
+    const formattedAmount = `${Math.round(resendAmount || 0).toLocaleString("fr")} ${(resendCurrency || "xpf").toUpperCase()}`;
+    try {
+      const transporter = nodemailer.createTransport({
+        host: "smtp-relay.brevo.com", port: 587, secure: false,
+        auth: { user: process.env.BREVO_SMTP_USER, pass: process.env.BREVO_SMTP_PASS },
+      });
+      await transporter.sendMail({
+        from: `"FENUA SIM" <hello@fenuasim.com>`,
+        to: clientEmail,
+        bcc: "clients@fenua-sim.odoo.com",
+        replyTo: `"FENUA SIM" <hello@fenuasim.com>`,
+        subject: `Rappel — Votre lien de paiement eSIM`,
+        html: createEmailHTML({
+          clientFirstName, clientLastName, packageName: resendPackageName || "",
+          destination: "", dataAmount: "", validityDays: "",
+          formattedAmount, paymentUrl: resendPaymentUrl,
+          advisorName: resendAdvisorName || partner.advisor_name,
+        }),
+        text: `Bonjour ${clientFirstName},
+
+Rappel : voici votre lien de paiement eSIM :
+${resendPaymentUrl}
+
+Montant : ${formattedAmount}
+
+L'équipe FENUA SIM`,
+      });
+      console.log("✅ Email renvoyé à:", clientEmail);
+    } catch (err: any) {
+      console.error("❌ Erreur renvoi email:", err.message);
+    }
+    return res.status(200).json({ success: true });
+  }
+
   if (!packageId || !clientFirstName || !clientLastName || !clientEmail)
     return res.status(400).json({ error: "Champs requis manquants" });
 
@@ -182,12 +221,26 @@ function createEmailHTML({ clientFirstName, clientLastName, packageName, destina
             </td></tr>
           </table>
 
-          <!-- CTA -->
+          <!-- CTA — compatible Outlook/iPhone (VML + fallback) -->
           <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
             <tr><td align="center">
-              <a href="${paymentUrl}" style="display:inline-block;background:linear-gradient(135deg,#A020F0,#FF7F11);color:#fff;font-size:16px;font-weight:700;text-decoration:none;padding:16px 48px;border-radius:10px;">
-                💳 Payer maintenant
-              </a>
+              <!--[if mso]>
+              <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${paymentUrl}" style="height:52px;v-text-anchor:middle;width:240px;" arcsize="15%" strokecolor="#A020F0" fillcolor="#A020F0">
+                <w:anchorlock/>
+                <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">Payer maintenant</center>
+              </v:roundrect>
+              <![endif]-->
+              <!--[if !mso]><!-->
+              <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
+                <tr>
+                  <td style="background-color:#A020F0;border-radius:10px;padding:0;">
+                    <a href="${paymentUrl}" target="_blank" style="display:inline-block;padding:16px 48px;font-family:Arial,sans-serif;font-size:16px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:10px;background-color:#A020F0;">
+                      Payer maintenant
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <!--<![endif]-->
             </td></tr>
           </table>
 

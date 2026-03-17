@@ -1148,7 +1148,7 @@ export default function PartnerDashboard() {
                                 paddingRight: selectedPackage?.id === pkg.id ? 20 : 0,
                               }}
                             >
-                              <div>
+                              <div style={{ flex: 1 }}>
                                 <p
                                   style={{
                                     fontWeight: 700,
@@ -1163,11 +1163,19 @@ export default function PartnerDashboard() {
                                   style={{
                                     fontSize: 12,
                                     color: "#6b7280",
-                                    margin: "0 0 2px",
+                                    margin: "0 0 6px",
                                   }}
                                 >
                                   {getValidity(pkg)}
                                 </p>
+                                <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 4 }}>
+                                  <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: pkg.includes_voice ? "#dbeafe" : "#fce7f3", color: pkg.includes_voice ? "#1d4ed8" : "#be185d" }}>
+                                    {pkg.includes_voice ? "Appels inclus" : "Pas d'appels"}
+                                  </span>
+                                  <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: pkg.includes_sms ? "#ffedd5" : "#fce7f3", color: pkg.includes_sms ? "#c2410c" : "#be185d" }}>
+                                    {pkg.includes_sms ? "SMS inclus" : "Pas de SMS"}
+                                  </span>
+                                </div>
                                 {pkg.operator_name && (
                                   <p style={{ fontSize: 11, color: "#9ca3af", margin: 0 }}>
                                     {pkg.operator_name}
@@ -1182,6 +1190,7 @@ export default function PartnerDashboard() {
                                   color: "#A020F0",
                                   margin: 0,
                                   flexShrink: 0,
+                                  marginLeft: 8,
                                 }}
                               >
                                 {formatPrice(pkg)}

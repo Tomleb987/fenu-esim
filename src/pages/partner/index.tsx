@@ -274,8 +274,9 @@ export default function PartnerDashboard() {
 
   const copyLink = async () => { await navigator.clipboard.writeText(generatedLink); setCopied(true); setTimeout(() => setCopied(false), 2500); };
   const sendViaWhatsApp = () => {
-    const msg = `Bonjour ${clientForm.firstName}, voici votre lien de paiement sécurisé pour votre eSIM FenuaSIM :\n${generatedLink}`;
-    window.open(`https://wa.me/${clientForm.phone?.replace(/\s/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
+    const msg = "Bonjour " + clientForm.firstName + ", voici votre lien de paiement sécurisé pour votre eSIM FenuaSIM :\n" + generatedLink;
+    const waUrl = "https://wa.me/" + (clientForm.phone?.replace(/\s/g, "") || "") + "?text=" + encodeURIComponent(msg);
+    window.open(waUrl, "_blank");
   };
   const resetForm = () => { setStep("destination"); setSelectedRegion(""); setSelectedPackage(null); setClientForm({ firstName: "", lastName: "", email: "", phone: "" }); setGeneratedLink(""); setFormError(""); setSearchQuery(""); };
 

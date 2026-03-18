@@ -137,7 +137,7 @@ export default function AdminAssurance() {
             destinationRegion: destination,
             tripCost: Number(tripPrice) || 0,
             subscriberCountry: "PF",
-            subscriber: { firstName: sub.firstName, lastName: sub.lastName, birthDate: sub.birthDate, address: sub.address, postalCode: sub.postalCode, city: sub.city },
+            subscriber: { firstName: sub.firstName, lastName: sub.lastName, birthDate: sub.birthDate, email: clientEmail, address: sub.address, postalCode: sub.postalCode, city: sub.city },
             companions: travelers,
             options: selectedOptions,
           }
@@ -171,7 +171,7 @@ export default function AdminAssurance() {
             destinationRegion: destination,
             tripCost: Number(tripPrice) || 0,
             subscriberCountry: "PF",
-            subscriber: { firstName: sub.firstName, lastName: sub.lastName, birthDate: sub.birthDate, address: sub.address, postalCode: sub.postalCode, city: sub.city },
+            subscriber: { firstName: sub.firstName, lastName: sub.lastName, birthDate: sub.birthDate, email: clientEmail, address: sub.address, postalCode: sub.postalCode, city: sub.city },
             companions: travelers,
             options: selectedOptions,
             manualAmount: quote,

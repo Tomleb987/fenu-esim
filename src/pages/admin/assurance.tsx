@@ -638,7 +638,7 @@ export default function AdminAssurance() {
                 <div style={{ padding: "16px 24px", borderBottom: "1px solid #f0e8ff", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <h2 style={{ fontSize: 15, fontWeight: 700, color: "#1a0533", margin: 0 }}>Commandes assurance ({orders.length})</h2>
                   <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={exportXLS}
+                    <button onClick={exportCSV}
                       style={{ fontSize: 12, fontWeight: 600, color: "#15803d", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 7, padding: "5px 12px", cursor: "pointer" }}>
                       Bordereau CSV
                     </button>

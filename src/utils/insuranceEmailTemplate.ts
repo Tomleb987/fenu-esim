@@ -1,198 +1,221 @@
 // src/utils/insuranceEmailTemplate.ts
 
-interface InsuranceEmailParams {
+interface InsuranceEmailData {
   adhesionNumber: string;
   certificatUrl?: string | null;
   attestationUrl?: string | null;
+  firstName?: string;
+  lastName?: string;
+  destination?: string;
+  startDate?: string;
+  endDate?: string;
+  productLabel?: string;
 }
 
 export function insuranceEmailHtml({
   adhesionNumber,
   certificatUrl,
   attestationUrl,
+  firstName,
+  lastName,
+  destination,
+  startDate,
+  endDate,
+  productLabel,
 }: InsuranceEmailData): string {
 
-  const btnCertificat = certificatUrl ? `
-    <tr>
-      <td style="padding:6px 0;">
-        <table width="100%" cellpadding="0" cellspacing="0" border="0">
-          <tr>
-            <td align="center" style="background-color:#7c3aed;border-radius:10px;">
-              <a href="${certificatUrl}" target="_blank"
-                 style="display:block;padding:14px 20px;font-family:Arial,sans-serif;font-size:15px;font-weight:bold;color:#ffffff;text-decoration:none;line-height:1.3;">
-                📄 Bulletin d'adhésion (PDF)
-              </a>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>` : '';
+  const fullName = [firstName, lastName].filter(Boolean).join(" ") || "Madame, Monsieur";
+  const formatDate = (d?: string | null) => {
+    if (!d) return null;
+    try { return new Date(d).toLocaleDateString("fr-FR"); } catch { return null; }
+  };
+  const dateDepart = formatDate(startDate);
+  const dateRetour = formatDate(endDate);
 
-  const btnAttestation = attestationUrl ? `
-    <tr>
-      <td style="padding:6px 0;">
-        <table width="100%" cellpadding="0" cellspacing="0" border="0">
-          <tr>
-            <td align="center" style="background-color:#ffffff;border-radius:10px;border:2px solid #7c3aed;">
-              <a href="${attestationUrl}" target="_blank"
-                 style="display:block;padding:12px 20px;font-family:Arial,sans-serif;font-size:15px;font-weight:bold;color:#7c3aed;text-decoration:none;line-height:1.3;">
-                📋 Attestation d'assurance signée (PDF)
-              </a>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>` : '';
+  const btnCertificat = certificatUrl ? `
+              <table cellpadding="0" cellspacing="0" style="margin:0 auto 12px;width:100%;">
+                <tr>
+                  <td style="background-color:#A020F0;border-radius:10px;text-align:center;">
+                    <a href="${certificatUrl}" target="_blank"
+                       style="display:block;padding:14px 20px;font-family:Arial,sans-serif;font-size:15px;font-weight:bold;color:#ffffff;text-decoration:none;">
+                      Télécharger mon certificat d'assurance
+                    </a>
+                  </td>
+                </tr>
+              </table>` : '';
+
+  const btnAttestation = '';
 
   const docsSection = (certificatUrl || attestationUrl) ? `
-    <tr>
-      <td style="padding:20px 0 4px;">
-        <p style="margin:0 0 12px;font-family:Arial,sans-serif;font-size:15px;font-weight:bold;color:#1f2937;">
-          Vos documents :
-        </p>
-        <table width="100%" cellpadding="0" cellspacing="0" border="0">
-          ${btnCertificat}
-          ${btnAttestation}
-        </table>
-      </td>
-    </tr>` : `
-    <tr>
-      <td style="padding:20px 0 4px;">
-        <table width="100%" cellpadding="0" cellspacing="0" border="0">
-          <tr>
-            <td style="background-color:#eff6ff;border-radius:10px;border:1px solid #bfdbfe;padding:16px;">
-              <p style="margin:0;font-family:Arial,sans-serif;font-size:14px;color:#1e40af;line-height:1.5;">
-                📧 <strong>Vos documents sont en cours de génération.</strong><br/>
-                Vous les recevrez dans quelques minutes, une fois validés par AVA Assurances.
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>`;
+            <tr>
+              <td style="padding:24px 40px 8px;">
+                <p style="margin:0 0 14px;font-family:Arial,sans-serif;font-size:15px;font-weight:bold;color:#1a0533;text-align:center;">
+                  Vos documents sont disponibles :
+                </p>
+                ${btnCertificat}
+                ${btnAttestation}
+              </td>
+            </tr>` : `
+            <tr>
+              <td style="padding:20px 40px 8px;">
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="background:#eff6ff;border-radius:10px;border:1px solid #bfdbfe;padding:14px 16px;">
+                      <p style="margin:0;font-family:Arial,sans-serif;font-size:13px;color:#1e40af;line-height:1.6;">
+                        Vos documents sont en cours de generation par AVA Assurances.<br/>
+                        Vous les recevrez dans quelques minutes.
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>`;
 
   return `<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>Votre assurance FENUASIM est active</title>
+  <title>Votre assurance voyage FENUA SIM est active</title>
 </head>
-<body style="margin:0;padding:0;background-color:#f3f4f6;">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f3f4f6;">
-    <tr>
-      <td align="center" style="padding:24px 16px;">
+<body style="margin:0;padding:0;background-color:#f8f7ff;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8f7ff;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
 
-        <table width="100%" cellpadding="0" cellspacing="0" border="0"
-               style="max-width:560px;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+        <!-- HEADER -->
+        <tr>
+          <td style="background:linear-gradient(135deg,#A020F0 0%,#FF4D6D 50%,#FF7F11 100%);padding:36px 40px;text-align:center;">
+            <div style="font-size:26px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">
+              FENUA<span style="opacity:0.5;">•</span>SIM
+            </div>
+            <div style="color:rgba(255,255,255,0.75);font-size:12px;margin-top:4px;letter-spacing:1px;text-transform:uppercase;">
+              Assurance Voyage — Partenaire AVA
+            </div>
+            <div style="margin-top:20px;font-size:44px;line-height:1;">✅</div>
+            <h1 style="margin:10px 0 4px;font-family:Arial,sans-serif;font-size:22px;font-weight:800;color:#ffffff;">
+              Votre assurance est active !
+            </h1>
+            <p style="margin:0;font-family:Arial,sans-serif;font-size:14px;color:rgba(255,255,255,0.8);">
+              Votre contrat a bien été enregistré et validé.
+            </p>
+          </td>
+        </tr>
 
-          <!-- Header -->
-          <tr>
-            <td align="center" style="background:linear-gradient(135deg,#16a34a 0%,#059669 100%);padding:32px 24px;">
-              <p style="margin:0 0 8px;font-size:40px;line-height:1;">✅</p>
-              <h1 style="margin:0;font-family:Arial,sans-serif;font-size:24px;font-weight:bold;color:#ffffff;line-height:1.3;">
-                Assurance confirmée !
-              </h1>
-              <p style="margin:8px 0 0;font-family:Arial,sans-serif;font-size:15px;color:rgba(255,255,255,0.85);">
-                Votre assurance voyage est désormais active.
-              </p>
-            </td>
-          </tr>
+        <!-- SALUTATION -->
+        <tr>
+          <td style="padding:32px 40px 0;">
+            <p style="margin:0 0 6px;font-family:Arial,sans-serif;font-size:17px;font-weight:600;color:#1a0533;">
+              Bonjour ${fullName},
+            </p>
+            <p style="margin:0;font-family:Arial,sans-serif;font-size:14px;color:#4a5568;line-height:1.6;">
+              Votre paiement a bien été reçu. Votre couverture est désormais
+              <strong style="color:#16a34a;">active</strong>.
+              Retrouvez ci-dessous le récapitulatif de votre contrat et vos documents.
+            </p>
+          </td>
+        </tr>
 
-          <!-- Corps -->
-          <tr>
-            <td style="padding:28px 24px 8px;">
-              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <!-- CARTE RECAP -->
+        <tr>
+          <td style="padding:20px 40px;">
+            <table width="100%" cellpadding="0" cellspacing="0"
+                   style="background:#faf5ff;border-radius:12px;border:1.5px solid #e9d5ff;">
+              <tr>
+                <td style="padding:20px 22px;">
+                  <div style="font-size:11px;font-weight:700;color:#A020F0;text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;">
+                    🛡️ ${productLabel || "Assurance Voyage AVA"}
+                  </div>
+                  <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td style="padding:8px 0;border-bottom:1px solid #e9d5ff;font-family:Arial,sans-serif;font-size:13px;color:#6b7280;">
+                        Assuré principal
+                      </td>
+                      <td style="text-align:right;padding:8px 0;border-bottom:1px solid #e9d5ff;font-family:Arial,sans-serif;font-size:13px;font-weight:700;color:#1a0533;">
+                        ${fullName}
+                      </td>
+                    </tr>
+                    ${destination ? `
+                    <tr>
+                      <td style="padding:8px 0;border-bottom:1px solid #e9d5ff;font-family:Arial,sans-serif;font-size:13px;color:#6b7280;">
+                        Destination
+                      </td>
+                      <td style="text-align:right;padding:8px 0;border-bottom:1px solid #e9d5ff;font-family:Arial,sans-serif;font-size:13px;font-weight:700;color:#1a0533;">
+                        ${destination}
+                      </td>
+                    </tr>` : ""}
+                    ${dateDepart ? `
+                    <tr>
+                      <td style="padding:8px 0;border-bottom:1px solid #e9d5ff;font-family:Arial,sans-serif;font-size:13px;color:#6b7280;">
+                        Départ
+                      </td>
+                      <td style="text-align:right;padding:8px 0;border-bottom:1px solid #e9d5ff;font-family:Arial,sans-serif;font-size:13px;font-weight:600;color:#1a0533;">
+                        ${dateDepart}
+                      </td>
+                    </tr>` : ""}
+                    ${dateRetour ? `
+                    <tr>
+                      <td style="padding:8px 0;border-bottom:1px solid #e9d5ff;font-family:Arial,sans-serif;font-size:13px;color:#6b7280;">
+                        Retour
+                      </td>
+                      <td style="text-align:right;padding:8px 0;border-bottom:1px solid #e9d5ff;font-family:Arial,sans-serif;font-size:13px;font-weight:600;color:#1a0533;">
+                        ${dateRetour}
+                      </td>
+                    </tr>` : ""}
+                    <tr>
+                      <td style="padding:10px 0 0;font-family:Arial,sans-serif;font-size:13px;color:#6b7280;">
+                        N° Adhésion
+                      </td>
+                      <td style="text-align:right;padding:10px 0 0;">
+                        <span style="font-family:'Courier New',monospace;font-size:14px;font-weight:bold;color:#A020F0;background:#ffffff;border:1.5px solid #e9d5ff;border-radius:6px;padding:3px 10px;">
+                          ${adhesionNumber}
+                        </span>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
 
-                <tr>
-                  <td>
-                    <p style="margin:0 0 20px;font-family:Arial,sans-serif;font-size:15px;color:#374151;line-height:1.6;">
-                      Bonjour,<br/>
-                      Votre paiement a bien été reçu et votre contrat est <strong>actif</strong>.
-                    </p>
-                  </td>
-                </tr>
+        <!-- DOCUMENTS -->
+        ${docsSection}
 
-                <!-- Bulletin adhésion -->
-                <tr>
-                  <td style="padding-bottom:20px;">
-                    <table width="100%" cellpadding="0" cellspacing="0" border="0"
-                           style="background-color:#f9fafb;border-radius:10px;border:1px solid #e5e7eb;">
-                      <tr>
-                        <td style="padding:16px 18px;">
-                          <p style="margin:0 0 12px;font-family:Arial,sans-serif;font-size:11px;font-weight:bold;color:#9ca3af;text-transform:uppercase;letter-spacing:0.08em;">
-                            Bulletin d'adhésion
-                          </p>
-                          <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                            <tr>
-                              <td style="font-family:Arial,sans-serif;font-size:14px;color:#6b7280;padding-bottom:8px;">
-                                N° adhésion
-                              </td>
-                              <td align="right" style="padding-bottom:8px;">
-                                <span style="font-family:'Courier New',monospace;font-size:14px;font-weight:bold;color:#111827;background:#ffffff;border:1px solid #e5e7eb;border-radius:6px;padding:3px 10px;">
-                                  ${adhesionNumber}
-                                </span>
-                              </td>
-                            </tr>
-                            <tr>
-                              <td style="font-family:Arial,sans-serif;font-size:14px;color:#6b7280;padding-bottom:8px;">Assureur</td>
-                              <td align="right" style="font-family:Arial,sans-serif;font-size:14px;font-weight:500;color:#374151;padding-bottom:8px;">AVA Assurances</td>
-                            </tr>
-                            <tr>
-                              <td style="font-family:Arial,sans-serif;font-size:14px;color:#6b7280;">Statut</td>
-                              <td align="right">
-                                <span style="font-family:Arial,sans-serif;font-size:13px;font-weight:bold;color:#065f46;background:#d1fae5;border:1px solid #6ee7b7;border-radius:20px;padding:3px 12px;">
-                                  ● Actif
-                                </span>
-                              </td>
-                            </tr>
-                          </table>
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
+        <!-- SINISTRE -->
+        <tr>
+          <td style="padding:16px 40px;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="background:#f0fdf4;border-radius:10px;border:1px solid #bbf7d0;padding:14px 16px;">
+                  <p style="margin:0;font-family:Arial,sans-serif;font-size:13px;color:#15803d;line-height:1.7;">
+                    <strong>En cas de sinistre</strong><br/>
+                    Contactez AVA Assurances en mentionnant votre numéro d'adhésion
+                    <strong>${adhesionNumber}</strong>.<br/>
+                    Conservez cet email comme justificatif de votre couverture.
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
 
-                <!-- Documents -->
-                ${docsSection}
+        <!-- FOOTER -->
+        <tr>
+          <td style="background:#faf5ff;padding:20px 40px 24px;border-top:1px solid #f0e8ff;text-align:center;">
+            <p style="margin:0 0 4px;font-family:Arial,sans-serif;font-size:13px;font-weight:700;color:#A020F0;">
+              FENUA SIM — Partenaire AVA Assurances
+            </p>
+            <p style="margin:0;font-family:Arial,sans-serif;font-size:11px;color:#cbd5e1;">
+              <a href="https://fenuasim.com" style="color:#A020F0;text-decoration:none;">fenuasim.com</a>
+              &nbsp;·&nbsp;
+              <a href="mailto:hello@fenuasim.com" style="color:#A020F0;text-decoration:none;">hello@fenuasim.com</a>
+            </p>
+          </td>
+        </tr>
 
-                <!-- Notice -->
-                <tr>
-                  <td style="padding:16px 0 8px;">
-                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                      <tr>
-                        <td style="background-color:#eff6ff;border-radius:10px;border:1px solid #bfdbfe;padding:14px 16px;">
-                          <p style="margin:0;font-family:Arial,sans-serif;font-size:13px;color:#1e40af;line-height:1.6;">
-                            📧 Conservez cet email comme preuve de souscription.<br/>
-                            En cas de sinistre, contactez AVA Assurances avec votre numéro d'adhésion.
-                          </p>
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-
-              </table>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td style="padding:20px 24px 28px;border-top:1px solid #f3f4f6;" align="center">
-              <p style="margin:0 0 4px;font-family:Arial,sans-serif;font-size:12px;color:#9ca3af;">
-                🛡️ Partenaire officiel ANSET ASSURANCES
-              </p>
-              <p style="margin:0;font-family:Arial,sans-serif;font-size:12px;color:#d1d5db;">
-                FENUA SIM · contact@fenuasim.com ·
-                <a href="https://www.fenuasim.com" style="color:#7c3aed;text-decoration:none;">fenuasim.com</a>
-              </p>
-            </td>
-          </tr>
-
-        </table>
-
-      </td>
-    </tr>
+      </table>
+    </td></tr>
   </table>
 </body>
 </html>`;

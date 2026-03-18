@@ -5,6 +5,20 @@ import Head from "next/head";
 import { supabase } from "@/lib/supabaseClient";
 
 const ADMIN_EMAIL = "admin@fenuasim.com";
+
+// Chargement dynamique de SheetJS
+async function loadXLSX() {
+  if (typeof window !== "undefined" && !(window as any).XLSX) {
+    await new Promise<void>((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+      script.onload = () => resolve();
+      script.onerror = () => reject();
+      document.head.appendChild(script);
+    });
+  }
+  return (window as any).XLSX;
+}
 const G = "linear-gradient(135deg, #A020F0 0%, #FF4D6D 50%, #FF7F11 100%)";
 const FRAIS = 10;
 const EUR_TO_XPF = 119.33;
@@ -116,7 +130,7 @@ export default function AdminAssurance() {
     if (paid.length === 0) { alert("Aucun contrat paye a exporter."); return; }
 
     const rows = [
-      ["Nom", "Prenom", "N° Adhesion", "Prime AVA (EUR)", "Commission 10% (EUR)"],
+      ["Nom", "Prenom", "N° Adhesion", "Prime AVA (EUR)", "Commission 10% (EUR)", "A reverser ANSET (EUR)"],
       ...paid.map(o => {
         const primeAva = Math.max(0, (o.total_amount || 0) - FRAIS);
         const commission = +(primeAva * 0.10).toFixed(2);
@@ -126,6 +140,7 @@ export default function AdminAssurance() {
           o.adhesion_number || "",
           primeAva.toFixed(2),
           commission.toFixed(2),
+          (primeAva - commission).toFixed(2),
         ];
       })
     ];
@@ -635,9 +650,9 @@ export default function AdminAssurance() {
                 <div style={{ padding: "16px 24px", borderBottom: "1px solid #f0e8ff", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <h2 style={{ fontSize: 15, fontWeight: 700, color: "#1a0533", margin: 0 }}>Commandes assurance ({orders.length})</h2>
                   <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={exportCSV}
+                    <button onClick={exportXLS}
                       style={{ fontSize: 12, fontWeight: 600, color: "#15803d", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 7, padding: "5px 12px", cursor: "pointer" }}>
-                      Bordereau CSV
+                      Bordereau XLS
                     </button>
                     <button onClick={loadOrders} style={{ fontSize: 12, color: "#A020F0", background: "none", border: "none", cursor: "pointer", fontWeight: 500 }}>
                       Actualiser

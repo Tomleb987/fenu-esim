@@ -69,23 +69,12 @@ export default function Navbar() {
         <ul className="hidden md:flex items-center gap-6 font-medium text-gray-700">
           <li><Link href="/" className="nav-link">Accueil</Link></li>
           <li><Link href="/shop" className="nav-link">Nos eSIM</Link></li>
+          <li><Link href="/assurance" className="nav-link">Assurance</Link></li>
           <li><Link href="/blog" className="nav-link">Blog</Link></li>
           <li><Link href="/compatibilite" className="nav-link">Compatibilité</Link></li>
           <li><Link href="/faq" className="nav-link">FAQ</Link></li>
           <li><Link href="/contact" className="nav-link">Contact</Link></li>
           
-          {/* Espace Partenaire */}
-          <li>
-            <Link
-              href="/partner/login"
-              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold transition-all"
-              style={{ background: 'linear-gradient(135deg, #A020F0, #FF7F11)', color: '#fff', boxShadow: '0 2px 8px rgba(160,32,240,0.25)' }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-              Espace partenaire
-            </Link>
-          </li>
-
           {/* User Menu */}
           {user ? (
             <li className="relative">
@@ -162,20 +151,12 @@ export default function Navbar() {
           </button>
           <Link href="/" onClick={() => setMenuOpen(false)}>Accueil</Link>
           <Link href="/shop" onClick={() => setMenuOpen(false)}>Nos eSIM</Link>
+          <Link href="/assurance" onClick={() => setMenuOpen(false)}>Assurance</Link>
           <Link href="/blog" onClick={() => setMenuOpen(false)}>Blog</Link>
           <Link href="/compatibilite" onClick={() => setMenuOpen(false)}>Compatibilité</Link>
           <Link href="/faq" onClick={() => setMenuOpen(false)}>FAQ</Link>
           <Link href="/contact" onClick={() => setMenuOpen(false)}>Contact</Link>
           <Link href="/cart" onClick={() => setMenuOpen(false)}>Panier</Link>
-          <Link
-            href="/partner/login"
-            onClick={() => setMenuOpen(false)}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold"
-            style={{ background: 'linear-gradient(135deg, #A020F0, #FF7F11)', color: '#fff', width: 'fit-content' }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            Espace partenaire
-          </Link>
           
           {user ? (
             <>

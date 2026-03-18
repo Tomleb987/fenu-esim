@@ -640,7 +640,7 @@ export default function AdminAssurance() {
                   <div style={{ display: "flex", gap: 8 }}>
                     <button onClick={exportXLS}
                       style={{ fontSize: 12, fontWeight: 600, color: "#15803d", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 7, padding: "5px 12px", cursor: "pointer" }}>
-                      Bordereau XLS
+                      Bordereau CSV
                     </button>
                     <button onClick={loadOrders} style={{ fontSize: 12, color: "#A020F0", background: "none", border: "none", cursor: "pointer", fontWeight: 500 }}>
                       Actualiser

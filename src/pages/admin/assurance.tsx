@@ -6,19 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 
 const ADMIN_EMAIL = "admin@fenuasim.com";
 
-// Chargement dynamique de SheetJS
-async function loadXLSX() {
-  if (typeof window !== "undefined" && !(window as any).XLSX) {
-    await new Promise<void>((resolve, reject) => {
-      const script = document.createElement("script");
-      script.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
-      script.onload = () => resolve();
-      script.onerror = () => reject();
-      document.head.appendChild(script);
-    });
-  }
-  return (window as any).XLSX;
-}
+
 const G = "linear-gradient(135deg, #A020F0 0%, #FF4D6D 50%, #FF7F11 100%)";
 const FRAIS = 10;
 const EUR_TO_XPF = 119.33;

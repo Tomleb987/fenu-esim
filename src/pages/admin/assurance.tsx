@@ -111,6 +111,36 @@ export default function AdminAssurance() {
     if (data) setOrders(data as InsuranceOrder[]);
   };
 
+  const exportCSV = () => {
+    const paid = orders.filter(o => o.status === "active" || o.status === "paid");
+    if (paid.length === 0) { alert("Aucun contrat paye a exporter."); return; }
+
+    const rows = [
+      ["Nom", "Prenom", "N° Adhesion", "Prime AVA (EUR)", "Commission 10% (EUR)"],
+      ...paid.map(o => {
+        const primeAva = Math.max(0, (o.total_amount || 0) - FRAIS);
+        const commission = +(primeAva * 0.10).toFixed(2);
+        return [
+          o.subscriber_last_name || "",
+          o.subscriber_first_name || "",
+          o.adhesion_number || "",
+          primeAva.toFixed(2),
+          commission.toFixed(2),
+        ];
+      })
+    ];
+
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("
+");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `bordereau-assurance-${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const getOptions = () => product === "ava_carte_sante" ? OPTIONS_SANTE : product === "ava_tourist_card" ? OPTIONS_TOURIST : [];
 
   const toggleOption = (optId: string, subId?: string) => {
@@ -605,7 +635,15 @@ export default function AdminAssurance() {
               <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #f0e8ff", boxShadow: "0 2px 16px rgba(160,32,240,0.06)", overflow: "hidden" }}>
                 <div style={{ padding: "16px 24px", borderBottom: "1px solid #f0e8ff", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <h2 style={{ fontSize: 15, fontWeight: 700, color: "#1a0533", margin: 0 }}>Commandes assurance ({orders.length})</h2>
-                  <button onClick={loadOrders} style={{ fontSize: 12, color: "#A020F0", background: "none", border: "none", cursor: "pointer", fontWeight: 500 }}>↻ Actualiser</button>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={exportCSV}
+                      style={{ fontSize: 12, fontWeight: 600, color: "#15803d", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 7, padding: "5px 12px", cursor: "pointer" }}>
+                      Bordereau CSV
+                    </button>
+                    <button onClick={loadOrders} style={{ fontSize: 12, color: "#A020F0", background: "none", border: "none", cursor: "pointer", fontWeight: 500 }}>
+                      Actualiser
+                    </button>
+                  </div>
                 </div>
                 {orders.length === 0 ? (
                   <div style={{ padding: "60px 0", textAlign: "center", color: "#9ca3af", fontSize: 14 }}>Aucune commande</div>

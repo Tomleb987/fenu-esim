@@ -1817,7 +1817,8 @@ export default function PartnerDashboard() {
               const paidOrders = orders.filter(o => o.status === "paid" || o.status === "esim_sent");
               const rankMap: { [name: string]: { count: number; amount: number } } = {};
               paidOrders.forEach(o => {
-                const name = (o as any).seller_name || "Non renseigne";
+                const rawName = ((o as any).seller_name || "Non renseigne").trim();
+                const name = rawName.charAt(0).toUpperCase() + rawName.slice(1).toLowerCase();
                 if (!rankMap[name]) rankMap[name] = { count: 0, amount: 0 };
                 rankMap[name].count += 1;
                 rankMap[name].amount += o.amount || 0;

@@ -29,7 +29,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (partnerError || !partner || !partner.is_active)
     return res.status(403).json({ error: "Compte partenaire introuvable ou inactif" });
 
-  const { packageId, clientFirstName, clientLastName, clientEmail, clientPhone, destination,
+  const { packageId, clientFirstName, clientLastName, clientEmail, clientPhone, destination, sellerName,
     resendOnly, paymentUrl: resendPaymentUrl, packageName: resendPackageName,
     amount: resendAmount, currency: resendCurrency, advisorName: resendAdvisorName } = req.body;
 
@@ -153,6 +153,7 @@ L'équipe FENUA SIM`,
     status: "pending",
     amount: Math.round(rawPrice),
     currency: "xpf",
+    seller_name: sellerName || null,
     created_at: new Date().toISOString(),
   });
 

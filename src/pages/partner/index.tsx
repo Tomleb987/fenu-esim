@@ -269,6 +269,39 @@ export default function PartnerDashboard() {
     if (data) setOrders(data as PartnerOrder[]);
   };
 
+  const exportExcel = () => {
+    if (orders.length === 0) { alert("Aucune commande a exporter."); return; }
+
+    const rows = [
+      ["Client", "Email", "Conseiller", "Forfait", "Montant (XPF)", "Statut", "ICCID", "Date"],
+      ...orders.map(o => {
+        const iccid = (o as any).esim_iccid;
+        const s: { [k: string]: string } = {
+          pending: "En attente", paid: "Paye", esim_sent: "eSIM envoyee", error: "Erreur"
+        };
+        return [
+          o.client_name,
+          o.client_email,
+          (o as any).seller_name || "-",
+          o.package_name,
+          o.amount,
+          s[o.status] || o.status,
+          iccid ? iccid.toString().slice(-4) : "-",
+          new Date(o.created_at).toLocaleDateString("fr-FR"),
+        ];
+      })
+    ];
+
+    const csv = rows.map(r => r.join(";")).join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `commandes-${partnerProfile?.partner_code}-${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const packagesByRegion = packages.reduce((acc, pkg) => {
     const region = getFrenchName(pkg);
     if (!acc[region]) acc[region] = [];
@@ -1800,19 +1833,20 @@ export default function PartnerDashboard() {
                   <h2 style={{ fontSize: 16, fontWeight: 700, color: "#1a0533", margin: 0 }}>
                     Historique des commandes
                   </h2>
-                  <button
-                    onClick={() => loadOrders(partnerProfile?.partner_code)}
-                    style={{
-                      fontSize: 12,
-                      color: "#A020F0",
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      fontWeight: 500,
-                    }}
-                  >
-                    ↻ Actualiser
-                  </button>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <button
+                      onClick={exportExcel}
+                      style={{ fontSize: 12, fontWeight: 600, color: "#15803d", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 7, padding: "5px 12px", cursor: "pointer" }}
+                    >
+                      ⬇ Rapport Excel
+                    </button>
+                    <button
+                      onClick={() => loadOrders(partnerProfile?.partner_code)}
+                      style={{ fontSize: 12, color: "#A020F0", background: "none", border: "none", cursor: "pointer", fontWeight: 500 }}
+                    >
+                      ↻ Actualiser
+                    </button>
+                  </div>
                 </div>
 
                 {orders.length === 0 ? (

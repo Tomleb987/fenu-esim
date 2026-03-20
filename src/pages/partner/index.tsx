@@ -196,6 +196,10 @@ export default function PartnerDashboard() {
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [resentId, setResentId] = useState<string | null>(null);
   const [sellerName, setSellerName] = useState("");
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pinInput, setPinInput] = useState("");
+  const [pinError, setPinError] = useState("");
+  const [managerUnlocked, setManagerUnlocked] = useState(false);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -660,8 +664,14 @@ export default function PartnerDashboard() {
               <button
                 key={item.key}
                 onClick={() => {
+                  if (item.key === "orders" && !managerUnlocked) {
+                    setShowPinModal(true);
+                    setPinInput("");
+                    setPinError("");
+                    return;
+                  }
                   setActiveTab(item.key as "new" | "orders");
-                  if (item.key === "new") resetForm();
+                  if (item.key === "new") { resetForm(); setManagerUnlocked(false); }
                 }}
                 className="nav-btn"
                 style={{
@@ -1321,7 +1331,7 @@ export default function PartnerDashboard() {
                             marginBottom: 6,
                           }}
                         >
-                          Prénom du vendeur *
+                          Prénom du conseiller *
                         </label>
                         <input
                           type="text"
@@ -1404,7 +1414,7 @@ export default function PartnerDashboard() {
                               return;
                             }
                             if (!sellerName.trim()) {
-                              setFormError("Le prénom du vendeur est obligatoire.");
+                              setFormError("Le prénom du conseiller est obligatoire.");
                               return;
                             }
                             if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientForm.email)) {
@@ -1456,7 +1466,7 @@ export default function PartnerDashboard() {
                           ["Client", `${clientForm.firstName} ${clientForm.lastName}`],
                           ["Email", clientForm.email],
                           ["Téléphone", clientForm.phone || "-"],
-                          ["Vendeur", sellerName],
+                          ["Conseiller", sellerName],
                           ["Destination", selectedRegion],
                           ["Forfait", selectedPackage.name],
                           ["Données", getData(selectedPackage)],
@@ -1821,7 +1831,7 @@ export default function PartnerDashboard() {
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                       <thead>
                         <tr style={{ background: "#faf5ff" }}>
-                          {["Client", "Forfait", "Montant", "Statut", "ICCID", "Date", "Action"].map(
+                          {["Client", "Forfait", "Conseiller", "Montant", "Statut", "ICCID", "Date", "Action"].map(
                             (h) => (
                               <th
                                 key={h}
@@ -1870,6 +1880,10 @@ export default function PartnerDashboard() {
 
                               <td style={{ padding: "13px 18px", color: "#374151" }}>
                                 {order.package_name}
+                              </td>
+
+                              <td style={{ padding: "13px 18px", color: "#374151" }}>
+                                {(order as any).seller_name || "-"}
                               </td>
 
                               <td
@@ -1960,6 +1974,58 @@ export default function PartnerDashboard() {
           </div>
         </main>
       </div>
+
+      {/* Modal PIN Manager */}
+      {showPinModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: 32, width: "100%", maxWidth: 360, boxShadow: "0 8px 40px rgba(0,0,0,0.2)" }}>
+            <div style={{ textAlign: "center", marginBottom: 20 }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>🔒</div>
+              <h2 style={{ fontSize: 18, fontWeight: 800, color: "#1a0533", margin: "0 0 4px" }}>Accès manager</h2>
+              <p style={{ fontSize: 13, color: "#9ca3af", margin: 0 }}>Entrez le code PIN pour voir l'historique</p>
+            </div>
+            <input
+              type="password"
+              value={pinInput}
+              onChange={e => { setPinInput(e.target.value); setPinError(""); }}
+              onKeyDown={e => { if (e.key === "Enter") {
+                if (pinInput === partnerProfile?.manager_pin) {
+                  setManagerUnlocked(true);
+                  setShowPinModal(false);
+                  setActiveTab("orders");
+                } else {
+                  setPinError("Code PIN incorrect.");
+                }
+              }}}
+              placeholder="••••"
+              maxLength={10}
+              style={{ width: "100%", padding: "12px 14px", border: `1.5px solid ${pinError ? "#fca5a5" : "#e9d5ff"}`, borderRadius: 10, fontSize: 18, textAlign: "center", letterSpacing: 8, boxSizing: "border-box", marginBottom: 8 }}
+              autoFocus
+            />
+            {pinError && <p style={{ color: "#dc2626", fontSize: 13, textAlign: "center", marginBottom: 8 }}>{pinError}</p>}
+            <button
+              onClick={() => {
+                if (pinInput === partnerProfile?.manager_pin) {
+                  setManagerUnlocked(true);
+                  setShowPinModal(false);
+                  setActiveTab("orders");
+                } else {
+                  setPinError("Code PIN incorrect.");
+                }
+              }}
+              style={{ width: "100%", padding: "12px", background: "linear-gradient(135deg, #A020F0, #FF7F11)", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", marginBottom: 8 }}
+            >
+              Confirmer
+            </button>
+            <button
+              onClick={() => setShowPinModal(false)}
+              style={{ width: "100%", padding: "10px", background: "none", border: "none", color: "#9ca3af", fontSize: 13, cursor: "pointer" }}
+            >
+              Annuler
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }

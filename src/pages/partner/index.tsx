@@ -195,6 +195,7 @@ export default function PartnerDashboard() {
   const [emailSent, setEmailSent] = useState(false);
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [resentId, setResentId] = useState<string | null>(null);
+  const [sellerName, setSellerName] = useState("");
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -355,6 +356,7 @@ export default function PartnerDashboard() {
           clientEmail: clientForm.email,
           clientPhone: clientForm.phone,
           destination: selectedRegion,
+          sellerName: sellerName,
         }),
       });
 
@@ -481,6 +483,7 @@ export default function PartnerDashboard() {
     setGeneratedLink("");
     setFormError("");
     setSearchQuery("");
+    setSellerName("");
   };
 
   const stepKeys: Step[] = ["destination", "forfait", "client", "recap", "lien"];
@@ -1308,6 +1311,35 @@ export default function PartnerDashboard() {
                         ))}
                       </div>
 
+                      <div style={{ marginBottom: 16 }}>
+                        <label
+                          style={{
+                            display: "block",
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: "#6b7280",
+                            marginBottom: 6,
+                          }}
+                        >
+                          Prénom du vendeur *
+                        </label>
+                        <input
+                          type="text"
+                          value={sellerName}
+                          onChange={(e) => setSellerName(e.target.value)}
+                          placeholder="Ex : Marie, Thomas..."
+                          style={{
+                            width: "100%",
+                            padding: "10px 14px",
+                            border: "1.5px solid #e5e7eb",
+                            borderRadius: 9,
+                            fontSize: 14,
+                            color: "#1a0533",
+                            boxSizing: "border-box",
+                          }}
+                        />
+                      </div>
+
                       <div
                         style={{
                           background: "#faf5ff",
@@ -1371,6 +1403,10 @@ export default function PartnerDashboard() {
                               setFormError("Prénom, nom et email sont obligatoires.");
                               return;
                             }
+                            if (!sellerName.trim()) {
+                              setFormError("Le prénom du vendeur est obligatoire.");
+                              return;
+                            }
                             if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientForm.email)) {
                               setFormError("Email invalide.");
                               return;
@@ -1420,6 +1456,7 @@ export default function PartnerDashboard() {
                           ["Client", `${clientForm.firstName} ${clientForm.lastName}`],
                           ["Email", clientForm.email],
                           ["Téléphone", clientForm.phone || "-"],
+                          ["Vendeur", sellerName],
                           ["Destination", selectedRegion],
                           ["Forfait", selectedPackage.name],
                           ["Données", getData(selectedPackage)],
@@ -1464,7 +1501,7 @@ export default function PartnerDashboard() {
                       </div>
 
                       <p style={{ fontSize: 12, color: "#9ca3af", marginBottom: 20 }}>
-                        Un lien Stripe sera généré instantanément, valable 72h. Après paiement,
+                        Un lien Stripe sera généré instantanément, valable 24h. Après paiement,
                         le QR code eSIM est envoyé automatiquement à {clientForm.email}.
                       </p>
 

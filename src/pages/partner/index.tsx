@@ -189,7 +189,7 @@ export default function PartnerDashboard() {
   const [copied, setCopied] = useState(false);
   const [formError, setFormError] = useState("");
   const [orders, setOrders] = useState<PartnerOrder[]>([]);
-  const [activeTab, setActiveTab] = useState<"new" | "orders">("new");
+  const [activeTab, setActiveTab] = useState<"new" | "orders" | "challenge">("new");
   const [searchQuery, setSearchQuery] = useState("");
   const [sendingEmail, setSendingEmail] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
@@ -693,6 +693,7 @@ export default function PartnerDashboard() {
             {[
               { key: "new", label: "Nouvelle commande", icon: "+" },
               { key: "orders", label: "Mes commandes", icon: "≡" },
+              { key: "challenge", label: "Challenge", icon: "🏆" },
             ].map((item) => (
               <button
                 key={item.key}
@@ -703,7 +704,7 @@ export default function PartnerDashboard() {
                     setPinError("");
                     return;
                   }
-                  setActiveTab(item.key as "new" | "orders");
+                  setActiveTab(item.key as "new" | "orders" | "challenge");
                   if (item.key === "new") { resetForm(); setManagerUnlocked(false); }
                 }}
                 className="nav-btn"
@@ -768,7 +769,7 @@ export default function PartnerDashboard() {
             }}
           >
             <h1 style={{ fontSize: 17, fontWeight: 700, margin: 0, color: "#1a0533" }}>
-              {activeTab === "new" ? "Nouvelle commande" : "Mes commandes"}
+              {activeTab === "new" ? "Nouvelle commande" : activeTab === "orders" ? "Mes commandes" : "Challenge 🏆"}
             </h1>
             <div
               style={{
@@ -1810,6 +1811,61 @@ export default function PartnerDashboard() {
                 </div>
               </div>
             )}
+
+            {activeTab === "challenge" && (() => {
+              // Calculer le classement depuis les commandes payées
+              const paidOrders = orders.filter(o => o.status === "paid" || o.status === "esim_sent");
+              const rankMap: { [name: string]: { count: number; amount: number } } = {};
+              paidOrders.forEach(o => {
+                const name = (o as any).seller_name || "Non renseigne";
+                if (!rankMap[name]) rankMap[name] = { count: 0, amount: 0 };
+                rankMap[name].count += 1;
+                rankMap[name].amount += o.amount || 0;
+              });
+              const ranking = Object.entries(rankMap)
+                .map(([name, data]) => ({ name, ...data }))
+                .sort((a, b) => b.count - a.count);
+              const medals = ["🥇", "🥈", "🥉"];
+              const maxCount = ranking[0]?.count || 1;
+
+              return (
+                <div style={{ maxWidth: 600, margin: "0 auto" }}>
+                  <div style={{ background: "linear-gradient(135deg, #1a0533, #2d0a5c)", borderRadius: 16, padding: "28px 32px", marginBottom: 24, textAlign: "center", color: "#fff" }}>
+                    <div style={{ fontSize: 40, marginBottom: 8 }}>🏆</div>
+                    <h2 style={{ fontSize: 20, fontWeight: 800, margin: "0 0 4px" }}>Classement des conseillers</h2>
+                    <p style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", margin: 0 }}>
+                      Basé sur les ventes confirmées — {partnerProfile?.partner_code}
+                    </p>
+                  </div>
+
+                  {ranking.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: "40px 0", color: "#9ca3af", fontSize: 14 }}>
+                      Aucune vente confirmée pour le moment
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                      {ranking.map((r, i) => (
+                        <div key={r.name} style={{ background: "#fff", borderRadius: 14, padding: "16px 20px", border: `2px solid ${i === 0 ? "#fbbf24" : i === 1 ? "#d1d5db" : i === 2 ? "#f97316" : "#f0e8ff"}`, boxShadow: i === 0 ? "0 4px 16px rgba(251,191,36,0.2)" : "none", display: "flex", alignItems: "center", gap: 16 }}>
+                          <div style={{ fontSize: 28, flexShrink: 0 }}>{medals[i] || `#${i + 1}`}</div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                              <span style={{ fontWeight: 700, fontSize: 15, color: "#1a0533" }}>{r.name}</span>
+                              <span style={{ fontWeight: 800, fontSize: 14, color: "#A020F0" }}>{r.count} vente{r.count > 1 ? "s" : ""}</span>
+                            </div>
+                            <div style={{ background: "#f3f4f6", borderRadius: 999, height: 8, overflow: "hidden" }}>
+                              <div style={{ height: "100%", borderRadius: 999, background: i === 0 ? "linear-gradient(90deg, #fbbf24, #f97316)" : "linear-gradient(90deg, #A020F0, #FF4D6D)", width: `${Math.round((r.count / maxCount) * 100)}%`, transition: "width .5s ease" }} />
+                            </div>
+                            <p style={{ fontSize: 11, color: "#9ca3af", margin: "6px 0 0" }}>
+                              CA : {r.amount.toLocaleString("fr")} XPF
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {activeTab === "orders" && (
               <div

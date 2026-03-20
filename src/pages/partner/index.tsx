@@ -196,6 +196,8 @@ export default function PartnerDashboard() {
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [resentId, setResentId] = useState<string | null>(null);
   const [sellerName, setSellerName] = useState("");
+  const [compatibilityChecked, setCompatibilityChecked] = useState(false);
+  const [showCompatInfo, setShowCompatInfo] = useState(false);
   const [showPinModal, setShowPinModal] = useState(false);
   const [pinInput, setPinInput] = useState("");
   const [pinError, setPinError] = useState("");
@@ -521,6 +523,7 @@ export default function PartnerDashboard() {
     setFormError("");
     setSearchQuery("");
     setSellerName("");
+    setCompatibilityChecked(false);
   };
 
   const stepKeys: Step[] = ["destination", "forfait", "client", "recap", "lien"];
@@ -1419,6 +1422,72 @@ export default function PartnerDashboard() {
                         </div>
                       </div>
 
+                      {/* Case compatibilité */}
+                      <div style={{ background: compatibilityChecked ? "#f0fdf4" : "#fafafa", border: `1.5px solid ${compatibilityChecked ? "#bbf7d0" : "#e5e7eb"}`, borderRadius: 12, padding: "14px 16px", marginBottom: 16, transition: "all .2s" }}>
+                        <label style={{ display: "flex", alignItems: "flex-start", gap: 12, cursor: "pointer" }}>
+                          <input
+                            type="checkbox"
+                            checked={compatibilityChecked}
+                            onChange={e => setCompatibilityChecked(e.target.checked)}
+                            style={{ marginTop: 2, width: 18, height: 18, accentColor: "#16a34a", flexShrink: 0, cursor: "pointer" }}
+                          />
+                          <div style={{ flex: 1 }}>
+                            <p style={{ fontWeight: 600, fontSize: 13, color: "#1a0533", margin: "0 0 2px" }}>
+                              ✅ Compatibilité eSIM vérifiée *
+                            </p>
+                            <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>
+                              Je confirme avoir vérifié que le téléphone du client est compatible eSIM et déverrouillé.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={e => { e.preventDefault(); setShowCompatInfo(true); }}
+                            style={{ background: "#f3e8ff", border: "none", borderRadius: "50%", width: 24, height: 24, fontSize: 13, color: "#A020F0", cursor: "pointer", flexShrink: 0, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}
+                            title="Comment vérifier ?"
+                          >
+                            ?
+                          </button>
+                        </label>
+                      </div>
+
+                      {/* Modal info compatibilité */}
+                      {showCompatInfo && (
+                        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+                          <div style={{ background: "#fff", borderRadius: 16, padding: 28, maxWidth: 400, width: "100%", boxShadow: "0 8px 40px rgba(0,0,0,0.2)" }}>
+                            <div style={{ textAlign: "center", marginBottom: 16 }}>
+                              <div style={{ fontSize: 36, marginBottom: 8 }}>📱</div>
+                              <h3 style={{ fontSize: 17, fontWeight: 800, color: "#1a0533", margin: "0 0 4px" }}>Vérifier la compatibilité eSIM</h3>
+                              <p style={{ fontSize: 13, color: "#9ca3af", margin: 0 }}>Suivez ces étapes avec le client</p>
+                            </div>
+                            <div style={{ background: "#faf5ff", borderRadius: 12, padding: 16, marginBottom: 16 }}>
+                              <p style={{ fontWeight: 700, fontSize: 13, color: "#A020F0", margin: "0 0 10px" }}>Étape 1 — Vérifier l'IMEI</p>
+                              <div style={{ background: "#1a0533", borderRadius: 8, padding: "10px 14px", textAlign: "center", marginBottom: 8 }}>
+                                <span style={{ fontFamily: "monospace", fontSize: 20, fontWeight: 800, color: "#fff", letterSpacing: 2 }}>*#06#</span>
+                              </div>
+                              <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>Faites composer ce code sur le téléphone. Si 2 IMEI s'affichent, le téléphone est compatible eSIM.</p>
+                            </div>
+                            <div style={{ background: "#f0fdf4", borderRadius: 12, padding: 16, marginBottom: 16 }}>
+                              <p style={{ fontWeight: 700, fontSize: 13, color: "#15803d", margin: "0 0 8px" }}>Étape 2 — Vérifier le déverrouillage</p>
+                              <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>Le téléphone doit être <strong>déverrouillé opérateur</strong> (ne doit pas être bloqué sur un réseau comme Vini ou Vodafone).</p>
+                            </div>
+                            <div style={{ background: "#eff6ff", borderRadius: 12, padding: 16, marginBottom: 20 }}>
+                              <p style={{ fontWeight: 700, fontSize: 13, color: "#1d4ed8", margin: "0 0 8px" }}>Étape 3 — Vérifier sur le site</p>
+                              <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 8px" }}>Vous pouvez aussi vérifier via la page compatibilité FENUA SIM.</p>
+                              <a href="https://fenuasim.com/compatibilite" target="_blank" rel="noopener noreferrer"
+                                style={{ fontSize: 12, color: "#A020F0", fontWeight: 600, textDecoration: "none" }}>
+                                fenuasim.com/compatibilite →
+                              </a>
+                            </div>
+                            <button
+                              onClick={() => setShowCompatInfo(false)}
+                              style={{ width: "100%", padding: "12px", background: "linear-gradient(135deg, #A020F0, #FF7F11)", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}
+                            >
+                              Compris ✓
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
                       {formError && (
                         <p style={{ color: "#dc2626", fontSize: 13, marginBottom: 12 }}>
                           {formError}
@@ -1449,6 +1518,10 @@ export default function PartnerDashboard() {
                             }
                             if (!sellerName.trim()) {
                               setFormError("Le prénom du conseiller est obligatoire.");
+                              return;
+                            }
+                            if (!compatibilityChecked) {
+                              setFormError("Veuillez confirmer que la compatibilité eSIM a été vérifiée.");
                               return;
                             }
                             if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientForm.email)) {

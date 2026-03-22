@@ -711,6 +711,10 @@ export default function AdminDashboard() {
                 className="flex items-center gap-1 text-xs px-3 py-2 border border-gray-200 rounded-xl bg-white text-gray-500 hover:text-gray-800 shadow-sm">
                 Assurance <ChevronRight size={12} />
               </a>
+              <a href="/admin/routeurs"
+                className="flex items-center gap-1 text-xs px-3 py-2 border border-gray-200 rounded-xl bg-white text-gray-500 hover:text-gray-800 shadow-sm">
+                Routeurs <ChevronRight size={12} />
+              </a>
               <button onClick={handleLogout}
                 className="flex items-center gap-1.5 text-xs px-3 py-2 border border-gray-200 rounded-xl bg-white text-gray-400 hover:text-red-500 shadow-sm">
                 <LogOut size={12} /> Déconnexion

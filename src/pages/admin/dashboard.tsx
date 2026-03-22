@@ -98,7 +98,7 @@ function useDashboard(period: { start: string; end: string }) {
           .order("period", { ascending: false }).limit(12),
         supabase.from("v_partner_commissions_detail").select("*")
           .gte("period_month", `${period.start.slice(0, 7)}-01`)
-          .lte("period_month", `${period.end.slice(0, 7)}-01`),
+          .lte("period_month", `${period.end.slice(0, 7)}-28`),
         // Toutes assurances en attente (toutes périodes confondues)
         supabase.from("insurances")
           .select("id, created_at, premium_ava, frais_distribution, amount_to_transfer, transfer_status")
@@ -126,7 +126,7 @@ function useDashboard(period: { start: string; end: string }) {
       const insRev    = ins.reduce((s, i) => s + (i.frais_distribution ?? 0) + ((i.premium_ava ?? 0) * 0.10), 0);
       const insPrem   = ins.reduce((s, i) => s + (i.premium_ava ?? 0), 0);
       const insPend   = ins.filter(i => i.transfer_status === "pending");
-      const insPendA  = insPend.reduce((s, i) => s + (i.amount_to_transfer ?? ((i.premium_ava ?? 0) - (i.frais_distribution ?? 0))), 0);
+      const insPendA  = insPend.reduce((s, i) => s + (i.amount_to_transfer ?? ((i.premium_ava ?? 0) * 0.90)), 0);
       const insFees   = ins.reduce((s, i) => s + (i.stripe_fee ?? 0), 0);
 
       const rentRev   = rent.reduce((s, r) => s + (r.rental_amount ?? 0), 0);
@@ -136,9 +136,17 @@ function useDashboard(period: { start: string; end: string }) {
       const totalFees = esimFees + insFees + rentFees;
       const totalRev  = esimRev + insRev + rentRev;
 
+      // Tous les reversements en attente (toutes périodes) pour l'alerte globale
+      const allPendingIns = pendingInsRes.data ?? [];
+      const allPendingCount = allPendingIns.length;
+      const allPendingAmount = allPendingIns.reduce((s: number, i: any) =>
+        s + Number(i.amount_to_transfer ?? ((i.premium_ava ?? 0) * 0.90)), 0);
+
       setKpis({
         esim:      { count: esim.length, revenue: esimRev, margin_net: esimMgn, commissions: esimCom, avg_basket: esim.length ? esimRev / esim.length : 0 },
-        insurance: { count: ins.length, revenue: insRev, premiums: insPrem, pending_transfer: insPendA, pending_count: insPend.length },
+        insurance: { count: ins.length, revenue: insRev, premiums: insPrem,
+          pending_transfer: allPendingAmount,
+          pending_count: allPendingCount },
         routers:   { count: rent.length, revenue: rentRev, deposits: rentDep, available: stk.filter(r => r.status === "available").length, rented: stk.filter(r => r.status === "rented").length, total: stk.length },
         totals:    { revenue: totalRev, margin: esimMgn + insRev + rentRev - totalFees, stripe_fees: totalFees },
       });

@@ -76,7 +76,7 @@ function useDashboard(period: { start: string; end: string }) {
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const [esimRes, insRes, rentRes, stockRes, ansetRes, partnerRes] = await Promise.all([
+      const [esimRes, insRes, rentRes, stockRes, ansetRes, partnerRes, pendingInsRes] = await Promise.all([
         supabase.from("orders")
           .select("price, margin_net, commission_amount, source, partner_code, stripe_fee, created_at")
           .gte("created_at", `${period.start}T00:00:00`)
@@ -96,6 +96,11 @@ function useDashboard(period: { start: string; end: string }) {
         supabase.from("insurer_settlements")
           .select("period, total_contracts, total_to_transfer, status")
           .order("period", { ascending: false }).limit(6),
+        // Assurances en attente de reversement (directement depuis insurances)
+        supabase.from("insurances")
+          .select("id, created_at, user_email, subscriber_first_name, subscriber_last_name, premium_ava, frais_distribution, amount_to_transfer, transfer_status, stripe_session_id")
+          .in("status", ["paid", "validated"])
+          .eq("transfer_status", "pending"),
         supabase.from("v_partner_commissions_detail").select("*")
           .gte("period_month", period.start.slice(0, 7))
           .lte("period_month", period.end.slice(0, 7)),
@@ -169,7 +174,25 @@ function useDashboard(period: { start: string; end: string }) {
       });
       setPartners(Object.values(pMap).sort((a, b) => b.total_sales - a.total_sales));
 
-      setAnset(ansetRes.data ?? []);
+      // Grouper les assurances en attente par mois pour affichage
+      const pendingIns = pendingInsRes.data ?? [];
+      const pendingByMonth: Record<string, any> = {};
+      pendingIns.forEach((i: any) => {
+        const m = i.created_at.slice(0, 7);
+        if (!pendingByMonth[m]) pendingByMonth[m] = { period: m, total_contracts: 0, total_to_transfer: 0, status: "pending" };
+        pendingByMonth[m].total_contracts += 1;
+        pendingByMonth[m].total_to_transfer += i.amount_to_transfer ?? ((i.premium_ava ?? 0) - (i.frais_distribution ?? 0));
+      });
+
+      // Merger avec insurer_settlements existants
+      const settlementMap: Record<string, any> = {};
+      (ansetRes.data ?? []).forEach((s: any) => { settlementMap[s.period] = s; });
+      Object.values(pendingByMonth).forEach((p: any) => {
+        if (!settlementMap[p.period]) settlementMap[p.period] = p;
+      });
+      const mergedAnset = Object.values(settlementMap).sort((a: any, b: any) => b.period.localeCompare(a.period));
+
+      setAnset(mergedAnset);
       setStock(stk);
     } catch (err: any) {
       setError(err.message ?? "Erreur de chargement");
@@ -731,6 +754,51 @@ export default function AdminDashboard() {
             <KpiCard label="Stock disponible"  value={loading ? "…" : `${kpis?.routers.available ?? 0} / ${kpis?.routers.total ?? 0}`}
               badge={kpis?.routers.available === 0 && kpis?.routers.total > 0 ? "Complet" : undefined} warn={kpis?.routers.available === 0 && (kpis?.routers.total ?? 0) > 0} />
             <KpiCard label="En location"       value={loading ? "…" : fmtNum(kpis?.routers.rented ?? 0)} />
+          </div>
+
+          {/* ── Ligne cumul total ── */}
+          <div className="mt-6 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-5 py-3 border-b border-gray-50">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Cumul toutes activités</p>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-gray-50">
+              <div className="px-5 py-4">
+                <p className="text-xs text-gray-400 mb-1">CA réel total</p>
+                <p className="text-xl font-bold text-gray-900 tabular-nums">
+                  {loading ? "…" : fmtEur((kpis?.totals.revenue ?? 0))}
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  {loading || !kpis ? "" : `${fmtNum(kpis.esim.count + kpis.insurance.count + kpis.routers.count)} commandes`}
+                </p>
+              </div>
+              <div className="px-5 py-4">
+                <p className="text-xs text-gray-400 mb-1">Marge brute</p>
+                <p className="text-xl font-bold tabular-nums" style={{ color: "#059669" }}>
+                  {loading ? "…" : fmtEur(kpis?.esim.margin_net ?? 0 + (kpis?.insurance.revenue ?? 0) + (kpis?.routers.revenue ?? 0))}
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  {loading || !kpis ? "" : fmtPct(kpis.esim.margin_net + kpis.insurance.revenue + kpis.routers.revenue, kpis.totals.revenue)}
+                </p>
+              </div>
+              <div className="px-5 py-4">
+                <p className="text-xs text-gray-400 mb-1">Frais Stripe</p>
+                <p className="text-xl font-bold text-red-400 tabular-nums">
+                  {loading ? "…" : `- ${fmtEur(kpis?.totals.stripe_fees ?? 0)}`}
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  {loading || !kpis ? "" : fmtPct(kpis.totals.stripe_fees, kpis.totals.revenue)}
+                </p>
+              </div>
+              <div className="px-5 py-4">
+                <p className="text-xs text-gray-400 mb-1">Marge nette</p>
+                <p className="text-xl font-bold tabular-nums" style={{ color: "#A020F0" }}>
+                  {loading ? "…" : fmtEur(kpis?.totals.margin ?? 0)}
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  {loading || !kpis ? "" : fmtPct(kpis.totals.margin, kpis.totals.revenue)}
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Graphiques */}

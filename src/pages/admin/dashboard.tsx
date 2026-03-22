@@ -14,7 +14,7 @@ import {
 } from "recharts";
 import {
   TrendingUp, Package, Shield, Wifi, AlertTriangle,
-  RefreshCw, Upload, ChevronRight, CheckCircle, Clock, LogOut,
+  RefreshCw, Upload, ChevronRight, CheckCircle, Clock, LogOut, Calendar,
 } from "lucide-react";
 
 const ADMIN_EMAIL = "admin@fenuasim.com";
@@ -526,7 +526,15 @@ export default function AdminDashboard() {
   const router = useRouter();
   const [periodKey, setPeriodKey] = useState("30j");
   const [authChecked, setAuthChecked] = useState(false);
-  const period = getPeriod(periodKey);
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
+  const [showCustom, setShowCustom] = useState(false);
+  const [markingAnset, setMarkingAnset] = useState<string | null>(null);
+  const [ansetRef, setAnsetRef] = useState("");
+
+  const period = showCustom && customStart && customEnd
+    ? { start: customStart, end: customEnd }
+    : getPeriod(periodKey);
   const { kpis, monthly, sources, partners, anset, stock, loading, error, reload } = useDashboard(period);
 
   useEffect(() => {
@@ -554,6 +562,23 @@ export default function AdminDashboard() {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push("/admin/login");
+  };
+
+  const handleMarkAnsetPaid = async (period: string) => {
+    if (!ansetRef.trim()) { alert("Saisis la référence de virement"); return; }
+    setMarkingAnset(period);
+    try {
+      const res = await fetch("/api/admin/bordereaux", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "mark_anset_paid", period, reference: ansetRef.trim() }),
+      });
+      const data = await res.json();
+      if (data.success) { alert(`✅ Reversement ${period} marqué comme payé`); setAnsetRef(""); reload(); }
+      else alert(`Erreur : ${data.error}`);
+    } finally {
+      setMarkingAnset(null);
+    }
   };
 
   if (!authChecked) return (
@@ -607,6 +632,11 @@ export default function AdminDashboard() {
                   </button>
                 ))}
               </div>
+              <button
+                onClick={() => { setShowCustom(!showCustom); if (showCustom) setPeriodKey("30j"); }}
+                className={`flex items-center gap-1.5 text-xs px-3 py-2 border rounded-xl shadow-sm transition-colors ${showCustom ? "bg-purple-50 border-purple-200 text-purple-700" : "bg-white border-gray-200 text-gray-500 hover:text-gray-800"}`}>
+                <Calendar size={12} /> Dates
+              </button>
               <button onClick={reload}
                 className="flex items-center gap-1.5 text-xs px-3 py-2 border border-gray-200 rounded-xl bg-white text-gray-500 hover:text-gray-800 shadow-sm">
                 <RefreshCw size={12} className={loading ? "animate-spin" : ""} /> Actualiser
@@ -621,6 +651,31 @@ export default function AdminDashboard() {
               </button>
             </div>
           </div>
+
+          {/* Filtre dates personnalisées */}
+          {showCustom && (
+            <div className="flex items-center gap-3 bg-white border border-purple-100 rounded-xl px-4 py-3 mb-4 flex-wrap shadow-sm">
+              <Calendar size={14} className="text-purple-500 shrink-0" />
+              <span className="text-xs text-gray-500 shrink-0">Période personnalisée :</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-gray-400">Du</span>
+                  <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)}
+                    className="text-xs px-2 py-1.5 border border-gray-200 rounded-lg text-gray-700 bg-white" />
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-gray-400">au</span>
+                  <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)}
+                    className="text-xs px-2 py-1.5 border border-gray-200 rounded-lg text-gray-700 bg-white" />
+                </div>
+                {customStart && customEnd && (
+                  <span className="text-xs text-purple-600 font-medium">
+                    {Math.round((new Date(customEnd).getTime() - new Date(customStart).getTime()) / 86400000) + 1} jours
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Alerte ANSET */}
           {kpis && kpis.insurance.pending_count > 0 && (
@@ -743,32 +798,74 @@ export default function AdminDashboard() {
             <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
               <p className="text-sm font-semibold text-gray-700 mb-4">Reversements ANSET</p>
               {loading ? <Spinner /> : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-xs text-gray-400 border-b border-gray-100">
-                      <th className="text-left pb-2 font-normal">Période</th>
-                      <th className="text-right pb-2 font-normal">Contrats</th>
-                      <th className="text-right pb-2 font-normal">À reverser</th>
-                      <th className="text-right pb-2 font-normal">Statut</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {anset.length === 0 ? (
-                      <tr><td colSpan={4} className="py-6 text-center text-xs text-gray-400">Aucun bordereau généré</td></tr>
-                    ) : anset.map(s => (
-                      <tr key={s.period} className="border-b border-gray-50 last:border-0">
-                        <td className="py-2.5 font-medium text-gray-700">{s.period}</td>
-                        <td className="py-2.5 text-right text-gray-500">{s.total_contracts}</td>
-                        <td className="py-2.5 text-right font-semibold text-gray-800 tabular-nums">{fmtEur(s.total_to_transfer)}</td>
-                        <td className="py-2.5 text-right">
-                          {s.status === "paid"
-                            ? <span className="inline-flex items-center gap-1 text-xs text-green-600"><CheckCircle size={11} />Reversé</span>
-                            : <span className="inline-flex items-center gap-1 text-xs text-amber-600"><Clock size={11} />En attente</span>}
-                        </td>
+                <>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-xs text-gray-400 border-b border-gray-100">
+                        <th className="text-left pb-2 font-normal">Période</th>
+                        <th className="text-right pb-2 font-normal">Contrats</th>
+                        <th className="text-right pb-2 font-normal">À reverser</th>
+                        <th className="text-right pb-2 font-normal">Statut</th>
+                        <th className="text-right pb-2 font-normal"></th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {anset.length === 0 ? (
+                        <tr><td colSpan={5} className="py-6 text-center text-xs text-gray-400">Aucun bordereau généré</td></tr>
+                      ) : anset.map(s => (
+                        <tr key={s.period} className="border-b border-gray-50 last:border-0">
+                          <td className="py-2.5 font-medium text-gray-700">{s.period}</td>
+                          <td className="py-2.5 text-right text-gray-500">{s.total_contracts}</td>
+                          <td className="py-2.5 text-right font-semibold text-gray-800 tabular-nums">{fmtEur(s.total_to_transfer)}</td>
+                          <td className="py-2.5 text-right">
+                            {s.status === "paid"
+                              ? <span className="inline-flex items-center gap-1 text-xs text-green-600"><CheckCircle size={11} />Reversé</span>
+                              : <span className="inline-flex items-center gap-1 text-xs text-amber-600"><Clock size={11} />En attente</span>}
+                          </td>
+                          <td className="py-2.5 text-right">
+                            {s.status !== "paid" && (
+                              <button
+                                onClick={() => setMarkingAnset(markingAnset === s.period ? null : s.period)}
+                                className="text-xs px-2 py-1 rounded-lg border border-green-200 text-green-700 hover:bg-green-50 transition-colors">
+                                Marquer payé
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  {/* Formulaire confirmation paiement ANSET */}
+                  {markingAnset && (
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                      <p className="text-xs font-medium text-gray-600 mb-2">
+                        Confirmer le reversement <strong>{markingAnset}</strong>
+                      </p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <input
+                          type="text"
+                          placeholder="Référence virement (ex: VIR-20260301)"
+                          value={ansetRef}
+                          onChange={e => setAnsetRef(e.target.value)}
+                          className="flex-1 min-w-0 text-xs px-3 py-2 border border-gray-200 rounded-xl text-gray-700 bg-white"
+                        />
+                        <button
+                          onClick={() => handleMarkAnsetPaid(markingAnset)}
+                          disabled={!!markingAnset && markingAnset !== null && !ansetRef.trim()}
+                          className="text-xs px-4 py-2 rounded-xl text-white font-medium disabled:opacity-50 transition-opacity hover:opacity-90"
+                          style={{ background: G }}>
+                          {markingAnset ? "Confirmer ✓" : "…"}
+                        </button>
+                        <button
+                          onClick={() => { setMarkingAnset(null); setAnsetRef(""); }}
+                          className="text-xs px-3 py-2 rounded-xl border border-gray-200 text-gray-500 hover:text-gray-700">
+                          Annuler
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 

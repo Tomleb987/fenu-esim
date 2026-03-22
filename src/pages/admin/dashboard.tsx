@@ -97,8 +97,8 @@ function useDashboard(period: { start: string; end: string }) {
           .select("period, total_contracts, total_to_transfer, status")
           .order("period", { ascending: false }).limit(12),
         supabase.from("v_partner_commissions_detail").select("*")
-          .gte("period_month", period.start.slice(0, 7))
-          .lte("period_month", period.end.slice(0, 7)),
+          .gte("period_month", `${period.start.slice(0, 7)}-01`)
+          .lte("period_month", `${period.end.slice(0, 7)}-01`),
         // Toutes assurances en attente (toutes périodes confondues)
         supabase.from("insurances")
           .select("id, created_at, premium_ava, frais_distribution, amount_to_transfer, transfer_status")

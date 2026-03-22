@@ -21,20 +21,16 @@ const ADMIN_EMAIL = "admin@fenuasim.com";
 const G = "linear-gradient(135deg, #A020F0 0%, #FF4D6D 50%, #FF7F11 100%)";
 const C = { esim: "#A020F0", insurance: "#FF4D6D", routers: "#FF7F11", partner: "#0EA896" };
 
-// ── Formatage montants avec centimes ─────────────────────────
 const fmtEur = (n: number) =>
   new Intl.NumberFormat("fr-FR", {
     style: "currency", currency: "EUR",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: 2, maximumFractionDigits: 2,
   }).format(n || 0);
 
 const fmtNum = (n: number) => new Intl.NumberFormat("fr-FR").format(n || 0);
-
 const fmtPct = (n: number, total: number) =>
   total === 0 ? "0 %" : `${((n / total) * 100).toFixed(1)} %`;
 
-// ── Périodes ─────────────────────────────────────────────────
 function getPeriod(key: string) {
   const now = new Date();
   const p = (n: number) => String(n).padStart(2, "0");
@@ -49,7 +45,6 @@ function getPeriod(key: string) {
   }
 }
 
-// ── Types ─────────────────────────────────────────────────────
 interface KPIs {
   esim:      { count: number; revenue: number; margin_net: number; commissions: number; avg_basket: number };
   insurance: { count: number; revenue: number; premiums: number; pending_transfer: number; pending_count: number };
@@ -62,7 +57,6 @@ interface PartnerRow   { partner_code: string; partner_name: string; total_sales
 interface ANSETRow     { period: string; total_contracts: number; total_to_transfer: number; status: string }
 interface RouterRow    { id: string; model: string; serial_number: string; status: string; current_renter: string | null; current_rental_end: string | null }
 
-// ── Hook données ──────────────────────────────────────────────
 function useDashboard(period: { start: string; end: string }) {
   const [kpis, setKpis]         = useState<KPIs | null>(null);
   const [monthly, setMonthly]   = useState<MonthlyPoint[]>([]);
@@ -76,9 +70,10 @@ function useDashboard(period: { start: string; end: string }) {
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const [esimRes, insRes, rentRes, stockRes, ansetRes, partnerRes, pendingInsRes] = await Promise.all([
+      // 6 requêtes : esim, ins, rent, stock, anset, partner
+      const [esimRes, insRes, rentRes, stockRes, ansetRes, partnerRes] = await Promise.all([
         supabase.from("orders")
-          .select("price, margin_net, commission_amount, source, partner_code, stripe_fee, created_at")
+          .select("price, currency, margin_net, commission_amount, source, partner_code, stripe_fee, created_at")
           .gte("created_at", `${period.start}T00:00:00`)
           .lte("created_at", `${period.end}T23:59:59`)
           .in("status", ["completed", "paid"]),
@@ -95,42 +90,44 @@ function useDashboard(period: { start: string; end: string }) {
         supabase.from("v_router_stock").select("*"),
         supabase.from("insurer_settlements")
           .select("period, total_contracts, total_to_transfer, status")
-          .order("period", { ascending: false }).limit(6),
-        // Assurances en attente de reversement (directement depuis insurances)
-        supabase.from("insurances")
-          .select("id, created_at, user_email, subscriber_first_name, subscriber_last_name, premium_ava, frais_distribution, amount_to_transfer, transfer_status, stripe_session_id")
-          .in("status", ["paid", "validated"])
-          .eq("transfer_status", "pending"),
+          .order("period", { ascending: false }).limit(12),
         supabase.from("v_partner_commissions_detail").select("*")
           .gte("period_month", period.start.slice(0, 7))
           .lte("period_month", period.end.slice(0, 7)),
       ]);
+
+      // Requête séparée : toutes assurances en attente (toutes périodes)
+      const { data: pendingIns } = await supabase
+        .from("insurances")
+        .select("id, created_at, premium_ava, frais_distribution, amount_to_transfer, transfer_status")
+        .in("status", ["paid", "validated"])
+        .eq("transfer_status", "pending");
 
       const esim = esimRes.data ?? [];
       const ins  = insRes.data  ?? [];
       const rent = rentRes.data ?? [];
       const stk  = stockRes.data ?? [];
 
-      // Convertir price en EUR selon la devise
       const priceEur = (o: any) => {
         const c = (o.currency || "EUR").toUpperCase();
         if (c === "XPF" || c === "CFP") return (o.price ?? 0) * 100 / 119.33;
         return o.price ?? 0;
       };
-      const esimRev   = esim.reduce((s, o) => s + priceEur(o), 0);
-      const esimMgn   = esim.reduce((s, o) => s + (o.margin_net ?? 0), 0);
-      const esimCom   = esim.reduce((s, o) => s + (o.commission_amount ?? 0), 0);
-      const esimFees  = esim.reduce((s, o) => s + (o.stripe_fee ?? 0), 0);
 
-      const insRev    = ins.reduce((s, i) => s + (i.frais_distribution ?? 0), 0);
-      const insPrem   = ins.reduce((s, i) => s + (i.premium_ava ?? 0), 0);
-      const insPend   = ins.filter(i => i.transfer_status === "pending");
-      const insPendA  = insPend.reduce((s, i) => s + (i.amount_to_transfer ?? ((i.premium_ava ?? 0) - (i.frais_distribution ?? 0))), 0);
-      const insFees   = ins.reduce((s, i) => s + (i.stripe_fee ?? 0), 0);
+      const esimRev  = esim.reduce((s, o) => s + priceEur(o), 0);
+      const esimMgn  = esim.reduce((s, o) => s + (o.margin_net ?? 0), 0);
+      const esimCom  = esim.reduce((s, o) => s + (o.commission_amount ?? 0), 0);
+      const esimFees = esim.reduce((s, o) => s + (o.stripe_fee ?? 0), 0);
 
-      const rentRev   = rent.reduce((s, r) => s + (r.rental_amount ?? 0), 0);
-      const rentDep   = rent.filter(r => r.deposit_status === "held").reduce((s, r) => s + (r.deposit_amount ?? 0), 0);
-      const rentFees  = rent.reduce((s, r) => s + (r.stripe_fee ?? 0), 0);
+      const insRev   = ins.reduce((s, i) => s + (i.frais_distribution ?? 0), 0);
+      const insPrem  = ins.reduce((s, i) => s + (i.premium_ava ?? 0), 0);
+      const insPend  = ins.filter(i => i.transfer_status === "pending");
+      const insPendA = insPend.reduce((s, i) => s + (i.amount_to_transfer ?? ((i.premium_ava ?? 0) - (i.frais_distribution ?? 0))), 0);
+      const insFees  = ins.reduce((s, i) => s + (i.stripe_fee ?? 0), 0);
+
+      const rentRev  = rent.reduce((s, r) => s + (r.rental_amount ?? 0), 0);
+      const rentDep  = rent.filter(r => r.deposit_status === "held").reduce((s, r) => s + (r.deposit_amount ?? 0), 0);
+      const rentFees = rent.reduce((s, r) => s + (r.stripe_fee ?? 0), 0);
 
       const totalFees = esimFees + insFees + rentFees;
       const totalRev  = esimRev + insRev + rentRev;
@@ -149,7 +146,7 @@ function useDashboard(period: { start: string; end: string }) {
         if (!mMap[m]) mMap[m] = { month: m, esim: 0, insurance: 0, routers: 0 };
         mMap[m][type] += v;
       };
-      esim.forEach(o => addM(o.created_at, "esim", o.price ?? 0));
+      esim.forEach(o => addM(o.created_at, "esim", priceEur(o)));
       ins.forEach(i  => addM(i.created_at, "insurance", i.frais_distribution ?? 0));
       rent.forEach(r => addM(r.created_at, "routers", r.rental_amount ?? 0));
       setMonthly(Object.values(mMap).sort((a, b) => a.month.localeCompare(b.month)));
@@ -159,7 +156,7 @@ function useDashboard(period: { start: string; end: string }) {
       esim.forEach(o => {
         const src = o.source ?? (o.partner_code ? "Partenaire" : "Direct");
         if (!sMap[src]) sMap[src] = { source: src, revenue: 0, count: 0 };
-        sMap[src].revenue += o.price ?? 0;
+        sMap[src].revenue += priceEur(o);
         sMap[src].count   += 1;
       });
       setSources(Object.values(sMap).sort((a, b) => b.revenue - a.revenue).slice(0, 5));
@@ -174,25 +171,27 @@ function useDashboard(period: { start: string; end: string }) {
       });
       setPartners(Object.values(pMap).sort((a, b) => b.total_sales - a.total_sales));
 
-      // Grouper les assurances en attente par mois pour affichage
-      const pendingIns = pendingInsRes.data ?? [];
-      const pendingByMonth: Record<string, any> = {};
-      pendingIns.forEach((i: any) => {
-        const m = i.created_at.slice(0, 7);
+      // ANSET : grouper les assurances en attente par mois
+      const pendingByMonth: Record<string, ANSETRow> = {};
+      (pendingIns ?? []).forEach((i: any) => {
+        const m = (i.created_at as string).slice(0, 7);
         if (!pendingByMonth[m]) pendingByMonth[m] = { period: m, total_contracts: 0, total_to_transfer: 0, status: "pending" };
         pendingByMonth[m].total_contracts += 1;
         pendingByMonth[m].total_to_transfer += i.amount_to_transfer ?? ((i.premium_ava ?? 0) - (i.frais_distribution ?? 0));
       });
 
-      // Merger avec insurer_settlements existants
+      // Merger avec insurer_settlements (la table a priorité si elle existe)
       const settlementMap: Record<string, any> = {};
       (ansetRes.data ?? []).forEach((s: any) => { settlementMap[s.period] = s; });
       Object.values(pendingByMonth).forEach((p: any) => {
-        if (!settlementMap[p.period]) settlementMap[p.period] = p;
+        if (!settlementMap[p.period]) {
+          settlementMap[p.period] = p;
+        } else if (settlementMap[p.period].status === "pending") {
+          settlementMap[p.period].total_contracts = p.total_contracts;
+          settlementMap[p.period].total_to_transfer = p.total_to_transfer;
+        }
       });
-      const mergedAnset = Object.values(settlementMap).sort((a: any, b: any) => b.period.localeCompare(a.period));
-
-      setAnset(mergedAnset);
+      setAnset(Object.values(settlementMap).sort((a: any, b: any) => b.period.localeCompare(a.period)));
       setStock(stk);
     } catch (err: any) {
       setError(err.message ?? "Erreur de chargement");
@@ -205,7 +204,6 @@ function useDashboard(period: { start: string; end: string }) {
   return { kpis, monthly, sources, partners, anset, stock, loading, error, reload: load };
 }
 
-// ── Composants UI ─────────────────────────────────────────────
 function KpiCard({ label, value, sub, badge, warn }: { label: string; value: string; sub?: string; badge?: string; warn?: boolean }) {
   return (
     <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
@@ -232,19 +230,15 @@ function Spinner() {
   return <div className="flex justify-center py-8"><div className="w-7 h-7 border-2 border-purple-200 border-t-purple-600 rounded-full animate-spin" /></div>;
 }
 
-
-
-// ── Composant Import Coûts Airalo ─────────────────────────────
 function CostsImportSection({ onDone }: { onDone: () => void }) {
   const [usdRate, setUsdRate] = useState("0.92");
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult]   = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setLoading(true);
-    setResult(null);
+    setLoading(true); setResult(null);
     const text = await file.text();
     const res = await fetch("/api/admin/import-costs", {
       method: "POST",
@@ -252,8 +246,7 @@ function CostsImportSection({ onDone }: { onDone: () => void }) {
       body: JSON.stringify({ csv: text, usd_rate: parseFloat(usdRate) }),
     });
     const data = await res.json();
-    setResult(data);
-    setLoading(false);
+    setResult(data); setLoading(false);
     if (data.updated > 0) onDone();
     e.target.value = "";
   };
@@ -263,37 +256,23 @@ function CostsImportSection({ onDone }: { onDone: () => void }) {
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-gray-700">Import prix de revient</p>
-          <p className="text-xs text-gray-400 mt-1">
-            CSV avec colonnes <code className="bg-gray-100 px-1 rounded">package_id</code> et <code className="bg-gray-100 px-1 rounded">cost_eur</code> (ou <code className="bg-gray-100 px-1 rounded">cost_usd</code>)
-          </p>
+          <p className="text-xs text-gray-400 mt-1">CSV Airalo avec colonne <code className="bg-gray-100 px-1 rounded">Net Price</code> (USD)</p>
           <div className="flex items-center gap-2 mt-3">
             <label className="text-xs text-gray-500 shrink-0">Taux USD → EUR</label>
-            <input
-              type="number"
-              step="0.001"
-              value={usdRate}
-              onChange={e => setUsdRate(e.target.value)}
-              className="w-20 text-xs px-2 py-1.5 border border-gray-200 rounded-lg text-gray-700"
-            />
-            <span className="text-xs text-gray-400">(ex: 0.920)</span>
+            <input type="number" step="0.001" value={usdRate} onChange={e => setUsdRate(e.target.value)}
+              className="w-20 text-xs px-2 py-1.5 border border-gray-200 rounded-lg text-gray-700" />
           </div>
           {result && (
             <div className={`mt-3 text-xs rounded-xl px-3 py-2 ${result.updated > 0 ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"}`}>
               ✅ {result.updated} packages mis à jour
               {result.notFound > 0 && <span className="ml-2">· ⚠️ {result.notFound} non trouvés</span>}
-              {result.marginsRecalculated && <span className="ml-2">· Marges recalculées</span>}
-              {result.notFoundIds?.length > 0 && (
-                <div className="mt-1 text-xs opacity-70">Non trouvés : {result.notFoundIds.join(", ")}</div>
-              )}
             </div>
           )}
         </div>
         <label className="cursor-pointer shrink-0">
           <input type="file" accept=".csv" className="hidden" onChange={handleImport} disabled={loading} />
-          <span className={`flex items-center gap-2 text-sm px-4 py-2.5 rounded-xl text-white font-medium shadow-sm transition-opacity ${loading ? "opacity-50" : "hover:opacity-90"}`}
-            style={{ background: G }}>
-            <Upload size={14} />
-            {loading ? "Import…" : "Importer CSV"}
+          <span className={`flex items-center gap-2 text-sm px-4 py-2.5 rounded-xl text-white font-medium shadow-sm ${loading ? "opacity-50" : "hover:opacity-90"}`} style={{ background: G }}>
+            <Upload size={14} />{loading ? "Import…" : "Importer CSV"}
           </span>
         </label>
       </div>
@@ -301,23 +280,18 @@ function CostsImportSection({ onDone }: { onDone: () => void }) {
   );
 }
 
-// ── Taux de conversion ────────────────────────────────────────
 const EUR_TO_XPF = 119.33;
 function toEur(amount: number, currency: string): number {
   if (!amount) return 0;
   const c = (currency || "EUR").toUpperCase();
-  // orders.price XPF = amount / 100 (Stripe stocke en centimes XPF)
-  // price_eur = price * 100 / 119.33 = amount / 119.33
   if (c === "XPF" || c === "CFP") return (amount * 100) / EUR_TO_XPF;
   return amount;
 }
 
-// ── Types Stats ───────────────────────────────────────────────
 interface MonthStat { month: string; label: string; count: number; revenue_eur: number; direct: number; partner: number }
 interface PackageStat { name: string; count: number; revenue_eur: number }
 interface DestinationStat { destination: string; count: number; revenue_eur: number }
 
-// ── Hook Stats ────────────────────────────────────────────────
 function useStatsData() {
   const [monthlyStats, setMonthlyStats] = useState<MonthStat[]>([]);
   const [topPackages, setTopPackages]   = useState<PackageStat[]>([]);
@@ -364,18 +338,14 @@ function useStatsData() {
         });
         setTopPackages(Object.values(pMap).sort((a, b) => b.count - a.count).slice(0, 10));
 
-        // Jointure via airalo_id = package_id (pas via name)
         const packageIds = [...new Set(data.map(o => o.package_id).filter(Boolean))] as string[];
         const { data: pkgs } = await supabase
           .from("airalo_packages")
-          .select("airalo_id, slug, country, region_fr, region, type")
+          .select("airalo_id, region_fr, region")
           .in("airalo_id", packageIds.slice(0, 200));
 
         const destMap: Record<string, string> = {};
-        (pkgs ?? []).forEach((p: any) => {
-          // region_fr → region → "Autre" (country est toujours null dans Airalo)
-          destMap[p.airalo_id] = p.region_fr || p.region || "Autre";
-        });
+        (pkgs ?? []).forEach((p: any) => { destMap[p.airalo_id] = p.region_fr || p.region || "Autre"; });
 
         const dMap: Record<string, DestinationStat> = {};
         data.forEach(o => {
@@ -398,13 +368,12 @@ function useStatsData() {
   return { monthlyStats, topPackages, topDest, statsLoading, statsError };
 }
 
-// ── Composant StatsSection ────────────────────────────────────
 function StatsSection() {
   const { monthlyStats, topPackages, topDest, statsLoading, statsError } = useStatsData();
   const [view, setView] = useState<"revenue" | "count">("revenue");
 
   if (statsError) return (
-    <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700 mt-4">⚠️ Erreur stats : {statsError}</div>
+    <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700 mt-4">⚠️ {statsError}</div>
   );
 
   const maxPkg  = topPackages[0]?.count ?? 1;
@@ -415,22 +384,17 @@ function StatsSection() {
 
   return (
     <div className="mt-2">
-      {/* Graphique mensuel */}
       <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm mt-4">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
           <div>
             <p className="text-sm font-semibold text-gray-700">Historique depuis le lancement</p>
-            <p className="text-xs text-gray-400 mt-0.5">Avril 2025 · toutes devises converties en EUR</p>
+            <p className="text-xs text-gray-400 mt-0.5">Avril 2025 · toutes devises en EUR</p>
           </div>
           <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
             <button onClick={() => setView("revenue")}
-              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all ${view === "revenue" ? "bg-white text-gray-800 shadow-sm" : "text-gray-500"}`}>
-              CA (€)
-            </button>
+              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all ${view === "revenue" ? "bg-white text-gray-800 shadow-sm" : "text-gray-500"}`}>CA (€)</button>
             <button onClick={() => setView("count")}
-              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all ${view === "count" ? "bg-white text-gray-800 shadow-sm" : "text-gray-500"}`}>
-              Volume
-            </button>
+              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all ${view === "count" ? "bg-white text-gray-800 shadow-sm" : "text-gray-500"}`}>Volume</button>
           </div>
         </div>
         {statsLoading ? <Spinner /> : monthlyStats.length === 0 ? (
@@ -484,7 +448,6 @@ function StatsSection() {
         )}
       </div>
 
-      {/* Top forfaits + Top destinations */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
         <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
           <p className="text-sm font-semibold text-gray-700 mb-4">Top 10 forfaits</p>
@@ -512,7 +475,6 @@ function StatsSection() {
             </div>
           )}
         </div>
-
         <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
           <p className="text-sm font-semibold text-gray-700 mb-4">Top destinations</p>
           {statsLoading ? <Spinner /> : topDest.length === 0 ? (
@@ -544,20 +506,20 @@ function StatsSection() {
   );
 }
 
-// ── Page ──────────────────────────────────────────────────────
 export default function AdminDashboard() {
   const router = useRouter();
-  const [periodKey, setPeriodKey] = useState("30j");
+  const [periodKey, setPeriodKey]   = useState("30j");
   const [authChecked, setAuthChecked] = useState(false);
   const [customStart, setCustomStart] = useState("");
-  const [customEnd, setCustomEnd] = useState("");
-  const [showCustom, setShowCustom] = useState(false);
+  const [customEnd, setCustomEnd]     = useState("");
+  const [showCustom, setShowCustom]   = useState(false);
   const [markingAnset, setMarkingAnset] = useState<string | null>(null);
-  const [ansetRef, setAnsetRef] = useState("");
+  const [ansetRef, setAnsetRef]       = useState("");
 
   const period = showCustom && customStart && customEnd
     ? { start: customStart, end: customEnd }
     : getPeriod(periodKey);
+
   const { kpis, monthly, sources, partners, anset, stock, loading, error, reload } = useDashboard(period);
 
   useEffect(() => {
@@ -587,42 +549,33 @@ export default function AdminDashboard() {
     router.push("/admin/login");
   };
 
-  const handleGenerateBordereau = async (period: string) => {
+  const handleGenerateBordereau = async (p: string) => {
     const res = await fetch("/api/admin/anset-bordereau", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ period }),
+      body: JSON.stringify({ period: p }),
     });
-    if (!res.ok) {
-      const err = await res.json();
-      alert(`Erreur : ${err.error}`);
-      return;
-    }
-    // Téléchargement direct du PDF
+    if (!res.ok) { const err = await res.json(); alert(`Erreur : ${err.error}`); return; }
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url;
-    a.download = `bordereau-anset-${period}.pdf`;
-    a.click();
+    a.href = url; a.download = `bordereau-anset-${p}.pdf`; a.click();
     URL.revokeObjectURL(url);
   };
 
-  const handleMarkAnsetPaid = async (period: string) => {
+  const handleMarkAnsetPaid = async (p: string) => {
     if (!ansetRef.trim()) { alert("Saisis la référence de virement"); return; }
-    setMarkingAnset(period);
+    setMarkingAnset(p);
     try {
       const res = await fetch("/api/admin/bordereaux", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "mark_anset_paid", period, reference: ansetRef.trim() }),
+        body: JSON.stringify({ action: "mark_anset_paid", period: p, reference: ansetRef.trim() }),
       });
       const data = await res.json();
-      if (data.success) { alert(`✅ Reversement ${period} marqué comme payé`); setAnsetRef(""); reload(); }
+      if (data.success) { alert(`✅ Reversement ${p} marqué comme payé`); setAnsetRef(""); reload(); }
       else alert(`Erreur : ${data.error}`);
-    } finally {
-      setMarkingAnset(null);
-    }
+    } finally { setMarkingAnset(null); }
   };
 
   if (!authChecked) return (
@@ -632,11 +585,8 @@ export default function AdminDashboard() {
   );
 
   const TABS = [
-    { key: "auj", label: "Auj." },
-    { key: "7j",  label: "7j" },
-    { key: "30j", label: "30j" },
-    { key: "3m",  label: "3 mois" },
-    { key: "ytd", label: "YTD" },
+    { key: "auj", label: "Auj." }, { key: "7j", label: "7j" },
+    { key: "30j", label: "30j" }, { key: "3m", label: "3 mois" }, { key: "ytd", label: "YTD" },
   ];
   const PIE_COLORS = [C.esim, C.insurance, C.routers, C.partner, "#9CA3AF"];
 
@@ -646,7 +596,6 @@ export default function AdminDashboard() {
         <title>Dashboard — FENUA SIM</title>
         <meta name="robots" content="noindex" />
       </Head>
-
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
 
@@ -665,20 +614,18 @@ export default function AdminDashboard() {
                 <p className="text-xs text-gray-400">Tableau de bord interne</p>
               </div>
             </div>
-
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex gap-1 bg-white border border-gray-200 rounded-xl p-1 shadow-sm">
                 {TABS.map(t => (
-                  <button key={t.key} onClick={() => setPeriodKey(t.key)}
-                    className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all whitespace-nowrap ${periodKey === t.key ? "text-white shadow-sm" : "text-gray-500 hover:text-gray-800"}`}
-                    style={periodKey === t.key ? { background: G } : {}}>
+                  <button key={t.key} onClick={() => { setPeriodKey(t.key); setShowCustom(false); }}
+                    className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all whitespace-nowrap ${periodKey === t.key && !showCustom ? "text-white shadow-sm" : "text-gray-500 hover:text-gray-800"}`}
+                    style={periodKey === t.key && !showCustom ? { background: G } : {}}>
                     {t.label}
                   </button>
                 ))}
               </div>
-              <button
-                onClick={() => { setShowCustom(!showCustom); if (showCustom) setPeriodKey("30j"); }}
-                className={`flex items-center gap-1.5 text-xs px-3 py-2 border rounded-xl shadow-sm transition-colors ${showCustom ? "bg-purple-50 border-purple-200 text-purple-700" : "bg-white border-gray-200 text-gray-500 hover:text-gray-800"}`}>
+              <button onClick={() => setShowCustom(!showCustom)}
+                className={`flex items-center gap-1.5 text-xs px-3 py-2 border rounded-xl shadow-sm ${showCustom ? "bg-purple-50 border-purple-200 text-purple-700" : "bg-white border-gray-200 text-gray-500 hover:text-gray-800"}`}>
                 <Calendar size={12} /> Dates
               </button>
               <button onClick={reload}
@@ -696,28 +643,26 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* Filtre dates personnalisées */}
+          {/* Filtre dates */}
           {showCustom && (
             <div className="flex items-center gap-3 bg-white border border-purple-100 rounded-xl px-4 py-3 mb-4 flex-wrap shadow-sm">
               <Calendar size={14} className="text-purple-500 shrink-0" />
-              <span className="text-xs text-gray-500 shrink-0">Période personnalisée :</span>
-              <div className="flex items-center gap-2 flex-wrap">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs text-gray-400">Du</span>
-                  <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)}
-                    className="text-xs px-2 py-1.5 border border-gray-200 rounded-lg text-gray-700 bg-white" />
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs text-gray-400">au</span>
-                  <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)}
-                    className="text-xs px-2 py-1.5 border border-gray-200 rounded-lg text-gray-700 bg-white" />
-                </div>
-                {customStart && customEnd && (
-                  <span className="text-xs text-purple-600 font-medium">
-                    {Math.round((new Date(customEnd).getTime() - new Date(customStart).getTime()) / 86400000) + 1} jours
-                  </span>
-                )}
+              <span className="text-xs text-gray-500 shrink-0">Période :</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-gray-400">Du</span>
+                <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)}
+                  className="text-xs px-2 py-1.5 border border-gray-200 rounded-lg text-gray-700 bg-white" />
               </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-gray-400">au</span>
+                <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)}
+                  className="text-xs px-2 py-1.5 border border-gray-200 rounded-lg text-gray-700 bg-white" />
+              </div>
+              {customStart && customEnd && (
+                <span className="text-xs text-purple-600 font-medium">
+                  {Math.round((new Date(customEnd).getTime() - new Date(customStart).getTime()) / 86400000) + 1} jours
+                </span>
+              )}
             </div>
           )}
 
@@ -738,33 +683,29 @@ export default function AdminDashboard() {
           <Section title="CA réel & marges" icon={TrendingUp} />
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <KpiCard label="CA total réel" value={loading ? "…" : fmtEur(kpis?.totals.revenue ?? 0)} sub="eSIM + assurance + location" />
-            <KpiCard label="Marge nette"   value={loading ? "…" : fmtEur(kpis?.totals.margin ?? 0)}
-              sub={kpis ? fmtPct(kpis.totals.margin, kpis.totals.revenue) + " du CA" : ""} />
-            <KpiCard label="Frais Stripe"  value={loading ? "…" : fmtEur(kpis?.totals.stripe_fees ?? 0)}
-              badge={kpis?.totals.stripe_fees === 0 ? "Import CSV requis" : undefined} />
-            <KpiCard label="Commandes"     value={loading ? "…" : fmtNum((kpis?.esim.count ?? 0) + (kpis?.insurance.count ?? 0) + (kpis?.routers.count ?? 0))}
-              sub="toutes catégories" />
+            <KpiCard label="Marge nette"   value={loading ? "…" : fmtEur(kpis?.totals.margin ?? 0)} sub={kpis ? fmtPct(kpis.totals.margin, kpis.totals.revenue) + " du CA" : ""} />
+            <KpiCard label="Frais Stripe"  value={loading ? "…" : fmtEur(kpis?.totals.stripe_fees ?? 0)} badge={kpis?.totals.stripe_fees === 0 ? "Import CSV requis" : undefined} />
+            <KpiCard label="Commandes"     value={loading ? "…" : fmtNum((kpis?.esim.count ?? 0) + (kpis?.insurance.count ?? 0) + (kpis?.routers.count ?? 0))} sub="toutes catégories" />
           </div>
 
           {/* KPIs eSIM */}
           <Section title="eSIM" icon={Wifi} />
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <KpiCard label="CA eSIM"       value={loading ? "…" : fmtEur(kpis?.esim.revenue ?? 0)}    sub={`${kpis?.esim.count ?? 0} commandes`} />
-            <KpiCard label="Marge nette"   value={loading ? "…" : fmtEur(kpis?.esim.margin_net ?? 0)} sub="Après Airalo + Stripe" />
-            <KpiCard label="Commissions"   value={loading ? "…" : fmtEur(kpis?.esim.commissions ?? 0)}
-              badge={partners.length > 0 ? "À valider" : undefined} warn />
-            <KpiCard label="Panier moyen"  value={loading ? "…" : fmtEur(kpis?.esim.avg_basket ?? 0)} />
+            <KpiCard label="CA eSIM"      value={loading ? "…" : fmtEur(kpis?.esim.revenue ?? 0)}    sub={`${kpis?.esim.count ?? 0} commandes`} />
+            <KpiCard label="Marge nette"  value={loading ? "…" : fmtEur(kpis?.esim.margin_net ?? 0)} sub="Après Airalo + Stripe" />
+            <KpiCard label="Commissions"  value={loading ? "…" : fmtEur(kpis?.esim.commissions ?? 0)} badge={partners.length > 0 ? "À valider" : undefined} warn />
+            <KpiCard label="Panier moyen" value={loading ? "…" : fmtEur(kpis?.esim.avg_basket ?? 0)} />
           </div>
 
           {/* KPIs Assurance */}
           <Section title="Assurance" icon={Shield} />
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <KpiCard label="CA réel assurance"  value={loading ? "…" : fmtEur(kpis?.insurance.revenue ?? 0)}  sub="Frais distribution uniquement" />
-            <KpiCard label="Primes encaissées"  value={loading ? "…" : fmtEur(kpis?.insurance.premiums ?? 0)} badge="Hors CA" sub="Pour compte ANSET" />
-            <KpiCard label="À reverser ANSET"   value={loading ? "…" : fmtEur(kpis?.insurance.pending_transfer ?? 0)}
+            <KpiCard label="CA réel assurance" value={loading ? "…" : fmtEur(kpis?.insurance.revenue ?? 0)}  sub="Frais distribution uniquement" />
+            <KpiCard label="Primes encaissées" value={loading ? "…" : fmtEur(kpis?.insurance.premiums ?? 0)} badge="Hors CA" sub="Pour compte ANSET" />
+            <KpiCard label="À reverser ANSET"  value={loading ? "…" : fmtEur(kpis?.insurance.pending_transfer ?? 0)}
               badge={kpis && kpis.insurance.pending_count > 0 ? "En attente" : "À jour"}
               warn={kpis ? kpis.insurance.pending_count > 0 : false} />
-            <KpiCard label="Contrats"           value={loading ? "…" : fmtNum(kpis?.insurance.count ?? 0)} />
+            <KpiCard label="Contrats" value={loading ? "…" : fmtNum(kpis?.insurance.count ?? 0)} />
           </div>
 
           {/* KPIs Routeurs */}
@@ -773,11 +714,12 @@ export default function AdminDashboard() {
             <KpiCard label="CA location"       value={loading ? "…" : fmtEur(kpis?.routers.revenue ?? 0)}  sub={`${kpis?.routers.count ?? 0} locations`} />
             <KpiCard label="Cautions détenues" value={loading ? "…" : fmtEur(kpis?.routers.deposits ?? 0)} badge="Hors CA" sub="Remboursable" />
             <KpiCard label="Stock disponible"  value={loading ? "…" : `${kpis?.routers.available ?? 0} / ${kpis?.routers.total ?? 0}`}
-              badge={kpis?.routers.available === 0 && kpis?.routers.total > 0 ? "Complet" : undefined} warn={kpis?.routers.available === 0 && (kpis?.routers.total ?? 0) > 0} />
-            <KpiCard label="En location"       value={loading ? "…" : fmtNum(kpis?.routers.rented ?? 0)} />
+              badge={kpis?.routers.available === 0 && kpis?.routers.total > 0 ? "Complet" : undefined}
+              warn={kpis?.routers.available === 0 && (kpis?.routers.total ?? 0) > 0} />
+            <KpiCard label="En location" value={loading ? "…" : fmtNum(kpis?.routers.rented ?? 0)} />
           </div>
 
-          {/* ── Ligne cumul total ── */}
+          {/* Cumul toutes activités */}
           <div className="mt-6 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="px-5 py-3 border-b border-gray-50">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Cumul toutes activités</p>
@@ -785,39 +727,25 @@ export default function AdminDashboard() {
             <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-gray-50">
               <div className="px-5 py-4">
                 <p className="text-xs text-gray-400 mb-1">CA réel total</p>
-                <p className="text-xl font-bold text-gray-900 tabular-nums">
-                  {loading ? "…" : fmtEur((kpis?.totals.revenue ?? 0))}
-                </p>
-                <p className="text-xs text-gray-400 mt-1">
-                  {loading || !kpis ? "" : `${fmtNum(kpis.esim.count + kpis.insurance.count + kpis.routers.count)} commandes`}
-                </p>
+                <p className="text-xl font-bold text-gray-900 tabular-nums">{loading ? "…" : fmtEur(kpis?.totals.revenue ?? 0)}</p>
+                <p className="text-xs text-gray-400 mt-1">{loading || !kpis ? "" : `${fmtNum(kpis.esim.count + kpis.insurance.count + kpis.routers.count)} commandes`}</p>
               </div>
               <div className="px-5 py-4">
                 <p className="text-xs text-gray-400 mb-1">Marge brute</p>
                 <p className="text-xl font-bold tabular-nums" style={{ color: "#059669" }}>
-                  {loading ? "…" : fmtEur(kpis?.esim.margin_net ?? 0 + (kpis?.insurance.revenue ?? 0) + (kpis?.routers.revenue ?? 0))}
+                  {loading ? "…" : fmtEur((kpis?.esim.margin_net ?? 0) + (kpis?.insurance.revenue ?? 0) + (kpis?.routers.revenue ?? 0))}
                 </p>
-                <p className="text-xs text-gray-400 mt-1">
-                  {loading || !kpis ? "" : fmtPct(kpis.esim.margin_net + kpis.insurance.revenue + kpis.routers.revenue, kpis.totals.revenue)}
-                </p>
+                <p className="text-xs text-gray-400 mt-1">{loading || !kpis ? "" : fmtPct((kpis.esim.margin_net + kpis.insurance.revenue + kpis.routers.revenue), kpis.totals.revenue)}</p>
               </div>
               <div className="px-5 py-4">
                 <p className="text-xs text-gray-400 mb-1">Frais Stripe</p>
-                <p className="text-xl font-bold text-red-400 tabular-nums">
-                  {loading ? "…" : `- ${fmtEur(kpis?.totals.stripe_fees ?? 0)}`}
-                </p>
-                <p className="text-xs text-gray-400 mt-1">
-                  {loading || !kpis ? "" : fmtPct(kpis.totals.stripe_fees, kpis.totals.revenue)}
-                </p>
+                <p className="text-xl font-bold text-red-400 tabular-nums">{loading ? "…" : `- ${fmtEur(kpis?.totals.stripe_fees ?? 0)}`}</p>
+                <p className="text-xs text-gray-400 mt-1">{loading || !kpis ? "" : fmtPct(kpis.totals.stripe_fees, kpis.totals.revenue)}</p>
               </div>
               <div className="px-5 py-4">
                 <p className="text-xs text-gray-400 mb-1">Marge nette</p>
-                <p className="text-xl font-bold tabular-nums" style={{ color: "#A020F0" }}>
-                  {loading ? "…" : fmtEur(kpis?.totals.margin ?? 0)}
-                </p>
-                <p className="text-xs text-gray-400 mt-1">
-                  {loading || !kpis ? "" : fmtPct(kpis.totals.margin, kpis.totals.revenue)}
-                </p>
+                <p className="text-xl font-bold tabular-nums" style={{ color: "#A020F0" }}>{loading ? "…" : fmtEur(kpis?.totals.margin ?? 0)}</p>
+                <p className="text-xs text-gray-400 mt-1">{loading || !kpis ? "" : fmtPct(kpis.totals.margin, kpis.totals.revenue)}</p>
               </div>
             </div>
           </div>
@@ -832,9 +760,7 @@ export default function AdminDashboard() {
                 <>
                   <div className="flex gap-4 mb-3 text-xs text-gray-400 flex-wrap">
                     {([["eSIM", C.esim], ["Assurance", C.insurance], ["Routeurs", C.routers]] as [string, string][]).map(([l, c]) => (
-                      <span key={l} className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: c }} />{l}
-                      </span>
+                      <span key={l} className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: c }} />{l}</span>
                     ))}
                   </div>
                   <ResponsiveContainer width="100%" height={200}>
@@ -851,13 +777,11 @@ export default function AdminDashboard() {
                 </>
               )}
             </div>
-
             <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
               <p className="text-sm font-semibold text-gray-700 mb-4">CA par source (eSIM)</p>
               {loading ? <Spinner /> : sources.length === 0 ? (
                 <div className="h-48 flex items-center justify-center text-sm text-gray-400 text-center px-4">
-                  Aucune donnée<br />
-                  <span className="text-xs mt-1 block">Renseigne la colonne <code className="bg-gray-100 px-1 rounded">source</code> sur les commandes</span>
+                  Aucune donnée<br /><span className="text-xs mt-1 block">Renseigne la colonne <code className="bg-gray-100 px-1 rounded">source</code></span>
                 </div>
               ) : (
                 <>
@@ -882,7 +806,7 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* Tableaux */}
+          {/* Tableaux ANSET + Partenaires */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
             <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
               <p className="text-sm font-semibold text-gray-700 mb-4">Reversements ANSET</p>
@@ -900,7 +824,7 @@ export default function AdminDashboard() {
                     </thead>
                     <tbody>
                       {anset.length === 0 ? (
-                        <tr><td colSpan={5} className="py-6 text-center text-xs text-gray-400">Aucun bordereau généré</td></tr>
+                        <tr><td colSpan={5} className="py-6 text-center text-xs text-gray-400">Aucun reversement en attente</td></tr>
                       ) : anset.map(s => (
                         <tr key={s.period} className="border-b border-gray-50 last:border-0">
                           <td className="py-2.5 font-medium text-gray-700">{s.period}</td>
@@ -913,14 +837,12 @@ export default function AdminDashboard() {
                           </td>
                           <td className="py-2.5 text-right">
                             <div className="flex items-center justify-end gap-1.5">
-                              <button
-                                onClick={() => handleGenerateBordereau(s.period)}
+                              <button onClick={() => handleGenerateBordereau(s.period)}
                                 className="text-xs px-2 py-1 rounded-lg border border-purple-200 text-purple-700 hover:bg-purple-50 transition-colors">
                                 PDF
                               </button>
                               {s.status !== "paid" && (
-                                <button
-                                  onClick={() => setMarkingAnset(markingAnset === s.period ? null : s.period)}
+                                <button onClick={() => setMarkingAnset(markingAnset === s.period ? null : s.period)}
                                   className="text-xs px-2 py-1 rounded-lg border border-green-200 text-green-700 hover:bg-green-50 transition-colors">
                                   Marquer payé
                                 </button>
@@ -931,33 +853,19 @@ export default function AdminDashboard() {
                       ))}
                     </tbody>
                   </table>
-
-                  {/* Formulaire confirmation paiement ANSET */}
                   {markingAnset && (
                     <div className="mt-4 pt-4 border-t border-gray-100">
-                      <p className="text-xs font-medium text-gray-600 mb-2">
-                        Confirmer le reversement <strong>{markingAnset}</strong>
-                      </p>
+                      <p className="text-xs font-medium text-gray-600 mb-2">Confirmer le reversement <strong>{markingAnset}</strong></p>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <input
-                          type="text"
-                          placeholder="Référence virement (ex: VIR-20260301)"
-                          value={ansetRef}
-                          onChange={e => setAnsetRef(e.target.value)}
-                          className="flex-1 min-w-0 text-xs px-3 py-2 border border-gray-200 rounded-xl text-gray-700 bg-white"
-                        />
-                        <button
-                          onClick={() => handleMarkAnsetPaid(markingAnset)}
-                          disabled={!!markingAnset && markingAnset !== null && !ansetRef.trim()}
-                          className="text-xs px-4 py-2 rounded-xl text-white font-medium disabled:opacity-50 transition-opacity hover:opacity-90"
-                          style={{ background: G }}>
-                          {markingAnset ? "Confirmer ✓" : "…"}
-                        </button>
-                        <button
-                          onClick={() => { setMarkingAnset(null); setAnsetRef(""); }}
-                          className="text-xs px-3 py-2 rounded-xl border border-gray-200 text-gray-500 hover:text-gray-700">
-                          Annuler
-                        </button>
+                        <input type="text" placeholder="Référence virement (ex: VIR-20260301)"
+                          value={ansetRef} onChange={e => setAnsetRef(e.target.value)}
+                          className="flex-1 min-w-0 text-xs px-3 py-2 border border-gray-200 rounded-xl text-gray-700 bg-white" />
+                        <button onClick={() => handleMarkAnsetPaid(markingAnset)}
+                          disabled={!ansetRef.trim()}
+                          className="text-xs px-4 py-2 rounded-xl text-white font-medium disabled:opacity-50 hover:opacity-90"
+                          style={{ background: G }}>Confirmer ✓</button>
+                        <button onClick={() => { setMarkingAnset(null); setAnsetRef(""); }}
+                          className="text-xs px-3 py-2 rounded-xl border border-gray-200 text-gray-500 hover:text-gray-700">Annuler</button>
                       </div>
                     </div>
                   )}
@@ -1007,9 +915,7 @@ export default function AdminDashboard() {
                     {r.status === "available" ? "✓ Disponible" : r.status === "rented" ? "● En location" : "⚙ Maintenance"}
                   </p>
                   <p className="text-xs text-gray-400 mt-0.5">{r.serial_number}</p>
-                  {r.current_rental_end && (
-                    <p className="text-xs text-gray-400 mt-0.5">Retour : {new Date(r.current_rental_end).toLocaleDateString("fr-FR")}</p>
-                  )}
+                  {r.current_rental_end && <p className="text-xs text-gray-400 mt-0.5">Retour : {new Date(r.current_rental_end).toLocaleDateString("fr-FR")}</p>}
                 </div>
               ))}
             </div>
@@ -1018,7 +924,6 @@ export default function AdminDashboard() {
           {/* Stats historiques */}
           <Section title="Statistiques — depuis le lancement" icon={TrendingUp} />
           <StatsSection />
-
 
           {/* Import coûts Airalo */}
           <Section title="Coûts d'achat Airalo" icon={Package} />
@@ -1030,13 +935,11 @@ export default function AdminDashboard() {
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div>
                 <p className="text-sm font-semibold text-gray-700">Réconciliation mensuelle</p>
-                <p className="text-xs text-gray-400 mt-1">Télécharge ton CSV depuis <strong>Stripe → Rapports → Paiements</strong> puis importe-le ici</p>
-                <p className="text-xs text-gray-400 mt-0.5">Met à jour les frais Stripe réels et les marges nettes sur toutes les commandes</p>
+                <p className="text-xs text-gray-400 mt-1">Stripe → Rapports → Paiements → Exporter</p>
               </div>
               <label className="cursor-pointer shrink-0">
                 <input type="file" accept=".csv" className="hidden" onChange={handleCSVImport} />
-                <span className="flex items-center gap-2 text-sm px-4 py-2.5 rounded-xl text-white font-medium shadow-sm hover:opacity-90 transition-opacity"
-                  style={{ background: G }}>
+                <span className="flex items-center gap-2 text-sm px-4 py-2.5 rounded-xl text-white font-medium shadow-sm hover:opacity-90" style={{ background: G }}>
                   <Upload size={14} /> Importer CSV
                 </span>
               </label>
@@ -1050,5 +953,4 @@ export default function AdminDashboard() {
   );
 }
 
-// ── Pas de Layout site public sur cette page ──────────────────
 AdminDashboard.getLayout = (page: ReactElement) => page;

@@ -232,7 +232,7 @@ function useStatsData() {
       try {
         const { data: orders, error } = await supabase
           .from("orders")
-          .select("price, currency, package_name, partner_code, created_at")
+          .select("price, currency, package_name, package_id, partner_code, created_at")
           .gte("created_at", "2025-04-01T00:00:00")
           .in("status", ["completed", "paid"])
           .order("created_at", { ascending: true });
@@ -265,18 +265,22 @@ function useStatsData() {
         });
         setTopPackages(Object.values(pMap).sort((a, b) => b.count - a.count).slice(0, 10));
 
-        const packageNames = [...new Set(data.map(o => o.package_name).filter(Boolean))] as string[];
+        // Jointure via airalo_id = package_id (pas via name)
+        const packageIds = [...new Set(data.map(o => o.package_id).filter(Boolean))] as string[];
         const { data: pkgs } = await supabase
           .from("airalo_packages")
-          .select("name, country, region_fr, region")
-          .in("name", packageNames.slice(0, 200));
+          .select("airalo_id, slug, country, region_fr, region, type")
+          .in("airalo_id", packageIds.slice(0, 200));
 
         const destMap: Record<string, string> = {};
-        (pkgs ?? []).forEach((p: any) => { destMap[p.name] = p.country || p.region_fr || p.region || "Autre"; });
+        (pkgs ?? []).forEach((p: any) => {
+          // region_fr → region → "Autre" (country est toujours null dans Airalo)
+          destMap[p.airalo_id] = p.region_fr || p.region || "Autre";
+        });
 
         const dMap: Record<string, DestinationStat> = {};
         data.forEach(o => {
-          const dest = destMap[o.package_name ?? ""] ?? "Autre";
+          const dest = destMap[o.package_id ?? ""] ?? "Autre";
           const eur = toEur(o.price ?? 0, o.currency ?? "EUR");
           if (!dMap[dest]) dMap[dest] = { destination: dest, count: 0, revenue_eur: 0 };
           dMap[dest].count += 1;

@@ -1,270 +1,273 @@
 // ============================================================
-// FENUA SIM – API Route : Bordereau ANSET PDF
-// src/pages/api/admin/anset-bordereau.ts
-// POST { period: "2026-03" }
+// FENUA SIM – API Route : Commissions & Bordereaux
+// Fichier : src/pages/api/admin/bordereaux.ts
+//
+// Actions disponibles :
+//   POST { action: "commissions", period: "2025-01" }
+//     → Calcule les commissions partenaires du mois
+//   POST { action: "anset", period: "2025-01" }
+//     → Génère le bordereau ANSET du mois
+//   POST { action: "mark_anset_paid", period: "2025-01", reference: "VIR-xxx" }
+//     → Marque le reversement ANSET comme payé
+//   POST { action: "mark_commission_paid", partner_code: "xxx", period: "2025-01", reference: "VIR-xxx" }
+//     → Marque la commission partenaire comme payée
 // ============================================================
 
 import type { NextApiRequest, NextApiResponse } from "next";
 import { supabaseAdmin as supabase } from "@/lib/supabaseAdmin";
 
-const COMPANY = {
-  legal:    "SAS FENUASIM",
-  address1: "58 rue Monceau",
-  address2: "75000 Paris",
-  siret:    "943 713 875",
-  email:    "contact@fenuasim.com",
-};
+// ── Types ────────────────────────────────────────────────────
+interface PeriodRange { start: string; end: string }
 
-const ASSUREUR = { name: "ANSET", address: "À compléter" };
+function getPeriodRange(period: string): PeriodRange {
+  const [year, month] = period.split("-").map(Number);
+  const start = new Date(year, month - 1, 1);
+  const end   = new Date(year, month, 0); // dernier jour du mois
+  const fmt = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return { start: fmt(start), end: fmt(end) };
+}
 
+// ── ACTION : Calcul commissions partenaires ──────────────────
+async function calcCommissions(period: string) {
+  const { start, end } = getPeriodRange(period);
+
+  // Commandes avec partenaire sur la période
+  const { data: orders, error } = await supabase
+    .from("orders")
+    .select("id, email, package_name, price, partner_code, commission_amount, created_at")
+    .not("partner_code", "is", null)
+    .gte("created_at", `${start}T00:00:00`)
+    .lte("created_at", `${end}T23:59:59`)
+    .in("status", ["completed", "paid"]);
+
+  if (error) throw new Error(`Fetch orders: ${error.message}`);
+  if (!orders || orders.length === 0) return { message: "Aucune commande partenaire sur cette période", bordereaux: [] };
+
+  // Taux de commission depuis partner_profiles
+  const partnerCodes = [...new Set(orders.map(o => o.partner_code))];
+  const { data: profiles } = await supabase
+    .from("partner_profiles")
+    .select("partner_code, advisor_name, commission_rate")
+    .in("partner_code", partnerCodes);
+
+  const rateMap: Record<string, { name: string; rate: number }> = {};
+  (profiles ?? []).forEach(p => {
+    rateMap[p.partner_code] = {
+      name: p.advisor_name ?? p.partner_code,
+      rate: p.commission_rate ?? 0.10,
+    };
+  });
+
+  // Grouper par partenaire
+  const grouped: Record<string, typeof orders> = {};
+  orders.forEach(o => {
+    if (!grouped[o.partner_code]) grouped[o.partner_code] = [];
+    grouped[o.partner_code].push(o);
+  });
+
+  const bordereaux = [];
+
+  for (const [code, partnerOrders] of Object.entries(grouped)) {
+    const { name, rate } = rateMap[code] ?? { name: code, rate: 0.10 };
+    const totalSales = partnerOrders.reduce((s, o) => s + (o.price ?? 0), 0);
+    const totalCommission = Math.round(totalSales * rate * 100) / 100;
+
+    // Mettre à jour commission_amount sur chaque commande si vide
+    for (const order of partnerOrders) {
+      if (!order.commission_amount) {
+        await supabase
+          .from("orders")
+          .update({ commission_amount: Math.round((order.price ?? 0) * rate * 100) / 100 })
+          .eq("id", order.id);
+      }
+    }
+
+    // Upsert bordereau
+    const { error: upsertErr } = await supabase
+      .from("partner_commissions")
+      .upsert({
+        partner_code: code,
+        period,
+        period_start: start,
+        period_end: end,
+        total_orders: partnerOrders.length,
+        total_sales: totalSales,
+        total_commission: totalCommission,
+        commission_rate: rate,
+        status: "pending",
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "partner_code,period" });
+
+    if (upsertErr) throw new Error(`Upsert commission ${code}: ${upsertErr.message}`);
+
+    bordereaux.push({
+      partner_code: code,
+      partner_name: name,
+      period,
+      total_orders: partnerOrders.length,
+      total_sales: totalSales,
+      total_commission: totalCommission,
+      commission_rate: rate,
+      orders: partnerOrders.map(o => ({
+        id: o.id,
+        date: o.created_at,
+        email: o.email,
+        product: o.package_name,
+        amount: o.price,
+        commission: Math.round((o.price ?? 0) * rate * 100) / 100,
+      })),
+    });
+  }
+
+  return { bordereaux, period };
+}
+
+// ── ACTION : Bordereau ANSET ─────────────────────────────────
+async function calcANSET(period: string) {
+  const { start, end } = getPeriodRange(period);
+
+  const { data: insurances, error } = await supabase
+    .from("insurances")
+    .select(`
+      id, created_at, user_email,
+      subscriber_first_name, subscriber_last_name,
+      adhesion_number, product_type,
+      premium_ava, frais_distribution, amount_to_transfer, transfer_status
+    `)
+    .gte("created_at", `${start}T00:00:00`)
+    .lte("created_at", `${end}T23:59:59`)
+    .in("status", ["paid", "validated"]);
+
+  if (error) throw new Error(`Fetch insurances: ${error.message}`);
+
+  const contracts = (insurances ?? []).map(i => {
+    const premium = i.premium_ava ?? 0;
+    const frais   = i.frais_distribution ?? 0;
+    const toTransfer = i.amount_to_transfer ?? (premium - frais);
+    return {
+      id: i.id,
+      date: new Date(i.created_at).toLocaleDateString("fr-FR"),
+      customer: `${i.subscriber_first_name ?? ""} ${i.subscriber_last_name ?? ""}`.trim(),
+      adhesion: i.adhesion_number ?? "",
+      product: i.product_type ?? "",
+      premium_ava: premium,
+      frais_distribution: frais,
+      amount_to_transfer: toTransfer,
+      transfer_status: i.transfer_status ?? "pending",
+    };
+  });
+
+  const totalPremium   = contracts.reduce((s, c) => s + c.premium_ava, 0);
+  const totalFees      = contracts.reduce((s, c) => s + c.frais_distribution, 0);
+  const totalTransfer  = contracts.reduce((s, c) => s + c.amount_to_transfer, 0);
+
+  // Upsert bordereau ANSET
+  const { error: upsertErr } = await supabase
+    .from("insurer_settlements")
+    .upsert({
+      period,
+      period_start: start,
+      period_end: end,
+      total_contracts: contracts.length,
+      total_premium: totalPremium,
+      total_distribution_fees: totalFees,
+      total_to_transfer: totalTransfer,
+      status: "pending",
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "period" });
+
+  if (upsertErr) throw new Error(`Upsert ANSET: ${upsertErr.message}`);
+
+  return {
+    period,
+    total_contracts: contracts.length,
+    total_premium: totalPremium,
+    total_distribution_fees: totalFees,
+    total_to_transfer: totalTransfer,
+    contracts,
+  };
+}
+
+// ── ACTION : Marquer ANSET comme payé ────────────────────────
+async function markANSETPaid(period: string, reference: string) {
+  const { start, end } = getPeriodRange(period);
+  const now = new Date().toISOString();
+
+  const { error: e1 } = await supabase
+    .from("insurer_settlements")
+    .update({ status: "paid", paid_at: now, payment_reference: reference })
+    .eq("period", period);
+  if (e1) throw new Error(`Update settlement: ${e1.message}`);
+
+  const { error: e2 } = await supabase
+    .from("insurances")
+    .update({ transfer_status: "paid", transfer_date: now })
+    .gte("created_at", `${start}T00:00:00`)
+    .lte("created_at", `${end}T23:59:59`)
+    .in("status", ["paid", "validated"])
+    .eq("transfer_status", "pending");
+  if (e2) throw new Error(`Update insurances: ${e2.message}`);
+
+  return { success: true, period, reference };
+}
+
+// ── ACTION : Marquer commission partenaire comme payée ───────
+async function markCommissionPaid(partnerCode: string, period: string, reference: string) {
+  const { error } = await supabase
+    .from("partner_commissions")
+    .update({
+      status: "paid",
+      paid_at: new Date().toISOString(),
+      payment_reference: reference,
+    })
+    .eq("partner_code", partnerCode)
+    .eq("period", period);
+  if (error) throw new Error(`Update commission: ${error.message}`);
+  return { success: true, partner_code: partnerCode, period, reference };
+}
+
+// ── Handler ──────────────────────────────────────────────────
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const { period } = req.body as { period: string };
-  if (!period || !/^\d{4}-\d{2}$/.test(period)) {
-    return res.status(400).json({ error: "period requis (ex: 2026-03)" });
-  }
+  const { action, period, partner_code, reference } = req.body as {
+    action: string;
+    period?: string;
+    partner_code?: string;
+    reference?: string;
+  };
 
-  const [year, month] = period.split("-").map(Number);
-  const periodStart = `${period}-01`;
-  const periodEnd   = new Date(year, month, 0).toISOString().slice(0, 10);
-
-  const { data: contracts, error } = await supabase
-    .from("insurances")
-    .select(`
-      id, created_at,
-      subscriber_first_name, subscriber_last_name,
-      user_email, adhesion_number, product_type,
-      premium_ava, frais_distribution, amount_to_transfer,
-      transfer_status, start_date, end_date
-    `)
-    .gte("created_at", `${periodStart}T00:00:00`)
-    .lte("created_at", `${periodEnd}T23:59:59`)
-    .in("status", ["paid", "validated"])
-    .order("created_at", { ascending: true });
-
-  if (error) return res.status(500).json({ error: error.message });
-  if (!contracts || contracts.length === 0) {
-    return res.status(404).json({ error: "Aucun contrat trouvé pour cette période" });
-  }
-
-  const totalPremium    = contracts.reduce((s, c) => s + (c.premium_ava ?? 0), 0);
-  const totalFees       = contracts.reduce((s, c) => s + (c.frais_distribution ?? 0), 0);
-  const totalToTransfer = contracts.reduce((s, c) => s + (c.amount_to_transfer ?? ((c.premium_ava ?? 0) - (c.frais_distribution ?? 0))), 0);
-
-  const MONTH_FR = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
-  const periodLabel = `${MONTH_FR[month - 1]} ${year}`;
-  const today = new Date().toLocaleDateString("fr-FR");
-  const fmtEur = (n: number) => new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", minimumFractionDigits: 2 }).format(n);
+  if (!action) return res.status(400).json({ error: "action requis" });
 
   try {
-    // Import dynamique pour éviter les erreurs SSR avec jsPDF
-    const { jsPDF } = await import("jspdf");
-
-    const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
-    const W = 210;
-    let y = 0;
-
-    const VIOLET: [number, number, number] = [160, 32, 240];
-    const DARK:   [number, number, number] = [26, 5, 51];
-    const GRAY:   [number, number, number] = [107, 114, 128];
-    const LGRAY:  [number, number, number] = [245, 247, 250];
-    const WHITE:  [number, number, number] = [255, 255, 255];
-
-    // En-tête
-    doc.setFillColor(...VIOLET);
-    doc.rect(0, 0, W, 30, "F");
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.setTextColor(...WHITE);
-    doc.text("FENUASIM", 14, 14);
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(220, 200, 255);
-    doc.text("eSIM · Assurance · Routeurs", 14, 20);
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
-    doc.setTextColor(...WHITE);
-    doc.text("BORDEREAU DE REVERSEMENT", W - 14, 13, { align: "right" });
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(220, 200, 255);
-    doc.text(`ANSET · ${periodLabel}`, W - 14, 20, { align: "right" });
-
-    y = 38;
-
-    // Blocs émetteur / destinataire / date
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(7);
-    doc.setTextColor(...GRAY);
-    doc.text("ÉMETTEUR", 14, y);
-    doc.text("DESTINATAIRE", 110, y);
-    doc.text("DATE", W - 50, y);
-
-    y += 5;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(...DARK);
-    doc.text(COMPANY.legal, 14, y);
-    doc.text(ASSUREUR.name, 110, y);
-    doc.text(today, W - 50, y);
-
-    y += 4;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(...GRAY);
-    doc.text(COMPANY.address1, 14, y);
-    doc.text(ASSUREUR.address, 110, y);
-
-    y += 4;
-    doc.text(COMPANY.address2, 14, y);
-    y += 4;
-    doc.text(`SIRET : ${COMPANY.siret}`, 14, y);
-
-    y += 10;
-    doc.setDrawColor(230, 225, 255);
-    doc.setLineWidth(0.5);
-    doc.line(14, y, W - 14, y);
-    y += 8;
-
-    // Période
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(...DARK);
-    doc.text(`Période : ${periodLabel}  ·  ${contracts.length} contrat${contracts.length > 1 ? "s" : ""}`, 14, y);
-    y += 8;
-
-    // 3 boîtes résumé
-    const boxW = (W - 28 - 8) / 3;
-    const boxes = [
-      { label: "PRIMES ENCAISSÉES", value: fmtEur(totalPremium), sub: "Pour compte ANSET", highlight: false },
-      { label: "FRAIS DISTRIBUTION", value: fmtEur(totalFees), sub: "CA Fenua Sim conservé", highlight: false },
-      { label: "MONTANT À REVERSER", value: fmtEur(totalToTransfer), sub: "À virer à ANSET", highlight: true },
-    ];
-
-    boxes.forEach((box, i) => {
-      const bx = 14 + i * (boxW + 4);
-      if (box.highlight) doc.setFillColor(...VIOLET);
-      else doc.setFillColor(...LGRAY);
-      doc.rect(bx, y, boxW, 18, "F");
-
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(7);
-      if (box.highlight) doc.setTextColor(220, 200, 255);
-      else doc.setTextColor(...GRAY);
-      doc.text(box.label, bx + 3, y + 5);
-
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
-      if (box.highlight) doc.setTextColor(...WHITE);
-      else doc.setTextColor(...DARK);
-      doc.text(box.value, bx + 3, y + 12);
-
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(6.5);
-      if (box.highlight) doc.setTextColor(200, 180, 240);
-      else doc.setTextColor(...GRAY);
-      doc.text(box.sub, bx + 3, y + 17);
-    });
-
-    y += 26;
-
-    // Tableau des contrats
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.setTextColor(...DARK);
-    doc.text("DÉTAIL DES CONTRATS", 14, y);
-    y += 5;
-
-    // En-tête tableau
-    doc.setFillColor(...DARK);
-    doc.rect(14, y, W - 28, 7, "F");
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(7);
-    doc.setTextColor(...WHITE);
-    doc.text("Date",        16,       y + 4.5);
-    doc.text("Assuré",      37,       y + 4.5);
-    doc.text("N° adhésion", 95,       y + 4.5);
-    doc.text("Produit",     130,      y + 4.5);
-    doc.text("Prime",       177,      y + 4.5, { align: "right" });
-    doc.text("À reverser",  W - 16,   y + 4.5, { align: "right" });
-    y += 7;
-
-    contracts.forEach((c, idx) => {
-      if (y > 260) { doc.addPage(); y = 20; }
-
-      if (idx % 2 === 0) {
-        doc.setFillColor(250, 248, 255);
-        doc.rect(14, y, W - 28, 6.5, "F");
+    switch (action) {
+      case "commissions": {
+        if (!period) return res.status(400).json({ error: "period requis (ex: 2025-01)" });
+        const result = await calcCommissions(period);
+        return res.status(200).json(result);
       }
-
-      const date       = new Date(c.created_at).toLocaleDateString("fr-FR");
-      const name       = `${c.subscriber_first_name ?? ""} ${c.subscriber_last_name ?? ""}`.trim() || c.user_email || "-";
-      const adhesion   = (c.adhesion_number ?? "-").slice(0, 18);
-      const product    = (c.product_type ?? "-").slice(0, 18);
-      const premium    = fmtEur(c.premium_ava ?? 0);
-      const toTransfer = fmtEur(c.amount_to_transfer ?? ((c.premium_ava ?? 0) - (c.frais_distribution ?? 0)));
-
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(7);
-      doc.setTextColor(...DARK);
-      doc.text(date,              16,       y + 4.2);
-      doc.text(name.slice(0, 25), 37,       y + 4.2);
-      doc.text(adhesion,          95,       y + 4.2);
-      doc.text(product,           130,      y + 4.2);
-      doc.text(premium,           177,      y + 4.2, { align: "right" });
-
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(...VIOLET);
-      doc.text(toTransfer,        W - 16,   y + 4.2, { align: "right" });
-      y += 6.5;
-    });
-
-    // Total
-    y += 2;
-    doc.setDrawColor(...VIOLET);
-    doc.setLineWidth(0.5);
-    doc.line(14, y, W - 14, y);
-    y += 5;
-
-    doc.setFillColor(...VIOLET);
-    doc.rect(W - 72, y - 4, 58, 10, "F");
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(...DARK);
-    doc.text("TOTAL À REVERSER :", W - 74, y + 2.5, { align: "right" });
-    doc.setTextColor(...WHITE);
-    doc.text(fmtEur(totalToTransfer), W - 16, y + 2.5, { align: "right" });
-
-    y += 16;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.5);
-    doc.setTextColor(...GRAY);
-    doc.text("Ce bordereau récapitule les primes d'assurance encaissées pour le compte d'ANSET.", 14, y);
-    y += 4;
-    doc.text(`Le montant de ${fmtEur(totalToTransfer)} doit être viré à ANSET dans les délais contractuels.`, 14, y);
-
-    // Pied de page
-    const footerY = 287;
-    doc.setDrawColor(230, 225, 255);
-    doc.setLineWidth(0.3);
-    doc.line(14, footerY - 4, W - 14, footerY - 4);
-    doc.setFontSize(7);
-    doc.setTextColor(...GRAY);
-    doc.text(`${COMPANY.legal}  ·  SIRET ${COMPANY.siret}  ·  ${COMPANY.email}`, W / 2, footerY, { align: "center" });
-
-    const pdfBytes = Buffer.from(doc.output("arraybuffer"));
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="bordereau-anset-${period}.pdf"`);
-    return res.send(pdfBytes);
-
+      case "anset": {
+        if (!period) return res.status(400).json({ error: "period requis (ex: 2025-01)" });
+        const result = await calcANSET(period);
+        return res.status(200).json(result);
+      }
+      case "mark_anset_paid": {
+        if (!period || !reference) return res.status(400).json({ error: "period et reference requis" });
+        const result = await markANSETPaid(period, reference);
+        return res.status(200).json(result);
+      }
+      case "mark_commission_paid": {
+        if (!period || !partner_code || !reference)
+          return res.status(400).json({ error: "period, partner_code et reference requis" });
+        const result = await markCommissionPaid(partner_code, period, reference);
+        return res.status(200).json(result);
+      }
+      default:
+        return res.status(400).json({ error: `Action inconnue : ${action}` });
+    }
   } catch (err: any) {
-    console.error("anset-bordereau error:", err);
-    return res.status(500).json({ error: err.message ?? "Erreur génération PDF" });
+    console.error("bordereaux error:", err);
+    return res.status(500).json({ error: err.message ?? "Erreur serveur" });
   }
 }

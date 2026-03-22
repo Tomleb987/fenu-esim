@@ -15,9 +15,9 @@ import { jsPDF } from "jspdf";
 const COMPANY = {
   name: "FENUASIM",
   legal: "SAS FENUASIM",
-  address1: "XX Rue XXXX",     // ← À compléter
+  address1: "58 RUE MONCEAU",     // ← À compléter
   address2: "75000 Paris",      // ← À compléter
-  siret: "XXX XXX XXX XXXXX",  // ← À compléter
+  siret: "943 713 875",  // ← À compléter
   email: "contact@fenuasim.com",
   website: "www.fenuasim.com",
   vat: "TVA non applicable, art. 293 B du CGI",

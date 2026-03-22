@@ -2,10 +2,15 @@
 // FENUA SIM – API Route : Import CSV Stripe
 // src/pages/api/admin/stripe-import.ts
 //
-// Stratégie de réconciliation :
-//   1. CSV colonne "Source" = charge ID (ch_xxx)
-//   2. On appelle Stripe API : charge → payment_intent → checkout_session
-//   3. On cherche checkout_session dans orders.stripe_session_id
+// Format : Stripe "Payments" export (unified_payments.csv)
+// Colonnes clés :
+//   id                = charge ID (ch_xxx)
+//   Amount            = montant brut (XPF entier ou EUR avec virgule)
+//   Currency          = xpf | eur
+//   Converted Amount  = montant converti en EUR (avec virgule)
+//   Fee               = frais Stripe en EUR (avec virgule)
+//   Customer Email    = email client
+//   Status            = Paid | Failed | Refunded
 // ============================================================
 
 import type { NextApiRequest, NextApiResponse } from "next";
@@ -27,7 +32,7 @@ function parseCSV(text: string): Record<string, string>[] {
     const values = parseLine(line);
     const row: Record<string, string> = {};
     headers.forEach((h, i) => {
-      row[h.trim().replace(/^"|"$/g, "")] = (values[i] ?? "").trim().replace(/^"|"$/g, "");
+      row[h.trim()] = (values[i] ?? "").trim().replace(/^"|"$/g, "");
     });
     return row;
   });
@@ -45,87 +50,90 @@ function parseLine(line: string): string[] {
   return result;
 }
 
-// ── Montant CSV → euros ──────────────────────────────────────
+// ── Parser montant (gère virgule ET point comme séparateur décimal) ──
 function parseAmount(val: string): number {
   if (!val) return 0;
-  const cleaned = val.replace(/[^0-9.\-]/g, "");
-  const n = parseFloat(cleaned);
-  if (isNaN(n)) return 0;
-  // Stripe balance CSV : entiers = centimes
-  if (Number.isInteger(n) && Math.abs(n) > 100) return n / 100;
-  return n;
+  // Supprimer espaces et guillemets
+  const cleaned = val.replace(/[\s"]/g, "");
+  // Remplacer virgule par point
+  const normalized = cleaned.replace(",", ".");
+  const n = parseFloat(normalized);
+  return isNaN(n) ? 0 : n;
 }
 
-// ── Cache charge → session (évite les appels API répétés) ────
+// ── Cache charge → session ────────────────────────────────────
 const sessionCache: Record<string, string | null> = {};
 
 async function getCheckoutSessionFromCharge(chargeId: string): Promise<string | null> {
   if (chargeId in sessionCache) return sessionCache[chargeId];
-
   try {
-    // Récupérer le charge pour avoir le payment_intent
     const charge = await stripe.charges.retrieve(chargeId);
     const piId = typeof charge.payment_intent === "string"
       ? charge.payment_intent
       : charge.payment_intent?.id;
-
     if (!piId) { sessionCache[chargeId] = null; return null; }
 
-    // Chercher la checkout session liée au payment_intent
     const sessions = await stripe.checkout.sessions.list({
       payment_intent: piId,
       limit: 1,
     });
-
     const sessionId = sessions.data[0]?.id ?? null;
     sessionCache[chargeId] = sessionId;
     return sessionId;
-  } catch (err) {
-    console.error(`Stripe lookup failed for ${chargeId}:`, err);
+  } catch {
     sessionCache[chargeId] = null;
     return null;
   }
 }
 
-// ── Réconciliation ───────────────────────────────────────────
+// ── Réconciliation ────────────────────────────────────────────
 async function reconcile(
   stripeId: string,
   chargeId: string,
-  fee: number,
-  net: number
+  feeEur: number,
+  netEur: number,
+  amountEur: number
 ): Promise<boolean> {
-  // Résoudre charge → checkout session via Stripe API
-  const sessionId = chargeId.startsWith("ch_")
-    ? await getCheckoutSessionFromCharge(chargeId)
-    : chargeId; // si c'est déjà un cs_ ou pi_
-
+  const sessionId = await getCheckoutSessionFromCharge(chargeId);
   if (!sessionId) return false;
 
-  // 1. Chercher dans orders via stripe_session_id
+  // 1. orders
   const { data: order } = await supabase
     .from("orders")
-    .select("id, price, cost_airalo, margin_gross")
+    .select("id, price, currency")
     .eq("stripe_session_id", sessionId)
     .maybeSingle();
 
   if (order) {
-    const marginGross = order.margin_gross ?? ((order.price ?? 0) - (order.cost_airalo ?? 0));
+    // Recalculer margin_net avec le vrai stripe_fee
+    const priceEur = order.currency?.toUpperCase() === "XPF"
+      ? order.price / 119.33
+      : order.price;
+
+    const { data: cost } = await supabase
+      .from("airalo_costs")
+      .select("cost_eur")
+      .eq("package_id", (await supabase.from("orders").select("package_id").eq("id", order.id).single()).data?.package_id ?? "")
+      .maybeSingle();
+
+    const costEur = cost?.cost_eur ?? 0;
+    const marginGross = priceEur - costEur;
+    const marginNet   = marginGross - feeEur;
+
     await supabase.from("orders").update({
-      stripe_fee: fee,
-      stripe_net: net,
-      margin_gross: marginGross,
-      margin_net: marginGross - fee,
+      stripe_fee:   feeEur,
+      stripe_net:   netEur,
+      margin_gross: Math.round(marginGross * 10000) / 10000,
+      margin_net:   Math.round(marginNet   * 10000) / 10000,
     }).eq("id", order.id);
 
     await supabase.from("stripe_transactions").update({
-      order_id: order.id,
-      reconciled: true,
-      reconciled_at: new Date().toISOString(),
+      order_id: order.id, reconciled: true, reconciled_at: new Date().toISOString(),
     }).eq("stripe_id", stripeId);
     return true;
   }
 
-  // 2. Chercher dans insurances
+  // 2. insurances
   const { data: insurance } = await supabase
     .from("insurances")
     .select("id, frais_distribution, premium_ava")
@@ -136,21 +144,19 @@ async function reconcile(
     const frais   = insurance.frais_distribution ?? 0;
     const premium = insurance.premium_ava ?? 0;
     await supabase.from("insurances").update({
-      stripe_fee: fee,
-      stripe_net: net,
-      margin_net: frais - fee,
+      stripe_fee:        feeEur,
+      stripe_net:        netEur,
+      margin_net:        frais - feeEur,
       amount_to_transfer: premium - frais,
     }).eq("id", insurance.id);
 
     await supabase.from("stripe_transactions").update({
-      insurance_id: insurance.id,
-      reconciled: true,
-      reconciled_at: new Date().toISOString(),
+      insurance_id: insurance.id, reconciled: true, reconciled_at: new Date().toISOString(),
     }).eq("stripe_id", stripeId);
     return true;
   }
 
-  // 3. Chercher dans router_rentals
+  // 3. router_rentals
   const { data: rental } = await supabase
     .from("router_rentals")
     .select("id, rental_amount")
@@ -159,15 +165,13 @@ async function reconcile(
 
   if (rental) {
     await supabase.from("router_rentals").update({
-      stripe_fee: fee,
-      stripe_net: net,
-      margin_net: (rental.rental_amount ?? 0) - fee,
+      stripe_fee: feeEur,
+      stripe_net: netEur,
+      margin_net: (rental.rental_amount ?? 0) - feeEur,
     }).eq("id", rental.id);
 
     await supabase.from("stripe_transactions").update({
-      rental_id: rental.id,
-      reconciled: true,
-      reconciled_at: new Date().toISOString(),
+      rental_id: rental.id, reconciled: true, reconciled_at: new Date().toISOString(),
     }).eq("stripe_id", stripeId);
     return true;
   }
@@ -175,7 +179,7 @@ async function reconcile(
   return false;
 }
 
-// ── Handler ──────────────────────────────────────────────────
+// ── Handler ───────────────────────────────────────────────────
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
@@ -191,44 +195,47 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   for (const row of rows) {
     try {
-      // ID de la ligne balance (bal_xxx ou txn_xxx)
-      const stripeId = row["id"] || row["balance_transaction_id"] || "";
-      if (!stripeId) continue;
+      const chargeId = row["id"] ?? "";
+      if (!chargeId.startsWith("ch_")) continue;
 
-      // Charge ID = colonne "Source" (ch_xxx)
-      const chargeId = row["Source"] || row["source"] || row["charge"] || "";
+      // Ignorer les paiements échoués
+      if (row["Status"]?.toLowerCase() !== "paid") continue;
 
-      const amount = parseAmount(row["Amount"] || row["amount"] || "0");
-      const fee    = parseAmount(row["Fee"]    || row["fee"]    || "0");
-      const net    = parseAmount(row["Net"]    || row["net"]    || "0");
+      const currency = (row["Currency"] ?? "eur").toLowerCase();
 
-      const currency    = (row["Currency"] || row["currency"] || "EUR").toUpperCase();
-      const description = row["Description"] || row["description"] || "";
-      const createdStr  = row["Created date (UTC)"] || row["Created (UTC)"] || row["created"] || "";
-      const isRefund    = (row["Type"] || row["type"] || "").toLowerCase().includes("refund") || amount < 0;
+      // Montant brut
+      const amountRaw = parseAmount(row["Amount"] ?? "0");
+      // Montant converti en EUR (Stripe le calcule)
+      const amountEur = parseAmount(row["Converted Amount"] ?? row["Amount"] ?? "0");
+      // Frais Stripe toujours en EUR
+      const feeEur    = parseAmount(row["Fee"] ?? "0");
+      const netEur    = amountEur - feeEur;
 
-      // Upsert dans stripe_transactions
+      const isRefund = parseAmount(row["Amount Refunded"] ?? "0") > 0;
+
+      // Upsert stripe_transactions
       const { error: upsertErr } = await supabase
         .from("stripe_transactions")
         .upsert({
-          stripe_id: stripeId,
-          stripe_type: row["Type"] || row["type"] || (isRefund ? "refund" : "charge"),
-          amount,
-          fee,
-          net,
-          currency,
-          description,
-          created_at_stripe: createdStr ? new Date(createdStr).toISOString() : null,
+          stripe_id:         chargeId,
+          stripe_type:       isRefund ? "refund" : "charge",
+          amount:            amountEur,
+          fee:               feeEur,
+          net:               netEur,
+          currency:          "EUR",
+          description:       row["Description"] ?? "",
+          created_at_stripe: row["Created date (UTC)"]
+            ? new Date(row["Created date (UTC)"]).toISOString()
+            : null,
           import_batch: importBatch,
-          raw_data: row,
+          raw_data:     row,
         }, { onConflict: "stripe_id", ignoreDuplicates: false });
 
-      if (upsertErr) { errors.push(`${stripeId}: ${upsertErr.message}`); continue; }
+      if (upsertErr) { errors.push(`${chargeId}: ${upsertErr.message}`); continue; }
       imported++;
 
-      // Réconciliation uniquement sur les paiements (pas les remboursements)
-      if (!isRefund && chargeId) {
-        const ok = await reconcile(stripeId, chargeId, fee, net);
+      if (!isRefund) {
+        const ok = await reconcile(chargeId, chargeId, feeEur, netEur, amountEur);
         if (ok) reconciled++;
         else unreconciled++;
       }

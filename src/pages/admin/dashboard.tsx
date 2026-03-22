@@ -203,6 +203,244 @@ function Spinner() {
   return <div className="flex justify-center py-8"><div className="w-7 h-7 border-2 border-purple-200 border-t-purple-600 rounded-full animate-spin" /></div>;
 }
 
+
+// ── Taux de conversion ────────────────────────────────────────
+const EUR_TO_XPF = 119.33;
+function toEur(amount: number, currency: string): number {
+  if (!amount) return 0;
+  const c = (currency || "EUR").toUpperCase();
+  if (c === "XPF" || c === "CFP") return amount / EUR_TO_XPF;
+  return amount;
+}
+
+// ── Types Stats ───────────────────────────────────────────────
+interface MonthStat { month: string; label: string; count: number; revenue_eur: number; direct: number; partner: number }
+interface PackageStat { name: string; count: number; revenue_eur: number }
+interface DestinationStat { destination: string; count: number; revenue_eur: number }
+
+// ── Hook Stats ────────────────────────────────────────────────
+function useStatsData() {
+  const [monthlyStats, setMonthlyStats] = useState<MonthStat[]>([]);
+  const [topPackages, setTopPackages]   = useState<PackageStat[]>([]);
+  const [topDest, setTopDest]           = useState<DestinationStat[]>([]);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [statsError, setStatsError]     = useState<string | null>(null);
+
+  useEffect(() => {
+    async function load() {
+      setStatsLoading(true);
+      try {
+        const { data: orders, error } = await supabase
+          .from("orders")
+          .select("price, currency, package_name, partner_code, created_at")
+          .gte("created_at", "2025-04-01T00:00:00")
+          .in("status", ["completed", "paid"])
+          .order("created_at", { ascending: true });
+
+        if (error) throw error;
+        const data = orders ?? [];
+
+        const MONTH_FR = ["Jan","Fév","Mar","Avr","Mai","Juin","Juil","Aoû","Sep","Oct","Nov","Déc"];
+        const mMap: Record<string, MonthStat> = {};
+        data.forEach(o => {
+          const m = o.created_at.slice(0, 7);
+          const [y, mo] = m.split("-").map(Number);
+          const label = `${MONTH_FR[mo - 1]} ${String(y).slice(2)}`;
+          const eur = toEur(o.price ?? 0, o.currency ?? "EUR");
+          if (!mMap[m]) mMap[m] = { month: m, label, count: 0, revenue_eur: 0, direct: 0, partner: 0 };
+          mMap[m].count += 1;
+          mMap[m].revenue_eur += eur;
+          if (o.partner_code) mMap[m].partner += eur;
+          else mMap[m].direct += eur;
+        });
+        setMonthlyStats(Object.values(mMap).sort((a, b) => a.month.localeCompare(b.month)));
+
+        const pMap: Record<string, PackageStat> = {};
+        data.forEach(o => {
+          const name = o.package_name ?? "Inconnu";
+          const eur = toEur(o.price ?? 0, o.currency ?? "EUR");
+          if (!pMap[name]) pMap[name] = { name, count: 0, revenue_eur: 0 };
+          pMap[name].count += 1;
+          pMap[name].revenue_eur += eur;
+        });
+        setTopPackages(Object.values(pMap).sort((a, b) => b.count - a.count).slice(0, 10));
+
+        const packageNames = [...new Set(data.map(o => o.package_name).filter(Boolean))] as string[];
+        const { data: pkgs } = await supabase
+          .from("airalo_packages")
+          .select("name, country, region_fr, region")
+          .in("name", packageNames.slice(0, 200));
+
+        const destMap: Record<string, string> = {};
+        (pkgs ?? []).forEach((p: any) => { destMap[p.name] = p.country || p.region_fr || p.region || "Autre"; });
+
+        const dMap: Record<string, DestinationStat> = {};
+        data.forEach(o => {
+          const dest = destMap[o.package_name ?? ""] ?? "Autre";
+          const eur = toEur(o.price ?? 0, o.currency ?? "EUR");
+          if (!dMap[dest]) dMap[dest] = { destination: dest, count: 0, revenue_eur: 0 };
+          dMap[dest].count += 1;
+          dMap[dest].revenue_eur += eur;
+        });
+        setTopDest(Object.values(dMap).sort((a, b) => b.count - a.count).slice(0, 8));
+      } catch (err: any) {
+        setStatsError(err.message);
+      } finally {
+        setStatsLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+  return { monthlyStats, topPackages, topDest, statsLoading, statsError };
+}
+
+// ── Composant StatsSection ────────────────────────────────────
+function StatsSection() {
+  const { monthlyStats, topPackages, topDest, statsLoading, statsError } = useStatsData();
+  const [view, setView] = useState<"revenue" | "count">("revenue");
+
+  if (statsError) return (
+    <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700 mt-4">⚠️ Erreur stats : {statsError}</div>
+  );
+
+  const maxPkg  = topPackages[0]?.count ?? 1;
+  const maxDest = topDest[0]?.count ?? 1;
+  const totalCount   = monthlyStats.reduce((s, m) => s + m.count, 0);
+  const totalRevEur  = monthlyStats.reduce((s, m) => s + m.revenue_eur, 0);
+  const totalPartner = monthlyStats.reduce((s, m) => s + m.partner, 0);
+
+  return (
+    <div className="mt-2">
+      {/* Graphique mensuel */}
+      <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm mt-4">
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+          <div>
+            <p className="text-sm font-semibold text-gray-700">Historique depuis le lancement</p>
+            <p className="text-xs text-gray-400 mt-0.5">Avril 2025 · toutes devises converties en EUR</p>
+          </div>
+          <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+            <button onClick={() => setView("revenue")}
+              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all ${view === "revenue" ? "bg-white text-gray-800 shadow-sm" : "text-gray-500"}`}>
+              CA (€)
+            </button>
+            <button onClick={() => setView("count")}
+              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all ${view === "count" ? "bg-white text-gray-800 shadow-sm" : "text-gray-500"}`}>
+              Volume
+            </button>
+          </div>
+        </div>
+        {statsLoading ? <Spinner /> : monthlyStats.length === 0 ? (
+          <div className="h-52 flex items-center justify-center text-sm text-gray-400">Aucune donnée</div>
+        ) : (
+          <>
+            {view === "revenue" && (
+              <>
+                <div className="flex gap-4 mb-3 text-xs text-gray-400 flex-wrap">
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: C.esim }} />Direct</span>
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: C.partner }} />Partenaires</span>
+                </div>
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={monthlyStats} barSize={20}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#9CA3AF" }} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: "#9CA3AF" }} tickLine={false} axisLine={false} tickFormatter={v => `${v} €`} />
+                    <Tooltip formatter={(v: number, name: string) => [`${v.toFixed(2)} €`, name === "direct" ? "Direct" : "Partenaires"]} labelFormatter={l => `Mois : ${l}`} />
+                    <Bar dataKey="direct"  stackId="a" fill={C.esim}    name="direct" />
+                    <Bar dataKey="partner" stackId="a" fill={C.partner} name="partner" radius={[3,3,0,0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </>
+            )}
+            {view === "count" && (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={monthlyStats} barSize={20}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#9CA3AF" }} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: "#9CA3AF" }} tickLine={false} axisLine={false} allowDecimals={false} />
+                  <Tooltip formatter={(v: number) => [`${v} ventes`, "Volume"]} labelFormatter={l => `Mois : ${l}`} />
+                  <Bar dataKey="count" fill={C.esim} radius={[3,3,0,0]} name="Ventes" />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+            <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-gray-50">
+              <div className="text-center">
+                <p className="text-xs text-gray-400 mb-1">Total ventes</p>
+                <p className="text-xl font-bold text-gray-900 tabular-nums">{fmtNum(totalCount)}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-gray-400 mb-1">CA total (EUR)</p>
+                <p className="text-xl font-bold text-gray-900 tabular-nums">{fmtEur(totalRevEur)}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-gray-400 mb-1">Via partenaires</p>
+                <p className="text-xl font-bold tabular-nums" style={{ color: C.partner }}>{fmtPct(totalPartner, totalRevEur)}</p>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Top forfaits + Top destinations */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+        <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+          <p className="text-sm font-semibold text-gray-700 mb-4">Top 10 forfaits</p>
+          {statsLoading ? <Spinner /> : topPackages.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-6">Aucune donnée</p>
+          ) : (
+            <div className="space-y-3">
+              {topPackages.map((p, i) => (
+                <div key={p.name}>
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-xs font-bold text-gray-300 w-5 shrink-0 tabular-nums">#{i+1}</span>
+                      <span className="text-xs text-gray-700 truncate font-medium">{p.name}</span>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0 ml-2">
+                      <span className="text-xs font-bold text-gray-900 tabular-nums">{p.count}×</span>
+                      <span className="text-xs text-gray-400 tabular-nums w-16 text-right">{fmtEur(p.revenue_eur)}</span>
+                    </div>
+                  </div>
+                  <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full" style={{ width: `${(p.count / maxPkg) * 100}%`, background: G, opacity: Math.max(0.3, 1 - i * 0.07) }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+          <p className="text-sm font-semibold text-gray-700 mb-4">Top destinations</p>
+          {statsLoading ? <Spinner /> : topDest.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-6">Aucune donnée</p>
+          ) : (
+            <div className="space-y-3">
+              {topDest.map((d, i) => (
+                <div key={d.destination}>
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-xs font-bold text-gray-300 w-5 shrink-0 tabular-nums">#{i+1}</span>
+                      <span className="text-xs text-gray-700 truncate font-medium">{d.destination}</span>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0 ml-2">
+                      <span className="text-xs font-bold text-gray-900 tabular-nums">{d.count}×</span>
+                      <span className="text-xs text-gray-400 tabular-nums w-16 text-right">{fmtEur(d.revenue_eur)}</span>
+                    </div>
+                  </div>
+                  <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full" style={{ width: `${(d.count / maxDest) * 100}%`, background: "linear-gradient(90deg, #FF4D6D, #FF7F11)", opacity: Math.max(0.3, 1 - i * 0.08) }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────
 export default function AdminDashboard() {
   const router = useRouter();
@@ -503,6 +741,10 @@ export default function AdminDashboard() {
               ))}
             </div>
           )}
+
+          {/* Stats historiques */}
+          <Section title="Statistiques — depuis le lancement" icon={TrendingUp} />
+          <StatsSection />
 
           {/* Import CSV Stripe */}
           <Section title="Import CSV Stripe" icon={Upload} />

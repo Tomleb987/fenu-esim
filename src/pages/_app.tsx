@@ -1,23 +1,29 @@
 import "@/styles/globals.css";
 import type { AppProps } from "next/app";
+import type { NextPage } from "next";
+import type { ReactElement, ReactNode } from "react";
 import Layout from "@/components/Layout";
 import { CartProvider } from "@/context/CartContext";
 import { supabase } from '@/lib/supabase';
 import { useEffect } from "react";
 import { useRouter } from "next/router";
 
-export default function App({ Component, pageProps }: AppProps) {
+type NextPageWithLayout = NextPage & {
+  getLayout?: (page: ReactElement) => ReactNode;
+}
+type AppPropsWithLayout = AppProps & {
+  Component: NextPageWithLayout;
+}
+
+export default function App({ Component, pageProps }: AppPropsWithLayout) {
   const router = useRouter();
 
   useEffect(() => {
-    // Gestion récupération mot de passe
     supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === "PASSWORD_RECOVERY") {
         router.push('/reset-password');
       }
     });
-
-    // Script Plausible Analytics
     const script = document.createElement("script");
     script.defer = true;
     script.dataset.domain = "fenuasim.com";
@@ -28,17 +34,24 @@ export default function App({ Component, pageProps }: AppProps) {
 
   useEffect(() => {
     async function fetchMargin() {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('config')
         .select('value')
         .eq('key', 'global_margin')
         .single();
-      if (data && data.value) {
-        localStorage.setItem('global_margin', data.value);
-      }
+      if (data?.value) localStorage.setItem('global_margin', data.value);
     }
     fetchMargin();
   }, []);
+
+  // Pages avec getLayout (ex: admin) → pas de navbar/footer
+  if (Component.getLayout) {
+    return (
+      <CartProvider>
+        {Component.getLayout(<Component {...pageProps} />)}
+      </CartProvider>
+    );
+  }
 
   return (
     <CartProvider>

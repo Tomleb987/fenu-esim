@@ -587,6 +587,27 @@ export default function AdminDashboard() {
     router.push("/admin/login");
   };
 
+  const handleGenerateBordereau = async (period: string) => {
+    const res = await fetch("/api/admin/anset-bordereau", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ period }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      alert(`Erreur : ${err.error}`);
+      return;
+    }
+    // Téléchargement direct du PDF
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `bordereau-anset-${period}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleMarkAnsetPaid = async (period: string) => {
     if (!ansetRef.trim()) { alert("Saisis la référence de virement"); return; }
     setMarkingAnset(period);
@@ -891,13 +912,20 @@ export default function AdminDashboard() {
                               : <span className="inline-flex items-center gap-1 text-xs text-amber-600"><Clock size={11} />En attente</span>}
                           </td>
                           <td className="py-2.5 text-right">
-                            {s.status !== "paid" && (
+                            <div className="flex items-center justify-end gap-1.5">
                               <button
-                                onClick={() => setMarkingAnset(markingAnset === s.period ? null : s.period)}
-                                className="text-xs px-2 py-1 rounded-lg border border-green-200 text-green-700 hover:bg-green-50 transition-colors">
-                                Marquer payé
+                                onClick={() => handleGenerateBordereau(s.period)}
+                                className="text-xs px-2 py-1 rounded-lg border border-purple-200 text-purple-700 hover:bg-purple-50 transition-colors">
+                                PDF
                               </button>
-                            )}
+                              {s.status !== "paid" && (
+                                <button
+                                  onClick={() => setMarkingAnset(markingAnset === s.period ? null : s.period)}
+                                  className="text-xs px-2 py-1 rounded-lg border border-green-200 text-green-700 hover:bg-green-50 transition-colors">
+                                  Marquer payé
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}

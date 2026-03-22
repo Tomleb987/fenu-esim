@@ -170,17 +170,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(7);
-    doc.setTextColor(box.highlight ? ...[220, 200, 255] : ...GRAY);
+    if (box.highlight) doc.setTextColor(220, 200, 255);
+    else doc.setTextColor(...GRAY);
     doc.text(box.label.toUpperCase(), bx + 3, y + 5);
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
-    doc.setTextColor(box.highlight ? ...WHITE : ...DARK);
+    if (box.highlight) doc.setTextColor(...WHITE);
+    else doc.setTextColor(...DARK);
     doc.text(box.value, bx + 3, y + 12);
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(6.5);
-    doc.setTextColor(box.highlight ? ...[200, 180, 240] : ...GRAY);
+    if (box.highlight) doc.setTextColor(200, 180, 240);
+    else doc.setTextColor(...GRAY);
     doc.text(box.sub, bx + 3, y + 17);
   });
 

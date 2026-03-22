@@ -9,8 +9,8 @@ import { supabaseAdmin as supabase } from "@/lib/supabaseAdmin";
 
 const COMPANY = {
   legal:    "SAS FENUASIM",
-  address1: "58 rue MONCEAU",
-  address2: "75008 Paris",
+  address1: "58 rue Monceau",
+  address2: "75000 Paris",
   siret:    "943 713 875",
   email:    "contact@fenuasim.com",
 };

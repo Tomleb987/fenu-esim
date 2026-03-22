@@ -9,9 +9,10 @@ import { supabaseAdmin as supabase } from "@/lib/supabaseAdmin";
 
 const COMPANY = {
   legal:    "SAS FENUASIM",
-  address1: "XX Rue XXXX",
+  address1: "58 rue Monceau",
   address2: "75000 Paris",
-  siret:    "XXX XXX XXX XXXXX",
+  siret:    "943 713 875 ",
+  ruia :    " PF26 010",
   email:    "contact@fenuasim.com",
 };
 
@@ -50,7 +51,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const totalPremium    = contracts.reduce((s, c) => s + (c.premium_ava ?? 0), 0);
   const totalFees       = contracts.reduce((s, c) => s + (c.frais_distribution ?? 0), 0);
-  const totalToTransfer = contracts.reduce((s, c) => s + (c.amount_to_transfer ?? ((c.premium_ava ?? 0) - (c.frais_distribution ?? 0))), 0);
+  // Formule : (premium_ava - frais_distribution) × 0.90
+  // prime_nette = premium_ava - frais_distribution
+  // commission_fenua = prime_nette × 10%
+  // amount_to_transfer = prime_nette × 0.90
+  const calcTransfer = (c: any) => {
+    const primeNette = (c.premium_ava ?? 0) - (c.frais_distribution ?? 0);
+    return c.amount_to_transfer ?? (primeNette * 0.90);
+  };
+  const totalToTransfer = contracts.reduce((s, c) => s + calcTransfer(c), 0);
 
   const MONTH_FR = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
   const periodLabel = `${MONTH_FR[month - 1]} ${year}`;
@@ -208,7 +217,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const adhesion   = (c.adhesion_number ?? "-").slice(0, 18);
       const product    = (c.product_type ?? "-").slice(0, 18);
       const premium    = fmtEur(c.premium_ava ?? 0);
-      const toTransfer = fmtEur(c.amount_to_transfer ?? ((c.premium_ava ?? 0) - (c.frais_distribution ?? 0)));
+      const primeNette = (c.premium_ava ?? 0) - (c.frais_distribution ?? 0);
+      const toTransfer = fmtEur(c.amount_to_transfer ?? (primeNette * 0.90));
 
       doc.setFont("helvetica", "normal");
       doc.setFontSize(7);

@@ -229,8 +229,8 @@ export default function FenuaSimBox() {
           </div>
           <div className="bg-purple-50 rounded-xl px-6 py-4 text-sm text-purple-700 inline-block">
             {currency === "eur"
-              ? <span>💡 Exemple : 7 nuits à 4 personnes = <strong>70 € total</strong> soit <strong>17,50 € par personne</strong></span>
-              : <span>💡 Exemple : 7 nuits à 4 personnes = <strong>83 510 XPF total</strong> soit <strong>20 878 XPF par personne</strong></span>
+              ? <span>💡 Exemple : 7 nuits à 4 personnes = <strong>70 € de location</strong> soit <strong>17,50 € par personne</strong> (caution 100 € remboursée)</span>
+              : <span>💡 Exemple : 7 nuits à 4 personnes = <strong>8 351 XPF de location</strong> soit <strong>2 088 XPF par personne</strong> (caution 12 000 XPF remboursée)</span>
             }
           </div>
         </div>

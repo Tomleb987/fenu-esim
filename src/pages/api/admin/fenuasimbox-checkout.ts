@@ -211,7 +211,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           </div>
 
           <div style="margin-top:16px;padding:12px;background:#f0fdf4;border-radius:8px">
-            <p style="margin:0;font-size:12px;color:#666">Lien Stripe : <a href="${session.url}">${session.url}</a></p>
+            <div style="text-align:center;margin-top:12px"><a href="${session.url}" style="display:inline-block;background:linear-gradient(135deg,#A020F0,#FF7F11);color:white;padding:10px 24px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:13px;">💳 Ouvrir le lien de paiement</a></div>
           </div>
         </div>
       </div>

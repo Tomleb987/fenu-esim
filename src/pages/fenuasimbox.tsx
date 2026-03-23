@@ -18,6 +18,7 @@ export default function FenuaSimBox() {
   });
   const [status, setStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [currency, setCurrency] = useState<"eur" | "xpf">("eur");
 
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
 
@@ -190,11 +191,34 @@ export default function FenuaSimBox() {
         <div className="max-w-3xl mx-auto px-4 text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Tarifs transparents</h2>
           <p className="text-gray-500 text-sm mb-8">Partagez le coût à plusieurs et la connexion devient encore plus économique</p>
+          {/* Sélecteur de devise */}
+          <div className="flex justify-center gap-2 mb-8">
+            {(["eur", "xpf"] as const).map(c => (
+              <button key={c} onClick={() => setCurrency(c)}
+                className={"px-6 py-2 rounded-xl text-sm font-semibold border transition-all " + (currency === c ? "text-white border-transparent shadow-sm" : "text-gray-500 border-gray-200 bg-white hover:border-purple-200")}
+                style={currency === c ? { background: G } : {}}>
+                {c === "eur" ? "€ EUR" : "XPF"}
+              </button>
+            ))}
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             {[
-              { label: "Location", value: "10 €/jour", sub: "Quel que soit le nombre d'appareils" },
-              { label: "Caution", value: "12 000 XPF", sub: "≈ 100 € · Remboursée au retour" },
-              { label: "À 4 voyageurs", value: "2,50 €/j", sub: "Par personne en partageant" },
+              {
+                label: "Location",
+                value: currency === "eur" ? "10 €/jour" : "1 193 XPF/j",
+                sub: "Quel que soit le nombre d'appareils"
+              },
+              {
+                label: "Caution",
+                value: currency === "eur" ? "100 €" : "12 000 XPF",
+                sub: "Remboursée au retour en bon état"
+              },
+              {
+                label: "À 4 voyageurs",
+                value: currency === "eur" ? "2,50 €/j" : "298 XPF/j",
+                sub: "Par personne en partageant"
+              },
             ].map(t => (
               <div key={t.label} className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
                 <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">{t.label}</p>
@@ -204,7 +228,10 @@ export default function FenuaSimBox() {
             ))}
           </div>
           <div className="bg-purple-50 rounded-xl px-6 py-4 text-sm text-purple-700 inline-block">
-            💡 Exemple : 7 nuits à 4 personnes = <strong>70 € total</strong> soit <strong>17,50 € par personne</strong>
+            {currency === "eur"
+              ? <span>💡 Exemple : 7 nuits à 4 personnes = <strong>70 € total</strong> soit <strong>17,50 € par personne</strong></span>
+              : <span>💡 Exemple : 7 nuits à 4 personnes = <strong>83 510 XPF total</strong> soit <strong>20 878 XPF par personne</strong></span>
+            }
           </div>
         </div>
       </div>

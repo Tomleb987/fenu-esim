@@ -111,6 +111,20 @@ export default function AdminRouteurs() {
 
   const handleLogout = async () => { await supabase.auth.signOut(); router.push("/admin/login"); };
 
+  const handleGenerateContract = async (rental: Rental) => {
+    const res = await fetch("/api/admin/rental-contract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rentalId: rental.id }),
+    });
+    if (!res.ok) { alert("Erreur génération contrat"); return; }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "contrat-location-" + rental.id.slice(0, 8) + ".pdf"; a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleGenerateInvoice = async (rental: Rental) => {
     const res = await fetch("/api/admin/generate-invoice", {
       method: "POST",
@@ -213,7 +227,7 @@ export default function AdminRouteurs() {
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-purple-500 inline-block" /> En location ({activeRentals.length})
                   </p>
-                  <RentalTable rentals={activeRentals} onReturn={setShowReturn} onInvoice={handleGenerateInvoice} onLinkEsim={setShowLinkEsim} />
+                  <RentalTable rentals={activeRentals} onReturn={setShowReturn} onInvoice={handleGenerateInvoice} onContract={handleGenerateContract} onLinkEsim={setShowLinkEsim} />
                 </div>
               )}
 
@@ -223,7 +237,7 @@ export default function AdminRouteurs() {
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" /> À venir ({upcomingRentals.length})
                   </p>
-                  <RentalTable rentals={upcomingRentals} onReturn={setShowReturn} onInvoice={handleGenerateInvoice} onLinkEsim={setShowLinkEsim} />
+                  <RentalTable rentals={upcomingRentals} onReturn={setShowReturn} onInvoice={handleGenerateInvoice} onContract={handleGenerateContract} onLinkEsim={setShowLinkEsim} />
                 </div>
               )}
 
@@ -233,7 +247,7 @@ export default function AdminRouteurs() {
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-gray-300 inline-block" /> Terminées ({pastRentals.length})
                   </p>
-                  <RentalTable rentals={pastRentals} onReturn={setShowReturn} onInvoice={handleGenerateInvoice} onLinkEsim={setShowLinkEsim} />
+                  <RentalTable rentals={pastRentals} onReturn={setShowReturn} onInvoice={handleGenerateInvoice} onContract={handleGenerateContract} onLinkEsim={setShowLinkEsim} />
                 </div>
               )}
 
@@ -354,10 +368,11 @@ export default function AdminRouteurs() {
 }
 
 // ── Tableau locations ─────────────────────────────────────────
-function RentalTable({ rentals, onReturn, onInvoice, onLinkEsim }: {
+function RentalTable({ rentals, onReturn, onInvoice, onContract, onLinkEsim }: {
   rentals: Rental[];
   onReturn: (r: Rental) => void;
   onInvoice: (r: Rental) => void;
+  onContract: (r: Rental) => void;
   onLinkEsim: (r: Rental) => void;
 }) {
   return (

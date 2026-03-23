@@ -257,19 +257,55 @@ export default function AdminRouteurs() {
                 </button>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {routers.map(r => (
-                  <div key={r.id} className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-                    <div className="flex items-center justify-between mb-3">
-                      <p className="font-semibold text-gray-800">{r.model}</p>
-                      <Badge
-                        label={r.status === "available" ? "Disponible" : r.status === "rented" ? "En location" : "Maintenance"}
-                        color={r.status === "available" ? "green" : r.status === "rented" ? "blue" : "amber"}
-                      />
+                {routers.map(r => {
+                  const activeRental = rentals.find(rl => rl.router_id === r.id && (rl.status === "active" || rl.status === "upcoming"));
+                  return (
+                    <div key={r.id} className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="font-semibold text-gray-800">{r.model}</p>
+                        <Badge
+                          label={r.status === "available" ? "Disponible" : r.status === "rented" ? "En location" : "Maintenance"}
+                          color={r.status === "available" ? "green" : r.status === "rented" ? "blue" : "amber"}
+                        />
+                      </div>
+                      <p className="text-xs text-gray-400">S/N : {r.serial_number}</p>
+                      <p className="text-xs text-gray-400 mt-1">{fmtEur(r.rental_price_per_day)}/jour · Caution {fmtEur(r.deposit_amount)}</p>
+                      {r.status === "rented" && (
+                        <div className="mt-3 pt-3 border-t border-gray-100">
+                          {activeRental ? (
+                            <>
+                              <p className="text-xs font-medium text-gray-700">{activeRental.customer_name || activeRental.customer_email}</p>
+                              <p className="text-xs text-gray-400 mt-0.5">
+                                Retour prévu : {fmtDate(activeRental.rental_end)}
+                              </p>
+                              <p className="text-xs text-gray-400 mt-0.5">{activeRental.rental_days}j · {fmtEur(activeRental.rental_amount)}</p>
+                              <div className="flex gap-1.5 mt-2">
+                                <button onClick={() => setShowReturn(activeRental)}
+                                  className="text-xs px-2 py-1 rounded-lg border border-green-200 text-green-700 hover:bg-green-50">
+                                  Retour
+                                </button>
+                                <button onClick={() => handleGenerateInvoice(activeRental)}
+                                  className="text-xs px-2 py-1 rounded-lg border border-purple-200 text-purple-700 hover:bg-purple-50 flex items-center gap-1">
+                                  <Download size={10} /> Facture
+                                </button>
+                              </div>
+                            </>
+                          ) : (
+                            <button
+                              onClick={async () => {
+                                if (!confirm("Remettre ce routeur en disponible ?")) return;
+                                await supabase.from("routers").update({ status: "available" }).eq("id", r.id);
+                                load();
+                              }}
+                              className="mt-1 w-full text-xs px-2 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 flex items-center justify-center gap-1">
+                              ⏹ Stop location
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <p className="text-xs text-gray-400">S/N : {r.serial_number}</p>
-                    <p className="text-xs text-gray-400 mt-1">{fmtEur(r.rental_price_per_day)}/jour · Caution {fmtEur(r.deposit_amount)}</p>
-                  </div>
-                ))}
+                  );
+                })}
                 {routers.length === 0 && (
                   <p className="text-sm text-gray-400 col-span-full text-center py-8">Aucun routeur — ajoutes-en un</p>
                 )}
@@ -445,24 +481,19 @@ function NewRentalModal({ routers, onClose, onDone }: { routers: Router[]; onClo
 
       if (error) throw error;
 
-      // Créer lien de paiement Stripe
-      const stripeRes = await fetch("/api/create-payment-link", {
+      // Créer Stripe Checkout Session (loyer + caution)
+      const stripeRes = await fetch("/api/admin/router-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount: Math.round(totalWithDeposit * 100),
-          currency: "eur",
-          description: `Location routeur ${selectedRouter?.model} - ${days}j + caution 50€`,
-          customer_email: form.customer_email,
-          metadata: { rental_id: rental.id, type: "router_rental" },
-        }),
+        body: JSON.stringify({ action: "create_checkout", rentalId: rental.id }),
       });
 
       if (stripeRes.ok) {
         const { url } = await stripeRes.json();
         setStripeLink(url);
-        // Mettre à jour la location avec le lien Stripe
-        await supabase.from("router_rentals").update({ payment_status: "pending" }).eq("id", rental.id);
+      } else {
+        const err = await stripeRes.json();
+        alert(`Erreur Stripe : ${err.error}`);
       }
 
       // Mettre à jour le statut du routeur
@@ -560,16 +591,41 @@ function ReturnModal({ rental, onClose, onDone }: { rental: Rental; onClose: () 
         : depositAction === "retain_partial" ? parseFloat(retainAmount) || 0 : 0;
       const refunded = rental.deposit_amount - retained;
 
-      await supabase.from("router_rentals").update({
-        status: "completed",
-        actual_return: today(),
-        deposit_status: depositAction === "refund" ? "refunded" : depositAction === "retain_full" ? "fully_retained" : "partially_retained",
-        deposit_refunded_amount: refunded,
-        deposit_retained_amount: retained,
-        deposit_retention_reason: retainReason || null,
-        deposit_settled_at: new Date().toISOString(),
-      }).eq("id", rental.id);
+      // 1. Rembourser la caution via Stripe si paiement Stripe existant
+      if (rental.stripe_payment_intent && refunded > 0) {
+        const refundRes = await fetch("/api/admin/router-payment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "refund_deposit",
+            rentalId: rental.id,
+            amount: refunded,
+          }),
+        });
+        if (!refundRes.ok) {
+          const err = await refundRes.json();
+          const proceed = confirm(`Remboursement Stripe échoué : ${err.error}
 
+Continuer quand même et marquer manuellement ?`);
+          if (!proceed) { setSaving(false); return; }
+        }
+      }
+
+      // 2. Mettre à jour la location (si pas déjà mis à jour par router-payment)
+      if (!rental.stripe_payment_intent || retained >= 0) {
+        await supabase.from("router_rentals").update({
+          status: "completed",
+          actual_return: today(),
+          deposit_status: depositAction === "refund" ? "refunded"
+            : depositAction === "retain_full" ? "fully_retained" : "partially_retained",
+          deposit_refunded_amount: refunded,
+          deposit_retained_amount: retained,
+          deposit_retention_reason: retainReason || null,
+          deposit_settled_at: new Date().toISOString(),
+        }).eq("id", rental.id);
+      }
+
+      // 3. Remettre le routeur disponible
       await supabase.from("routers").update({ status: "available" }).eq("id", rental.router_id);
       onDone();
     } catch (err: any) {
@@ -584,6 +640,10 @@ function ReturnModal({ rental, onClose, onDone }: { rental: Rental; onClose: () 
       <div className="bg-gray-50 rounded-xl p-4 mb-4 text-sm">
         <p className="font-medium text-gray-700">{rental.customer_name} — {rental.routers?.model}</p>
         <p className="text-xs text-gray-400 mt-1">Caution détenue : {fmtEur(rental.deposit_amount)}</p>
+          {rental.stripe_payment_intent
+            ? <p className="text-xs text-green-600 mt-1">✓ Remboursement Stripe automatique</p>
+            : <p className="text-xs text-amber-600 mt-1">⚠ Pas de paiement Stripe — remboursement manuel</p>
+          }
       </div>
 
       <Field label="Caution">

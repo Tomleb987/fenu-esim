@@ -994,28 +994,74 @@ export default function AdminDashboard() {
             <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
               <p className="text-sm font-semibold text-gray-700 mb-4">Commissions partenaires</p>
               {loading ? <Spinner /> : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-xs text-gray-400 border-b border-gray-100">
-                      <th className="text-left pb-2 font-normal">Partenaire</th>
-                      <th className="text-right pb-2 font-normal">CA</th>
-                      <th className="text-right pb-2 font-normal">Commission</th>
-                      <th className="text-right pb-2 font-normal">Cmdes</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {partners.length === 0 ? (
-                      <tr><td colSpan={4} className="py-6 text-center text-xs text-gray-400">Aucun partenaire actif sur la période</td></tr>
-                    ) : partners.map(p => (
-                      <tr key={p.partner_code} className="border-b border-gray-50 last:border-0">
-                        <td className="py-2.5 font-medium text-gray-700">{p.partner_name}</td>
-                        <td className="py-2.5 text-right text-gray-600 tabular-nums">{fmtEur(p.total_sales)}</td>
-                        <td className="py-2.5 text-right font-semibold tabular-nums" style={{ color: C.esim }}>{fmtEur(p.total_commission)}</td>
-                        <td className="py-2.5 text-right text-gray-400">{p.orders_count}</td>
+                <>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-xs text-gray-400 border-b border-gray-100">
+                        <th className="text-left pb-2 font-normal">Partenaire</th>
+                        <th className="text-right pb-2 font-normal">CA</th>
+                        <th className="text-right pb-2 font-normal">Commission</th>
+                        <th className="text-right pb-2 font-normal">Cmdes</th>
+                        <th className="text-right pb-2 font-normal"></th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {partners.length === 0 ? (
+                        <tr><td colSpan={5} className="py-6 text-center text-xs text-gray-400">Aucun partenaire actif sur la période</td></tr>
+                      ) : partners.map(p => (
+                        <tr key={p.partner_code} className="border-b border-gray-50 last:border-0">
+                          <td className="py-2.5 font-medium text-gray-700">{p.partner_name}</td>
+                          <td className="py-2.5 text-right text-gray-600 tabular-nums">{fmtEur(p.total_sales)}</td>
+                          <td className="py-2.5 text-right font-semibold tabular-nums" style={{ color: C.esim }}>{fmtEur(p.total_commission)}</td>
+                          <td className="py-2.5 text-right text-gray-400">{p.orders_count}</td>
+                          <td className="py-2.5 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => handleGenerateCommissionPdf(p.partner_code, p.partner_name)}
+                                className="text-xs px-2 py-1 rounded-lg border border-purple-200 text-purple-700 hover:bg-purple-50 transition-colors">
+                                PDF
+                              </button>
+                              <button
+                                onClick={() => setMarkingCommission(markingCommission === p.partner_code ? null : p.partner_code)}
+                                className="text-xs px-2 py-1 rounded-lg border border-green-200 text-green-700 hover:bg-green-50 transition-colors">
+                                Marquer payé
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  {markingCommission && (
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                      <p className="text-xs font-medium text-gray-600 mb-2">
+                        Confirmer le paiement commission <strong>{partners.find(p => p.partner_code === markingCommission)?.partner_name}</strong>
+                      </p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <input
+                          type="text"
+                          placeholder="Référence virement (ex: VIR-20260301)"
+                          value={commissionRef}
+                          onChange={e => setCommissionRef(e.target.value)}
+                          className="flex-1 min-w-0 text-xs px-3 py-2 border border-gray-200 rounded-xl text-gray-700 bg-white"
+                        />
+                        <button
+                          onClick={() => handleMarkCommissionPaid(markingCommission)}
+                          disabled={!commissionRef.trim()}
+                          className="text-xs px-4 py-2 rounded-xl text-white font-medium disabled:opacity-50 hover:opacity-90"
+                          style={{ background: G }}>
+                          Confirmer ✓
+                        </button>
+                        <button
+                          onClick={() => { setMarkingCommission(null); setCommissionRef(""); }}
+                          className="text-xs px-3 py-2 rounded-xl border border-gray-200 text-gray-500 hover:text-gray-700">
+                          Annuler
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>

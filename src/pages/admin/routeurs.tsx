@@ -82,7 +82,8 @@ export default function AdminRouteurs() {
   const [showAddRouter, setShowAddRouter] = useState(false);
   const [showNewRental, setShowNewRental] = useState(false);
   const [showReturn, setShowReturn] = useState<Rental | null>(null);
-  const [showLinkEsim, setShowLinkEsim] = useState<Rental | null>(null);
+  const [showLinkEsim, setShowLinkEsim]   = useState<Rental | null>(null);
+  const [sendingContract, setSendingContract] = useState<string | null>(null);
 
   // Auth
   useEffect(() => {
@@ -110,6 +111,27 @@ export default function AdminRouteurs() {
   useEffect(() => { if (authChecked) load(); }, [authChecked, load]);
 
   const handleLogout = async () => { await supabase.auth.signOut(); router.push("/admin/login"); };
+
+  const handleSendContractLink = async (rental: Rental) => {
+    if (!rental.customer_email) { alert("Email client manquant"); return; }
+    if (!confirm("Envoyer le lien de signature à " + rental.customer_email + " ?")) return;
+    setSendingContract(rental.id);
+    try {
+      const res = await fetch("/api/admin/send-contract-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rentalId: rental.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      alert("✅ Lien de signature envoyé à " + rental.customer_email);
+      load();
+    } catch (err: any) {
+      alert("Erreur : " + err.message);
+    } finally {
+      setSendingContract(null);
+    }
+  };
 
   const handleGenerateContract = async (rental: Rental) => {
     const res = await fetch("/api/admin/rental-contract", {
@@ -227,7 +249,7 @@ export default function AdminRouteurs() {
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-purple-500 inline-block" /> En location ({activeRentals.length})
                   </p>
-                  <RentalTable rentals={activeRentals} onReturn={setShowReturn} onInvoice={handleGenerateInvoice} onContract={handleGenerateContract} onLinkEsim={setShowLinkEsim} />
+                  <RentalTable rentals={activeRentals} onReturn={setShowReturn} onInvoice={handleGenerateInvoice} onContract={handleGenerateContract} onYouSign={handleSendContractLink} onLinkEsim={setShowLinkEsim} />
                 </div>
               )}
 
@@ -237,7 +259,7 @@ export default function AdminRouteurs() {
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" /> À venir ({upcomingRentals.length})
                   </p>
-                  <RentalTable rentals={upcomingRentals} onReturn={setShowReturn} onInvoice={handleGenerateInvoice} onContract={handleGenerateContract} onLinkEsim={setShowLinkEsim} />
+                  <RentalTable rentals={upcomingRentals} onReturn={setShowReturn} onInvoice={handleGenerateInvoice} onContract={handleGenerateContract} onYouSign={handleSendContractLink} onLinkEsim={setShowLinkEsim} />
                 </div>
               )}
 
@@ -247,7 +269,7 @@ export default function AdminRouteurs() {
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-gray-300 inline-block" /> Terminées ({pastRentals.length})
                   </p>
-                  <RentalTable rentals={pastRentals} onReturn={setShowReturn} onInvoice={handleGenerateInvoice} onContract={handleGenerateContract} onLinkEsim={setShowLinkEsim} />
+                  <RentalTable rentals={pastRentals} onReturn={setShowReturn} onInvoice={handleGenerateInvoice} onContract={handleGenerateContract} onYouSign={handleSendContractLink} onLinkEsim={setShowLinkEsim} />
                 </div>
               )}
 
@@ -368,11 +390,12 @@ export default function AdminRouteurs() {
 }
 
 // ── Tableau locations ─────────────────────────────────────────
-function RentalTable({ rentals, onReturn, onInvoice, onContract, onLinkEsim }: {
+function RentalTable({ rentals, onReturn, onInvoice, onContract, onYouSign, onLinkEsim }: {
   rentals: Rental[];
   onReturn: (r: Rental) => void;
   onInvoice: (r: Rental) => void;
   onContract: (r: Rental) => void;
+  onYouSign: (r: Rental) => void;
   onLinkEsim: (r: Rental) => void;
 }) {
   return (

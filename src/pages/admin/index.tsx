@@ -9,7 +9,7 @@ import { useRouter } from "next/router";
 import Head from "next/head";
 import Image from "next/image";
 import {
-  TrendingUp, Shield, Users, Package, LogOut, ChevronRight,
+  TrendingUp, Shield, Users, Package, LogOut, ChevronRight, Wifi,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -49,12 +49,22 @@ const MODULES = [
   },
   {
     key: "routeurs",
-    title: "FENUASIM BOX",
+    title: "Stock routeurs",
     desc: "Gestion du stock de routeurs, locations en cours, retours et cautions",
     href: "/admin/routeurs",
     icon: Package,
     color: "#FF7F11",
     bg: "linear-gradient(135deg, #FF7F11 0%, #FF4D6D 100%)",
+    badge: null,
+  },
+  {
+    key: "fenuasimbox",
+    title: "Créer dossier BOX",
+    desc: "Générer un lien Stripe client : eSIM + location routeur + caution en un seul paiement",
+    href: "/admin/fenuasimbox",
+    icon: Wifi,
+    color: "#0284C7",
+    bg: "linear-gradient(135deg, #0284C7 0%, #0EA896 100%)",
     badge: null,
   },
 ];

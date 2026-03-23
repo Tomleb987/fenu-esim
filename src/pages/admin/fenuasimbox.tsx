@@ -27,7 +27,49 @@ interface Package {
   id: string; name: string; data_amount: string; data_unit: string;
   validity_days: number; validity: string; price_eur: number;
   final_price_eur: number; price_xpf: number; final_price_xpf: number;
-  region_fr: string; region: string; type: string;
+  region_fr: string; region: string; type: string; country: string;
+  operator_name: string; includes_voice: boolean; includes_sms: boolean;
+  flag_url: string;
+}
+
+// Même logique que le tunnel partenaire
+const REGION_TRANSLATIONS: Record<string, string> = {
+  "Discover Global": "Monde", Asia: "Asie", Europe: "Europe", Japan: "Japon",
+  "Canary Islands": "Iles Canaries", "South Korea": "Coree du Sud",
+  "Hong Kong": "Hong Kong", "United States": "Etats-Unis", Australia: "Australie",
+  "New Zealand": "Nouvelle-Zelande", Mexico: "Mexique", Fiji: "Fidji",
+  Thailand: "Thailande", Singapore: "Singapour", Malaysia: "Malaisie",
+  Indonesia: "Indonesie", Philippines: "Philippines", Vietnam: "Viet Nam",
+  India: "Inde", China: "Chine", Taiwan: "Taiwan", "United Kingdom": "Royaume-Uni",
+  Germany: "Allemagne", Spain: "Espagne", Italy: "Italie", Greece: "Grece",
+  Portugal: "Portugal", Netherlands: "Pays-Bas", Belgium: "Belgique",
+  Switzerland: "Suisse", France: "France", Canada: "Canada",
+  "French Polynesia": "Polynesie francaise", UAE: "Emirats arabes unis",
+  "Saudi Arabia": "Arabie saoudite", Israel: "Israel", Jordan: "Jordanie",
+  Qatar: "Qatar", Brazil: "Bresil", Argentina: "Argentine", Chile: "Chili",
+  Turkey: "Turquie", Egypt: "Egypte", Morocco: "Maroc",
+  "South Africa": "Afrique du Sud", Oceania: "Oceanie",
+  "North America": "Amerique du Nord",
+  "Middle East and North Africa": "Moyen-Orient et Afrique du Nord",
+};
+
+function getFrenchName(pkg: Package): string {
+  const raw = pkg.region || pkg.country || "";
+  if (pkg.region_fr && pkg.region_fr !== raw) return pkg.region_fr;
+  return REGION_TRANSLATIONS[raw] || raw || "-";
+}
+
+function getData(pkg: Package): string {
+  if (pkg.data_unit === "illimite" || pkg.data_unit === "unlimited") return "Illimite";
+  if (pkg.data_amount) return \`\${pkg.data_amount} \${pkg.data_unit || "Go"}\`;
+  return pkg.data_unit || "Illimite";
+}
+
+function getValidity(pkg: Package): string {
+  if (pkg.validity_days) return \`\${pkg.validity_days} jours\`;
+  const v = pkg.validity?.toString() || pkg.name;
+  const m = v.match(/(\d+)\s*jours?/i) || v.match(/(\d+)\s*days?/i);
+  return m ? \`\${m[1]} jours\` : "";
 }
 interface Router {
   id: string; model: string; serial_number: string;
@@ -51,6 +93,7 @@ export default function AdminFenuasimBox() {
   // Forfait eSIM
   const [search, setSearch] = useState("");
   const [selectedPkg, setSelectedPkg] = useState<Package | null>(null);
+  const [selectedRegion, setSelectedRegion] = useState("");
   const [currency, setCurrency] = useState<"eur" | "xpf">("eur");
 
   // Routeur
@@ -77,12 +120,24 @@ export default function AdminFenuasimBox() {
   // Chargement données
   useEffect(() => {
     if (!authChecked) return;
-    supabase.from("airalo_packages")
-      .select("id, name, data_amount, data_unit, validity_days, validity, price_eur, final_price_eur, price_xpf, final_price_xpf, region_fr, region, type")
-      .eq("type", "sim")
-      .order("region_fr", { ascending: true })
-      .limit(500)
-      .then(({ data }) => setPackages(data ?? []));
+    // Chargement paginé comme le tunnel partenaire
+    (async () => {
+      let allData: Package[] = [];
+      let from = 0;
+      const pageSize = 1000;
+      while (true) {
+        const { data, error } = await supabase
+          .from("airalo_packages")
+          .select("id, name, data_amount, data_unit, validity_days, validity, price_eur, final_price_eur, price_xpf, final_price_xpf, region_fr, region, type, country, operator_name, includes_voice, includes_sms, flag_url")
+          .eq("status", "active")
+          .range(from, from + pageSize - 1);
+        if (error || !data || data.length === 0) break;
+        allData = [...allData, ...data];
+        if (data.length < pageSize) break;
+        from += pageSize;
+      }
+      setPackages(allData);
+    })();
 
     supabase.from("routers")
       .select("*")
@@ -117,10 +172,34 @@ export default function AdminFenuasimBox() {
 
   const total = esimPrice + (withRouter ? rentalAmount + deposit : 0);
 
-  const filteredPackages = packages.filter(p =>
-    !search || p.name.toLowerCase().includes(search.toLowerCase()) ||
-    (p.region_fr || p.region || "").toLowerCase().includes(search.toLowerCase())
+  // Grouper par région comme le tunnel partenaire
+  const packagesByRegion = packages.reduce((acc, pkg) => {
+    const region = getFrenchName(pkg);
+    if (!acc[region]) acc[region] = [];
+    acc[region].push(pkg);
+    return acc;
+  }, {} as Record<string, Package[]>);
+
+  const allRegions = Object.keys(packagesByRegion).sort();
+
+  const filteredRegions = allRegions.filter(r =>
+    !search || r.toLowerCase().includes(search.toLowerCase())
   );
+
+  // Filtrer les packages de la région sélectionnée
+  const regionPackages = selectedRegion
+    ? (packagesByRegion[selectedRegion] || []).sort((a, b) => {
+        const pa = a.price_xpf || a.final_price_xpf || a.price_eur || 0;
+        const pb = b.price_xpf || b.final_price_xpf || b.price_eur || 0;
+        return pa - pb;
+      })
+    : [];
+
+  // Pour la recherche directe de forfait par nom
+  const filteredPackages = search && !selectedRegion
+    ? packages.filter(p => p.name.toLowerCase().includes(search.toLowerCase()) ||
+        getFrenchName(p).toLowerCase().includes(search.toLowerCase()))
+    : regionPackages;
 
   const handleSubmit = async () => {
     if (!firstName || !lastName || !email || !selectedPkg) {
@@ -306,37 +385,66 @@ export default function AdminFenuasimBox() {
                 <div className="mb-3 bg-purple-50 rounded-xl px-4 py-3 flex items-center justify-between">
                   <div>
                     <p className="text-sm font-semibold text-purple-800">{selectedPkg.name}</p>
-                    <p className="text-xs text-purple-500">{selectedPkg.data_amount}{selectedPkg.data_unit} · {selectedPkg.validity_days || selectedPkg.validity} jours</p>
+                    <p className="text-xs text-purple-500">{getData(selectedPkg)} · {getValidity(selectedPkg)}</p>
                   </div>
-                  <p className="font-bold text-purple-700">
-                    {currency === "xpf" ? fmtXpf(esimPrice) : fmtEur(esimPrice)}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-bold text-purple-700">
+                      {currency === "xpf" ? fmtXpf(esimPrice) : fmtEur(esimPrice)}
+                    </p>
+                    <button onClick={() => { setSelectedPkg(null); setSelectedRegion(""); }}
+                      className="text-xs text-gray-400 hover:text-red-500">✕</button>
+                  </div>
                 </div>
               )}
 
-              <div className="max-h-56 overflow-y-auto rounded-xl border border-gray-100 divide-y divide-gray-50">
-                {filteredPackages.slice(0, 50).map(p => {
-                  const price = currency === "xpf"
-                    ? (p.price_xpf || p.final_price_xpf || Math.round((p.price_eur || p.final_price_eur) * 119.33))
-                    : (p.price_eur || p.final_price_eur);
-                  const isSelected = selectedPkg?.id === p.id;
-                  return (
-                    <button key={p.id} onClick={() => setSelectedPkg(p)}
-                      className={`w-full text-left px-4 py-3 flex items-center justify-between transition-colors ${isSelected ? "bg-purple-50" : "hover:bg-gray-50"}`}>
-                      <div>
-                        <p className={`text-sm font-medium ${isSelected ? "text-purple-700" : "text-gray-700"}`}>{p.name}</p>
-                        <p className="text-xs text-gray-400">{p.region_fr || p.region} · {p.data_amount}{p.data_unit} · {p.validity_days || p.validity}j</p>
-                      </div>
-                      <p className={`text-sm font-semibold shrink-0 ml-4 ${isSelected ? "text-purple-700" : "text-gray-600"}`}>
-                        {currency === "xpf" ? fmtXpf(price) : fmtEur(price)}
-                      </p>
+              {!selectedRegion && !selectedPkg && (
+                <div className="max-h-56 overflow-y-auto rounded-xl border border-gray-100 divide-y divide-gray-50">
+                  {filteredRegions.length === 0 ? (
+                    <p className="text-xs text-gray-400 text-center py-6">Aucune destination trouvée</p>
+                  ) : filteredRegions.map(region => (
+                    <button key={region} onClick={() => { setSelectedRegion(region); setSearch(""); }}
+                      className="w-full text-left px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                      <p className="text-sm font-medium text-gray-700">{region}</p>
+                      <span className="text-xs text-gray-400">{packagesByRegion[region]?.length} forfaits →</span>
                     </button>
-                  );
-                })}
-                {filteredPackages.length === 0 && (
-                  <p className="text-xs text-gray-400 text-center py-6">Aucun forfait trouvé</p>
-                )}
-              </div>
+                  ))}
+                </div>
+              )}
+
+              {selectedRegion && !selectedPkg && (
+                <div>
+                  <button onClick={() => { setSelectedRegion(""); setSearch(""); }}
+                    className="flex items-center gap-1 text-xs text-purple-600 mb-2 hover:underline">
+                    ← {selectedRegion}
+                  </button>
+                  <div className="max-h-64 overflow-y-auto rounded-xl border border-gray-100 divide-y divide-gray-50">
+                    {regionPackages.map(p => {
+                      const price = currency === "xpf"
+                        ? (p.price_xpf || p.final_price_xpf || Math.round((p.price_eur || p.final_price_eur || 0) * 119.33))
+                        : (p.price_eur || p.final_price_eur || 0);
+                      return (
+                        <button key={p.id} onClick={() => setSelectedPkg(p)}
+                          className="w-full text-left px-4 py-3 hover:bg-purple-50 transition-colors">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-gray-700">{getData(p)}</p>
+                              <p className="text-xs text-gray-400">{getValidity(p)} · {p.operator_name}</p>
+                              <div className="flex gap-1 mt-1">
+                                <span className={`text-xs px-1.5 py-0.5 rounded-full ${p.includes_voice ? "bg-blue-50 text-blue-600" : "bg-gray-100 text-gray-400"}`}>
+                                  {p.includes_voice ? "Appels" : "Sans appels"}
+                                </span>
+                              </div>
+                            </div>
+                            <p className="text-sm font-bold text-purple-700 shrink-0 ml-4">
+                              {currency === "xpf" ? fmtXpf(price) : fmtEur(price)}
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* 4. Routeur */}

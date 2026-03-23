@@ -10,7 +10,7 @@ import Head from "next/head";
 import { supabase } from "@/lib/supabaseClient";
 import {
   Package, Wifi, ChevronLeft, LogOut, CheckCircle,
-  Search, Copy, ExternalLink, User, Calendar,
+  Search, Copy, ExternalLink, User, Calendar, Download,
 } from "lucide-react";
 
 const ADMIN_EMAIL = "admin@fenuasim.com";

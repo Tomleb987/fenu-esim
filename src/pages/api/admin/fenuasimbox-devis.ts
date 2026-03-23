@@ -27,9 +27,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (!devis) return res.status(400).json({ error: "Données manquantes" });
 
+  const fmtNum = (n: number): string => {
+    const s = Math.round(n).toString();
+    let result = "";
+    for (let i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 === 0) result += " ";
+      result += s[i];
+    }
+    return result;
+  };
   const fmtCurrency = (n: number) => {
-    if (devis.currency === "xpf") return `${new Intl.NumberFormat("fr-FR").format(Math.round(n))} XPF`;
-    return new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", minimumFractionDigits: 0 }).format(n);
+    if (devis.currency === "xpf") return fmtNum(n) + " XPF";
+    return fmtNum(n) + " EUR";
   };
 
   const fmtDate = (d: string) => d ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" }) : "-";
@@ -129,7 +138,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (devis.withRouter) {
       drawLine(
         "Location routeur " + devis.routerModel,
-        `${devis.rentalDays} nuit${devis.rentalDays > 1 ? "s" : ""} · ${fmtDate(devis.rentalStart)} → ${fmtDate(devis.rentalEnd)}`,
+        `${devis.rentalDays} nuit${devis.rentalDays > 1 ? "s" : ""} · ${fmtDate(devis.rentalStart)} - ${fmtDate(devis.rentalEnd)}`,
         fmtCurrency(devis.rentalAmount)
       );
       drawLine("Caution routeur", "Remboursée au retour en bon état", fmtCurrency(devis.deposit));
@@ -227,7 +236,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                   ${devis.withRouter ? `
                   <tr><td colspan="2" style="padding-top:12px;border-top:1px solid #eee;"></td></tr>
                   <tr><td style="padding:6px 0;color:#666;">Routeur ${devis.routerModel}</td><td style="text-align:right;font-weight:bold;color:#1a0533;">${devis.rentalDays} nuits</td></tr>
-                  <tr><td style="color:#666;font-size:12px;">${fmtDate(devis.rentalStart)} → ${fmtDate(devis.rentalEnd)}</td><td style="text-align:right;color:#A020F0;font-weight:bold;">${fmtCurrency(devis.rentalAmount)}</td></tr>
+                  <tr><td style="color:#666;font-size:12px;">${fmtDate(devis.rentalStart)} - ${fmtDate(devis.rentalEnd)}</td><td style="text-align:right;color:#A020F0;font-weight:bold;">${fmtCurrency(devis.rentalAmount)}</td></tr>
                   <tr><td style="padding:6px 0;color:#666;">Caution (remboursable)</td><td style="text-align:right;color:#666;">${fmtCurrency(devis.deposit)}</td></tr>
                   ` : ""}
                   <tr style="border-top:2px solid #A020F0;">

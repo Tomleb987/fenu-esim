@@ -648,12 +648,13 @@ export default function AdminDashboard() {
   };
 
   const handleGenerateCommissionPdf = async (partnerCode: string) => {
-    const blob = await fetch("/api/admin/bordereaux", {
+    const res = await fetch("/api/admin/commission-pdf", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "commissions", period: period.start.slice(0, 7), partner_code: partnerCode }),
-    }).then(r => r.blob()).catch(() => null);
-    if (!blob) { alert("Erreur PDF commission"); return; }
+      body: JSON.stringify({ partner_code: partnerCode, period: period.start.slice(0, 7) }),
+    });
+    if (!res.ok) { const err = await res.json().catch(() => ({})); alert("Erreur : " + (err.error || "PDF commission")); return; }
+    const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url; a.download = "commission-" + partnerCode + "-" + period.start.slice(0, 7) + ".pdf"; a.click();

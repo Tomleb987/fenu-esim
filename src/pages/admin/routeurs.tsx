@@ -318,7 +318,7 @@ export default function AdminRouteurs() {
       {/* Modal : Nouvelle location */}
       {showNewRental && (
         <NewRentalModal
-          routers={routers.filter(r => r.status === "available")}
+          routers={routers}
           onClose={() => setShowNewRental(false)}
           onDone={() => { setShowNewRental(false); load(); }}
         />
@@ -438,10 +438,11 @@ function RentalTable({ rentals, onReturn, onInvoice, onLinkEsim }: {
 
 // ── Modal : Nouvelle location ─────────────────────────────────
 function NewRentalModal({ routers, onClose, onDone }: { routers: Router[]; onClose: () => void; onDone: () => void }) {
+  const todayStr = today();
   const [form, setForm] = useState({
     router_id: routers[0]?.id ?? "",
     customer_email: "", customer_name: "", customer_phone: "",
-    rental_start: today(), rental_end: "", notes: "",
+    rental_start: todayStr, rental_end: "", notes: "",
   });
   const [saving, setSaving] = useState(false);
   const [stripeLink, setStripeLink] = useState("");
@@ -596,10 +597,12 @@ function NewRentalModal({ routers, onClose, onDone }: { routers: Router[]; onClo
           }} className={inputCls} />
         </Field>
         <Field label="Date fin *">
-          <input type="date" value={form.rental_end} min={form.rental_start} onChange={async e => {
-            set("rental_end", e.target.value);
-            if (form.rental_start && e.target.value) await checkAvailability(form.rental_start, e.target.value);
-          }} className={inputCls} />
+          <input type="date" value={form.rental_end}
+            min={form.rental_start || today()}
+            onChange={async e => {
+              set("rental_end", e.target.value);
+              if (form.rental_start && e.target.value) await checkAvailability(form.rental_start, e.target.value);
+            }} className={inputCls} />
         </Field>
       </div>
       <Field label="Email client *">

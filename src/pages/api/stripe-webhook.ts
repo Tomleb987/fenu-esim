@@ -332,6 +332,50 @@ export default async function handler(
         }
         console.log("New order saved to database successfully.");
 
+        // ── FENUASIMBOX : notifier hello@fenuasim.com avec l'eSIM
+        if (session.metadata?.origin === "fenuasimbox") {
+          try {
+            const nodemailer = require("nodemailer");
+            const transporter = nodemailer.createTransport({
+              host: "smtp-relay.brevo.com", port: 587, secure: false,
+              auth: { user: process.env.BREVO_SMTP_USER, pass: process.env.BREVO_SMTP_PASS },
+            });
+            const qrUrl = airaloOrderData.qr_code || airaloOrderData.order?.qr_code_url || "";
+            const iccid = airaloOrderData.sim_iccid || airaloOrderData.order?.sim_iccid || "";
+            await transporter.sendMail({
+              from: `"FENUA SIM" <hello@fenuasim.com>`,
+              to: "hello@fenuasim.com",
+              subject: `✅ FENUASIMBOX — eSIM prête pour ${session.metadata.firstName} ${session.metadata.lastName}`,
+              html: `
+                <div style="font-family:Arial;max-width:600px;">
+                  <div style="background:linear-gradient(135deg,#A020F0,#FF7F11);padding:20px;border-radius:12px 12px 0 0;">
+                    <h2 style="color:white;margin:0">✅ eSIM FENUASIMBOX — Paiement reçu</h2>
+                  </div>
+                  <div style="background:#f9f9f9;padding:24px;border-radius:0 0 12px 12px;border:1px solid #eee;">
+                    <h3 style="color:#1a0533">Client</h3>
+                    <p><strong>${session.metadata.firstName} ${session.metadata.lastName}</strong></p>
+                    <p style="color:#666">${customerEmail}${session.metadata.phone ? ` · ${session.metadata.phone}` : ""}</p>
+                    <h3 style="color:#1a0533;margin-top:16px">eSIM</h3>
+                    <p>${packageData.name} — ${packageData.data_amount}${packageData.data_unit}</p>
+                    <p style="color:#666">ICCID : <strong>${iccid}</strong></p>
+                    ${qrUrl ? `<p><img src="${qrUrl}" width="180" alt="QR Code eSIM" style="border-radius:8px" /></p>` : ""}
+                    ${session.metadata.router_id ? `
+                    <h3 style="color:#1a0533;margin-top:16px">Routeur</h3>
+                    <p>${session.metadata.rental_days} jours · ${session.metadata.rental_start} → ${session.metadata.rental_end}</p>
+                    ` : ""}
+                    <div style="margin-top:20px;padding:12px;background:#d1fae5;border-radius:8px;">
+                      <p style="margin:0;font-size:13px;color:#065f46">⬆️ Installe cette eSIM sur le routeur avant remise au client.</p>
+                    </div>
+                  </div>
+                </div>
+              `,
+            });
+            console.log("FENUASIMBOX notification email sent to hello@fenuasim.com");
+          } catch (emailErr) {
+            console.error("Failed to send FENUASIMBOX notification email:", emailErr);
+          }
+        }
+
         console.log(airaloOrderData);
         const { data: userEsims, error: userEsimsError } = await supabase
           .from("user_sims")

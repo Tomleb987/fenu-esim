@@ -109,7 +109,7 @@ export default function FenuaSimBox() {
               {
                 icon: Users,
                 title: "Vous partez en famille avec des enfants",
-                desc: "Connectez jusqu'à 10 appareils en même temps — tablettes, téléphones, consoles... Chaque membre de la famille reste connecté sans multiplier les abonnements.",
+                desc: "Connectez jusqu'à 8 appareils en même temps — tablettes, téléphones, consoles... Chaque membre de la famille reste connecté sans multiplier les abonnements.",
                 tag: "Famille & groupe",
                 color: "#FF7F11",
               },
@@ -144,10 +144,10 @@ export default function FenuaSimBox() {
           <h2 className="text-2xl font-bold text-center text-gray-900 mb-10">Ce que vous obtenez</h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
             {[
-              { icon: Wifi,    title: "Jusqu'à 10 appareils",  desc: "Connectés simultanément" },
-              { icon: Globe,   title: "Partout dans le monde", desc: "Polynésie & international" },
+              { icon: Wifi,    title: "Jusqu'à 8 appareils",   desc: "Connectés simultanément" },
+              { icon: Globe,   title: "Partout dans le monde", desc: "International" },
               { icon: Battery, title: "12h d'autonomie",       desc: "Batterie longue durée" },
-              { icon: Shield,  title: "Caution 50 €",          desc: "Remboursée au retour" },
+              { icon: Shield,  title: "Caution 12 000 XPF",    desc: "≈ 100 € · Remboursée au retour" },
             ].map(({ icon: Icon, title, desc }) => (
               <div key={title} className="bg-white rounded-2xl p-5 text-center shadow-sm border border-gray-100">
                 <div className="w-11 h-11 rounded-xl flex items-center justify-center mx-auto mb-3" style={{ background: G }}>
@@ -169,7 +169,7 @@ export default function FenuaSimBox() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             {[
               { label: "Location", value: "10 €/jour", sub: "Quel que soit le nombre d'appareils" },
-              { label: "Caution", value: "50 €", sub: "Intégralement remboursée au retour" },
+              { label: "Caution", value: "12 000 XPF", sub: "≈ 100 € · Remboursée au retour" },
               { label: "À 4 voyageurs", value: "2,50 €/j", sub: "Par personne en partageant" },
             ].map(t => (
               <div key={t.label} className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
@@ -246,7 +246,7 @@ export default function FenuaSimBox() {
                 {nights > 0 && (
                   <div className="bg-purple-50 rounded-xl px-4 py-3 mb-4 flex items-center justify-between">
                     <span className="text-sm text-purple-700 font-medium">{nights} nuit{nights > 1 ? "s" : ""}</span>
-                    <span className="font-bold text-purple-700">{nights * 10} € de location</span>
+                    <span className="text-xs text-purple-500">Un devis vous sera envoyé par email</span>
                   </div>
                 )}
 
@@ -263,7 +263,6 @@ export default function FenuaSimBox() {
                   {[1,2,3,4,5,6,7,8,9,10].map(n => (
                     <option key={n} value={n}>
                       {n} personne{n > 1 ? "s" : ""}
-                      {n >= 2 && nights > 0 ? ` — ${((nights * 10) / n).toFixed(2)} €/pers/nuit` : ""}
                     </option>
                   ))}
                 </select>
@@ -305,8 +304,8 @@ export default function FenuaSimBox() {
           <div className="space-y-4">
             {[
               { q: "Mon téléphone n'est pas compatible eSIM — la BOX fonctionne quand même ?", r: "Oui, c'est exactement pour ça qu'elle existe. La FENUASIM BOX fonctionne de manière totalement indépendante de votre téléphone. Elle crée un réseau WiFi auquel vous vous connectez comme à la maison." },
-              { q: "Combien d'appareils peut-on connecter simultanément ?", r: "Jusqu'à 10 appareils en même temps — téléphones, tablettes, ordinateurs, consoles... Idéal pour toute une famille ou équipe." },
-              { q: "Comment fonctionne la caution ?", r: "Une caution de 50 € est demandée à la remise du routeur. Elle est intégralement remboursée au retour en bon état, sans délai ni justification." },
+              { q: "Combien d'appareils peut-on connecter simultanément ?", r: "Jusqu'à 8 appareils en même temps — téléphones, tablettes, ordinateurs, consoles... Idéal pour toute une famille ou équipe." },
+              { q: "Comment fonctionne la caution ?", r: "Une caution de 12 000 XPF (≈ 100 €) est demandée à la remise du routeur. Elle est intégralement remboursée au retour en bon état, sans délai ni justification." },
               { q: "Peut-on utiliser la BOX à l'international ?", r: "Oui. Il suffit d'y insérer une eSIM FENUA SIM adaptée à votre destination. Nous pouvons vous conseiller sur le forfait le plus adapté." },
               { q: "Comment récupère-t-on le routeur ?", r: "Nous vous indiquons le point de remise dans notre email de confirmation. Une remise en main propre sur rendez-vous est également possible." },
             ].map(({ q, r }) => (

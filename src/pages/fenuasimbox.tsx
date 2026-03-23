@@ -1,346 +1,560 @@
 // ============================================================
-// FENUA SIM – Page FENUASIMBOX
-// src/pages/fenuasimbox.tsx
+// FENUA SIM – Tunnel admin FENUASIMBOX
+// src/pages/admin/fenuasimbox.tsx
 // ============================================================
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { ReactElement } from "react";
+import { useRouter } from "next/router";
 import Head from "next/head";
-import Image from "next/image";
-import { Wifi, Shield, Battery, Globe, CheckCircle, ArrowRight, Smartphone, Briefcase, Users, PiggyBank } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
+import {
+  Package, Wifi, ChevronLeft, LogOut, CheckCircle,
+  Search, Copy, ExternalLink, User, Calendar,
+} from "lucide-react";
 
+const ADMIN_EMAIL = "admin@fenuasim.com";
 const G = "linear-gradient(135deg, #A020F0 0%, #FF4D6D 50%, #FF7F11 100%)";
+const DEPOSIT_XPF = 12000;
+const DEPOSIT_EUR = 100;
 
-export default function FenuaSimBox() {
-  const [form, setForm] = useState({
-    firstName: "", lastName: "", email: "", phone: "",
-    arrivalDate: "", departureDate: "", destination: "",
-    travelers: "1", message: "",
-  });
-  const [status, setStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
-  const [errorMsg, setErrorMsg] = useState("");
+const fmtEur = (n: number) => new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", minimumFractionDigits: 0 }).format(n);
+const fmtXpf = (n: number) => `${new Intl.NumberFormat("fr-FR").format(Math.round(n))} XPF`;
+const inputCls = "w-full text-sm px-3 py-2.5 border border-gray-200 rounded-xl text-gray-800 bg-white focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-100";
+const labelCls = "block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide";
 
-  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+interface Package {
+  id: string; name: string; data_amount: string; data_unit: string;
+  validity_days: number; validity: string; price_eur: number;
+  final_price_eur: number; price_xpf: number; final_price_xpf: number;
+  region_fr: string; region: string; type: string; country: string;
+  operator_name: string; includes_voice: boolean; includes_sms: boolean;
+  flag_url: string;
+}
 
-  const nights = form.arrivalDate && form.departureDate
-    ? Math.max(0, Math.round((new Date(form.departureDate).getTime() - new Date(form.arrivalDate).getTime()) / 86400000))
+// Même logique que le tunnel partenaire
+const REGION_TRANSLATIONS: Record<string, string> = {
+  "Discover Global": "Monde", Asia: "Asie", Europe: "Europe", Japan: "Japon",
+  "Canary Islands": "Iles Canaries", "South Korea": "Coree du Sud",
+  "Hong Kong": "Hong Kong", "United States": "Etats-Unis", Australia: "Australie",
+  "New Zealand": "Nouvelle-Zelande", Mexico: "Mexique", Fiji: "Fidji",
+  Thailand: "Thailande", Singapore: "Singapour", Malaysia: "Malaisie",
+  Indonesia: "Indonesie", Philippines: "Philippines", Vietnam: "Viet Nam",
+  India: "Inde", China: "Chine", Taiwan: "Taiwan", "United Kingdom": "Royaume-Uni",
+  Germany: "Allemagne", Spain: "Espagne", Italy: "Italie", Greece: "Grece",
+  Portugal: "Portugal", Netherlands: "Pays-Bas", Belgium: "Belgique",
+  Switzerland: "Suisse", France: "France", Canada: "Canada",
+  "French Polynesia": "Polynesie francaise", UAE: "Emirats arabes unis",
+  "Saudi Arabia": "Arabie saoudite", Israel: "Israel", Jordan: "Jordanie",
+  Qatar: "Qatar", Brazil: "Bresil", Argentina: "Argentine", Chile: "Chili",
+  Turkey: "Turquie", Egypt: "Egypte", Morocco: "Maroc",
+  "South Africa": "Afrique du Sud", Oceania: "Oceanie",
+  "North America": "Amerique du Nord",
+  "Middle East and North Africa": "Moyen-Orient et Afrique du Nord",
+};
+
+function getFrenchName(pkg: Package): string {
+  const raw = pkg.region || pkg.country || "";
+  if (pkg.region_fr && pkg.region_fr !== raw) return pkg.region_fr;
+  return REGION_TRANSLATIONS[raw] || raw || "-";
+}
+
+function getData(pkg: Package): string {
+  if (pkg.data_unit === "illimite" || pkg.data_unit === "unlimited") return "Illimite";
+  if (pkg.data_amount) return `${pkg.data_amount} ${pkg.data_unit || "Go"}`;
+  return pkg.data_unit || "Illimite";
+}
+
+function getValidity(pkg: Package): string {
+  if (pkg.validity_days) return `${pkg.validity_days} jours`;
+  const v = pkg.validity?.toString() || pkg.name;
+  const m = v.match(/(\d+)\s*jours?/i) || v.match(/(\d+)\s*days?/i);
+  return m ? `${m[1]} jours` : "";
+}
+interface Router {
+  id: string; model: string; serial_number: string;
+  rental_price_per_day: number; status: string;
+}
+
+export default function AdminFenuasimBox() {
+  const router = useRouter();
+  const [authChecked, setAuthChecked] = useState(false);
+
+  // Données
+  const [packages, setPackages] = useState<Package[]>([]);
+  const [routers, setRouters] = useState<Router[]>([]);
+
+  // Formulaire client
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+
+  // Forfait eSIM
+  const [search, setSearch] = useState("");
+  const [selectedPkg, setSelectedPkg] = useState<Package | null>(null);
+  const [selectedRegion, setSelectedRegion] = useState("");
+  const [currency, setCurrency] = useState<"eur" | "xpf">("eur");
+
+  // Routeur
+  const [withRouter, setWithRouter] = useState(true);
+  const [selectedRouter, setSelectedRouter] = useState<Router | null>(null);
+  const [rentalStart, setRentalStart] = useState("");
+  const [rentalEnd, setRentalEnd] = useState("");
+
+  // Résultat
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<{ url: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState("");
+
+  // Auth
+  useEffect(() => {
+    if (!router.isReady) return;
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session || session.user?.email !== ADMIN_EMAIL) router.push("/admin/login");
+      else setAuthChecked(true);
+    });
+  }, [router.isReady]);
+
+  // Chargement données
+  useEffect(() => {
+    if (!authChecked) return;
+    // Chargement paginé comme le tunnel partenaire
+    (async () => {
+      let allData: Package[] = [];
+      let from = 0;
+      const pageSize = 1000;
+      while (true) {
+        const { data, error } = await supabase
+          .from("airalo_packages")
+          .select("id, name, data_amount, data_unit, validity_days, validity, price_eur, final_price_eur, price_xpf, final_price_xpf, region_fr, region, type, country, operator_name, includes_voice, includes_sms, flag_url")
+          .eq("status", "active")
+          .range(from, from + pageSize - 1);
+        if (error || !data || data.length === 0) break;
+        allData = [...allData, ...data];
+        if (data.length < pageSize) break;
+        from += pageSize;
+      }
+      setPackages(allData);
+    })();
+
+    supabase.from("routers")
+      .select("*")
+      .eq("status", "available")
+      .then(({ data }) => {
+        setRouters(data ?? []);
+        if (data?.[0]) setSelectedRouter(data[0]);
+      });
+  }, [authChecked]);
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  const rentalDays = rentalStart && rentalEnd
+    ? Math.max(1, Math.round((new Date(rentalEnd).getTime() - new Date(rentalStart).getTime()) / 86400000))
     : 0;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.firstName || !form.lastName || !form.email || !form.arrivalDate || !form.departureDate) {
-      setErrorMsg("Merci de remplir tous les champs obligatoires."); return;
+  const rentalAmount = selectedRouter && rentalDays > 0
+    ? currency === "xpf"
+      ? Math.round(selectedRouter.rental_price_per_day * 119.33 * rentalDays)
+      : selectedRouter.rental_price_per_day * rentalDays
+    : 0;
+
+  const esimPrice = selectedPkg
+    ? currency === "xpf"
+      ? (selectedPkg.price_xpf || selectedPkg.final_price_xpf || Math.round((selectedPkg.price_eur || selectedPkg.final_price_eur) * 119.33))
+      : (selectedPkg.price_eur || selectedPkg.final_price_eur)
+    : 0;
+
+  const deposit = withRouter && selectedRouter
+    ? currency === "xpf" ? DEPOSIT_XPF : DEPOSIT_EUR
+    : 0;
+
+  const total = esimPrice + (withRouter ? rentalAmount + deposit : 0);
+
+  // Grouper par région comme le tunnel partenaire
+  const packagesByRegion = packages.reduce((acc, pkg) => {
+    const region = getFrenchName(pkg);
+    if (!acc[region]) acc[region] = [];
+    acc[region].push(pkg);
+    return acc;
+  }, {} as Record<string, Package[]>);
+
+  const allRegions = Object.keys(packagesByRegion).sort();
+
+  const filteredRegions = allRegions.filter(r =>
+    !search || r.toLowerCase().includes(search.toLowerCase())
+  );
+
+  // Filtrer les packages de la région sélectionnée
+  const regionPackages = selectedRegion
+    ? (packagesByRegion[selectedRegion] || []).sort((a, b) => {
+        const pa = a.price_xpf || a.final_price_xpf || a.price_eur || 0;
+        const pb = b.price_xpf || b.final_price_xpf || b.price_eur || 0;
+        return pa - pb;
+      })
+    : [];
+
+  // Pour la recherche directe de forfait par nom
+  const filteredPackages = search && !selectedRegion
+    ? packages.filter(p => p.name.toLowerCase().includes(search.toLowerCase()) ||
+        getFrenchName(p).toLowerCase().includes(search.toLowerCase()))
+    : regionPackages;
+
+  const handleSubmit = async () => {
+    if (!firstName || !lastName || !email || !selectedPkg) {
+      setError("Remplis tous les champs obligatoires"); return;
     }
-    if (new Date(form.departureDate) <= new Date(form.arrivalDate)) {
-      setErrorMsg("La date de départ doit être après la date d'arrivée."); return;
+    if (withRouter && (!selectedRouter || !rentalStart || !rentalEnd)) {
+      setError("Sélectionne un routeur et des dates"); return;
     }
-    setStatus("sending"); setErrorMsg("");
+    setLoading(true); setError("");
     try {
-      const res = await fetch("/api/fenuasimbox-request", {
+      const res = await fetch("/api/admin/fenuasimbox-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          clientFirstName: firstName, clientLastName: lastName,
+          clientEmail: email, clientPhone: phone,
+          packageId: selectedPkg.id, currency,
+          routerId: withRouter ? selectedRouter?.id : null,
+          rentalStart: withRouter ? rentalStart : null,
+          rentalEnd: withRouter ? rentalEnd : null,
+          rentalDays: withRouter ? rentalDays : 0,
+          rentalAmount: withRouter ? rentalAmount : 0,
+        }),
       });
-      if (!res.ok) throw new Error();
-      setStatus("success");
-    } catch {
-      setStatus("error");
-      setErrorMsg("Une erreur est survenue. Réessaie ou contacte-nous directement.");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setResult(data);
+    } catch (err: any) {
+      setError(err.message ?? "Erreur");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const inputCls = "w-full text-sm px-4 py-3 border border-gray-200 rounded-xl text-gray-800 bg-white focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-100 transition-all";
-  const labelCls = "block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide";
+  const handleCopy = () => {
+    if (!result?.url) return;
+    navigator.clipboard.writeText(result.url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  if (!authChecked) return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="w-8 h-8 border-2 border-purple-200 border-t-purple-600 rounded-full animate-spin" />
+    </div>
+  );
+
+  // ── Écran succès
+  if (result) return (
+    <>
+      <Head><title>FENUASIMBOX — Lien créé</title></Head>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl p-10 max-w-lg w-full text-center shadow-sm border border-gray-100">
+          <CheckCircle size={52} className="text-green-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Lien de paiement créé ✅</h2>
+          <p className="text-sm text-gray-500 mb-6">
+            Un email de notification a été envoyé à <strong>hello@fenuasim.com</strong>.<br />
+            Envoie ce lien à <strong>{email}</strong>.
+          </p>
+
+          <div className="bg-gray-50 rounded-xl px-4 py-3 text-xs text-gray-600 break-all mb-4 text-left">
+            {result.url}
+          </div>
+
+          <div className="flex gap-2 justify-center mb-6">
+            <button onClick={handleCopy}
+              className="flex items-center gap-1.5 text-sm px-4 py-2.5 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50">
+              <Copy size={14} /> {copied ? "Copié !" : "Copier"}
+            </button>
+            <a href={result.url} target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-sm px-4 py-2.5 rounded-xl text-white font-medium hover:opacity-90"
+              style={{ background: G }}>
+              <ExternalLink size={14} /> Ouvrir
+            </a>
+          </div>
+
+          <button onClick={() => {
+            setResult(null); setFirstName(""); setLastName(""); setEmail(""); setPhone("");
+            setSelectedPkg(null); setSearch(""); setRentalStart(""); setRentalEnd("");
+          }} className="text-xs text-gray-400 hover:text-gray-600">
+            ← Créer un nouveau dossier
+          </button>
+        </div>
+      </div>
+    </>
+  );
 
   return (
     <>
-      <Head>
-        <title>FENUASIM BOX — Routeur WiFi de voyage | FENUA SIM</title>
-        <meta name="description" content="Pas de téléphone compatible eSIM ? En famille, en business ou petit budget ? Louez la FENUASIM BOX — routeur WiFi portable à partager. 10€/jour, caution 50€ remboursable." />
-        <link rel="canonical" href="https://www.fenuasim.com/fenuasimbox" />
-      </Head>
+      <Head><title>FENUASIMBOX — Admin FENUA SIM</title><meta name="robots" content="noindex" /></Head>
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-3xl mx-auto px-4 py-8">
 
-      {/* Hero */}
-      <div className="relative overflow-hidden" style={{ background: "linear-gradient(135deg, #1a0533 0%, #2d0a5e 60%, #1a0533 100%)" }}>
-        <div className="absolute inset-0 opacity-10" style={{
-          backgroundImage: "radial-gradient(circle at 15% 50%, #A020F0 0%, transparent 50%), radial-gradient(circle at 85% 20%, #FF7F11 0%, transparent 50%)"
-        }} />
-        <div className="relative max-w-5xl mx-auto px-4 py-16">
-          <div className="flex flex-col lg:flex-row items-center gap-10 lg:gap-16">
-
-            {/* Texte */}
-            <div className="flex-1 text-center lg:text-left">
-              <div className="inline-flex items-center gap-2 bg-white/10 text-white/80 text-xs px-4 py-2 rounded-full mb-6 backdrop-blur-sm">
-                <Wifi size={13} /> Routeur WiFi portable · Location
+          {/* Header */}
+          <div className="flex items-center justify-between mb-8 flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: G }}>
+                <Package size={19} className="text-white" />
               </div>
-              <h1 className="text-4xl sm:text-6xl font-bold text-white mb-4">
-                FENUASIM <span style={{ background: G, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>BOX</span>
-              </h1>
-              <p className="text-xl text-white/80 max-w-xl mb-4 font-medium">
-                Une seule connexion pour toute votre équipe, famille ou groupe.
-              </p>
-              <p className="text-base text-white/60 max-w-lg mb-10">
-                Téléphone non compatible eSIM ? Voyage en famille ? Petit budget à partager ?
-                La FENUASIM BOX est faite pour vous.
-              </p>
-              <a href="#formulaire"
-                className="inline-flex items-center gap-2 px-8 py-4 rounded-2xl text-white font-semibold text-base shadow-lg hover:opacity-90 transition-opacity"
-                style={{ background: G }}>
-                Faire une demande <ArrowRight size={18} />
+              <div>
+                <h1 className="text-lg font-bold text-gray-800">
+                  <span style={{ background: G, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>FENUASIM</span>
+                  <span className="text-gray-300 mx-1">·</span>
+                  <span className="text-gray-700">BOX</span>
+                </h1>
+                <p className="text-xs text-gray-400">Créer un dossier client</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <a href="/admin"
+                className="flex items-center gap-1 text-xs px-3 py-2 border border-gray-200 rounded-xl bg-white text-gray-500 hover:text-gray-800 shadow-sm">
+                <ChevronLeft size={12} /> Admin
               </a>
-            </div>
-
-            {/* Image */}
-            <div className="flex-1 flex justify-center lg:justify-end">
-              <div className="relative">
-                <div className="absolute inset-0 rounded-3xl opacity-30 blur-3xl" style={{ background: G }} />
-                <Image
-                  src="/images/fenuasimbox.png"
-                  alt="FENUASIM BOX — Routeur WiFi portable"
-                  width={420}
-                  height={480}
-                  className="relative z-10 drop-shadow-2xl"
-                  style={{ objectFit: "contain", maxHeight: 420 }}
-                  priority
-                />
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </div>
-
-      {/* 4 profils cibles */}
-      <div className="bg-white py-16">
-        <div className="max-w-5xl mx-auto px-4">
-          <h2 className="text-2xl font-bold text-center text-gray-900 mb-3">La FENUASIM BOX, c'est pour vous si…</h2>
-          <p className="text-center text-gray-500 text-sm mb-10">4 situations où la BOX est la meilleure solution</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            {[
-              {
-                icon: Smartphone,
-                title: "Votre téléphone n'est pas compatible eSIM",
-                desc: "Tous les appareils ne supportent pas encore l'eSIM — iPhone anciens, Android entrée de gamme, appareils photo, tablettes... La BOX vous connecte tous, sans exception.",
-                tag: "Compatibilité universelle",
-                color: "#A020F0",
-              },
-              {
-                icon: Briefcase,
-                title: "Vous voyagez pour le business",
-                desc: "Restez joignable en permanence, connectez votre ordinateur et votre téléphone simultanément. Idéal pour les déplacements professionnels en Polynésie et à l'international.",
-                tag: "Voyage business",
-                color: "#FF4D6D",
-              },
-              {
-                icon: Users,
-                title: "Vous partez en famille avec des enfants",
-                desc: "Connectez jusqu'à 8 appareils en même temps — tablettes, téléphones, consoles... Chaque membre de la famille reste connecté sans multiplier les abonnements.",
-                tag: "Famille & groupe",
-                color: "#FF7F11",
-              },
-              {
-                icon: PiggyBank,
-                title: "Vous cherchez à partager les frais",
-                desc: "Pourquoi payer une eSIM par personne ? Partagez une seule connexion entre 2, 3 ou 4 voyageurs et divisez le coût. La solution la plus économique pour voyager connecté.",
-                tag: "Petit budget",
-                color: "#0EA896",
-              },
-            ].map(({ icon: Icon, title, desc, tag, color }) => (
-              <div key={title} className="bg-gray-50 rounded-2xl p-6 border border-gray-100 flex gap-4">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{ background: color + "20" }}>
-                  <Icon size={22} style={{ color }} />
-                </div>
-                <div>
-                  <span className="inline-block text-xs font-semibold px-2 py-0.5 rounded-full mb-2" style={{ background: color + "15", color }}>
-                    {tag}
-                  </span>
-                  <h3 className="font-semibold text-gray-800 mb-2 text-sm leading-snug">{title}</h3>
-                  <p className="text-xs text-gray-500 leading-relaxed">{desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Caractéristiques */}
-      <div className="bg-gray-50 py-14">
-        <div className="max-w-5xl mx-auto px-4">
-          <h2 className="text-2xl font-bold text-center text-gray-900 mb-10">Ce que vous obtenez</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
-            {[
-              { icon: Wifi,    title: "Jusqu'à 8 appareils",   desc: "Connectés simultanément" },
-              { icon: Globe,   title: "Partout dans le monde", desc: "International" },
-              { icon: Battery, title: "12h d'autonomie",       desc: "Batterie longue durée" },
-              { icon: Shield,  title: "Caution 12 000 XPF",    desc: "≈ 100 € · Remboursée au retour" },
-            ].map(({ icon: Icon, title, desc }) => (
-              <div key={title} className="bg-white rounded-2xl p-5 text-center shadow-sm border border-gray-100">
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center mx-auto mb-3" style={{ background: G }}>
-                  <Icon size={20} className="text-white" />
-                </div>
-                <p className="font-semibold text-gray-800 text-sm mb-1">{title}</p>
-                <p className="text-xs text-gray-400">{desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Tarifs */}
-      <div className="bg-white py-14">
-        <div className="max-w-3xl mx-auto px-4 text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Tarifs transparents</h2>
-          <p className="text-gray-500 text-sm mb-8">Partagez le coût à plusieurs et la connexion devient encore plus économique</p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-            {[
-              { label: "Location", value: "10 €/jour", sub: "Quel que soit le nombre d'appareils" },
-              { label: "Caution", value: "12 000 XPF", sub: "≈ 100 € · Remboursée au retour" },
-              { label: "À 4 voyageurs", value: "2,50 €/j", sub: "Par personne en partageant" },
-            ].map(t => (
-              <div key={t.label} className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
-                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">{t.label}</p>
-                <p className="text-2xl font-bold mb-1" style={{ background: G, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{t.value}</p>
-                <p className="text-xs text-gray-400">{t.sub}</p>
-              </div>
-            ))}
-          </div>
-          <div className="bg-purple-50 rounded-xl px-6 py-4 text-sm text-purple-700 inline-block">
-            💡 Exemple : 7 nuits à 4 personnes = <strong>70 € total</strong> soit <strong>17,50 € par personne</strong>
-          </div>
-        </div>
-      </div>
-
-      {/* Formulaire */}
-      <div id="formulaire" className="bg-gray-50 py-16">
-        <div className="max-w-2xl mx-auto px-4">
-          <div className="text-center mb-10">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Faire une demande</h2>
-            <p className="text-gray-500 text-sm">Aucun paiement à ce stade — on vous répond sous 24h pour confirmer la disponibilité.</p>
-          </div>
-
-          {status === "success" ? (
-            <div className="bg-white rounded-2xl p-10 text-center shadow-sm border border-gray-100">
-              <CheckCircle size={48} className="text-green-500 mx-auto mb-4" />
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Demande envoyée ✅</h3>
-              <p className="text-gray-500 text-sm mb-6">
-                Merci <strong>{form.firstName}</strong> ! Nous avons bien reçu votre demande et vous répondrons sous 24h à <strong>{form.email}</strong>.
-              </p>
-              <button onClick={() => { setStatus("idle"); setForm({ firstName: "", lastName: "", email: "", phone: "", arrivalDate: "", departureDate: "", destination: "", travelers: "1", message: "" }); }}
-                className="text-sm px-6 py-3 rounded-xl text-white font-medium" style={{ background: G }}>
-                Nouvelle demande
+              <button onClick={async () => { await supabase.auth.signOut(); router.push("/admin/login"); }}
+                className="flex items-center gap-1.5 text-xs px-3 py-2 border border-gray-200 rounded-xl bg-white text-gray-400 hover:text-red-500 shadow-sm">
+                <LogOut size={12} /> Déconnexion
               </button>
             </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 space-y-5">
-              <div className="grid grid-cols-2 gap-4">
+          </div>
+
+          <div className="space-y-5">
+
+            {/* 1. Infos client */}
+            <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+              <div className="flex items-center gap-2 mb-5">
+                <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: G }}>
+                  <User size={13} className="text-white" />
+                </div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Client</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3 mb-3">
                 <div>
                   <label className={labelCls}>Prénom *</label>
-                  <input type="text" value={form.firstName} onChange={e => set("firstName", e.target.value)} className={inputCls} placeholder="Jean" required />
+                  <input value={firstName} onChange={e => setFirstName(e.target.value)} className={inputCls} placeholder="Jean" />
                 </div>
                 <div>
                   <label className={labelCls}>Nom *</label>
-                  <input type="text" value={form.lastName} onChange={e => set("lastName", e.target.value)} className={inputCls} placeholder="Dupont" required />
+                  <input value={lastName} onChange={e => setLastName(e.target.value)} className={inputCls} placeholder="Dupont" />
                 </div>
               </div>
-
-              <div>
-                <label className={labelCls}>Email *</label>
-                <input type="email" value={form.email} onChange={e => set("email", e.target.value)} className={inputCls} placeholder="jean.dupont@email.com" required />
-              </div>
-
-              <div>
-                <label className={labelCls}>Téléphone</label>
-                <input type="tel" value={form.phone} onChange={e => set("phone", e.target.value)} className={inputCls} placeholder="+689 XX XX XX XX" />
-              </div>
-
-              <div className="border-t border-gray-100 pt-5">
-                <p className="text-sm font-semibold text-gray-700 mb-4">Votre séjour</p>
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <label className={labelCls}>Date d'arrivée *</label>
-                    <input type="date" value={form.arrivalDate} onChange={e => set("arrivalDate", e.target.value)}
-                      min={new Date().toISOString().slice(0, 10)} className={inputCls} required />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Date de départ *</label>
-                    <input type="date" value={form.departureDate} onChange={e => set("departureDate", e.target.value)}
-                      min={form.arrivalDate || new Date().toISOString().slice(0, 10)} className={inputCls} required />
-                  </div>
-                </div>
-
-                {nights > 0 && (
-                  <div className="bg-purple-50 rounded-xl px-4 py-3 mb-4 flex items-center justify-between">
-                    <span className="text-sm text-purple-700 font-medium">{nights} nuit{nights > 1 ? "s" : ""}</span>
-                    <span className="text-xs text-purple-500">Un devis vous sera envoyé par email</span>
-                  </div>
-                )}
-
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelCls}>Destination</label>
-                  <input type="text" value={form.destination} onChange={e => set("destination", e.target.value)}
-                    className={inputCls} placeholder="Ex : Bora Bora, Moorea, Japon, Europe..." />
+                  <label className={labelCls}>Email *</label>
+                  <input type="email" value={email} onChange={e => setEmail(e.target.value)} className={inputCls} placeholder="jean@email.com" />
+                </div>
+                <div>
+                  <label className={labelCls}>Téléphone</label>
+                  <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} className={inputCls} placeholder="+689..." />
                 </div>
               </div>
+            </div>
 
-              <div>
-                <label className={labelCls}>Nombre de voyageurs</label>
-                <select value={form.travelers} onChange={e => set("travelers", e.target.value)} className={inputCls}>
-                  {[1,2,3,4,5,6,7,8,9,10].map(n => (
-                    <option key={n} value={n}>
-                      {n} personne{n > 1 ? "s" : ""}
-                    </option>
-                  ))}
-                </select>
+            {/* 2. Devise */}
+            <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3">Devise</p>
+              <div className="flex gap-2">
+                {(["eur", "xpf"] as const).map(c => (
+                  <button key={c} onClick={() => setCurrency(c)}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-all ${currency === c ? "text-white border-transparent" : "text-gray-500 border-gray-200 bg-white hover:border-purple-200"}`}
+                    style={currency === c ? { background: G } : {}}>
+                    {c.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 3. Forfait eSIM */}
+            <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+              <div className="flex items-center gap-2 mb-5">
+                <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: G }}>
+                  <Wifi size={13} className="text-white" />
+                </div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Forfait eSIM *</p>
               </div>
 
-              <div>
-                <label className={labelCls}>Message (optionnel)</label>
-                <textarea value={form.message} onChange={e => set("message", e.target.value)}
-                  className={inputCls} rows={3}
-                  placeholder="Questions particulières, téléphone non compatible, besoins spécifiques..." />
+              <div className="relative mb-3">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input value={search} onChange={e => setSearch(e.target.value)}
+                  className={`${inputCls} pl-9`} placeholder="Rechercher par nom ou destination..." />
               </div>
 
-              {errorMsg && (
-                <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">{errorMsg}</div>
+              {selectedPkg && (
+                <div className="mb-3 bg-purple-50 rounded-xl px-4 py-3 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-purple-800">{selectedPkg.name}</p>
+                    <p className="text-xs text-purple-500">{getData(selectedPkg)} · {getValidity(selectedPkg)}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <p className="font-bold text-purple-700">
+                      {currency === "xpf" ? fmtXpf(esimPrice) : fmtEur(esimPrice)}
+                    </p>
+                    <button onClick={() => { setSelectedPkg(null); setSelectedRegion(""); }}
+                      className="text-xs text-gray-400 hover:text-red-500">✕</button>
+                  </div>
+                </div>
               )}
 
-              <button type="submit" disabled={status === "sending"}
-                className="w-full py-4 rounded-xl text-white font-semibold text-base shadow-sm hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
-                style={{ background: G }}>
-                {status === "sending" ? (
-                  <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Envoi en cours…</>
-                ) : (
-                  <>Envoyer ma demande <ArrowRight size={18} /></>
-                )}
-              </button>
+              {!selectedRegion && !selectedPkg && (
+                <div className="max-h-56 overflow-y-auto rounded-xl border border-gray-100 divide-y divide-gray-50">
+                  {filteredRegions.length === 0 ? (
+                    <p className="text-xs text-gray-400 text-center py-6">Aucune destination trouvée</p>
+                  ) : filteredRegions.map(region => (
+                    <button key={region} onClick={() => { setSelectedRegion(region); setSearch(""); }}
+                      className="w-full text-left px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                      <p className="text-sm font-medium text-gray-700">{region}</p>
+                      <span className="text-xs text-gray-400">{packagesByRegion[region]?.length} forfaits →</span>
+                    </button>
+                  ))}
+                </div>
+              )}
 
-              <p className="text-xs text-gray-400 text-center">
-                Aucun paiement requis · Réponse sous 24h · Disponibilité confirmée par email
-              </p>
-            </form>
-          )}
-        </div>
-      </div>
+              {selectedRegion && !selectedPkg && (
+                <div>
+                  <button onClick={() => { setSelectedRegion(""); setSearch(""); }}
+                    className="flex items-center gap-1 text-xs text-purple-600 mb-2 hover:underline">
+                    ← {selectedRegion}
+                  </button>
+                  <div className="max-h-64 overflow-y-auto rounded-xl border border-gray-100 divide-y divide-gray-50">
+                    {regionPackages.map(p => {
+                      const price = currency === "xpf"
+                        ? (p.price_xpf || p.final_price_xpf || Math.round((p.price_eur || p.final_price_eur || 0) * 119.33))
+                        : (p.price_eur || p.final_price_eur || 0);
+                      return (
+                        <button key={p.id} onClick={() => setSelectedPkg(p)}
+                          className="w-full text-left px-4 py-3 hover:bg-purple-50 transition-colors">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-gray-700">{getData(p)}</p>
+                              <p className="text-xs text-gray-400">{getValidity(p)} · {p.operator_name}</p>
+                              <div className="flex gap-1 mt-1">
+                                <span className={`text-xs px-1.5 py-0.5 rounded-full ${p.includes_voice ? "bg-blue-50 text-blue-600" : "bg-gray-100 text-gray-400"}`}>
+                                  {p.includes_voice ? "Appels" : "Sans appels"}
+                                </span>
+                              </div>
+                            </div>
+                            <p className="text-sm font-bold text-purple-700 shrink-0 ml-4">
+                              {currency === "xpf" ? fmtXpf(price) : fmtEur(price)}
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
 
-      {/* FAQ */}
-      <div className="bg-white py-12">
-        <div className="max-w-2xl mx-auto px-4">
-          <h2 className="text-xl font-bold text-gray-900 mb-6 text-center">Questions fréquentes</h2>
-          <div className="space-y-4">
-            {[
-              { q: "Mon téléphone n'est pas compatible eSIM — la BOX fonctionne quand même ?", r: "Oui, c'est exactement pour ça qu'elle existe. La FENUASIM BOX fonctionne de manière totalement indépendante de votre téléphone. Elle crée un réseau WiFi auquel vous vous connectez comme à la maison." },
-              { q: "Combien d'appareils peut-on connecter simultanément ?", r: "Jusqu'à 8 appareils en même temps — téléphones, tablettes, ordinateurs, consoles... Idéal pour toute une famille ou équipe." },
-              { q: "Comment fonctionne la caution ?", r: "Une caution de 12 000 XPF (≈ 100 €) est demandée à la remise du routeur. Elle est intégralement remboursée au retour en bon état, sans délai ni justification." },
-              { q: "Peut-on utiliser la BOX à l'international ?", r: "Oui. Il suffit d'y insérer une eSIM FENUA SIM adaptée à votre destination. Nous pouvons vous conseiller sur le forfait le plus adapté." },
-              { q: "Comment récupère-t-on le routeur ?", r: "Nous vous indiquons le point de remise dans notre email de confirmation. Une remise en main propre sur rendez-vous est également possible." },
-            ].map(({ q, r }) => (
-              <div key={q} className="bg-gray-50 rounded-xl p-5 border border-gray-100">
-                <p className="font-semibold text-gray-800 mb-2 text-sm">{q}</p>
-                <p className="text-gray-500 text-sm leading-relaxed">{r}</p>
+            {/* 4. Routeur */}
+            <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: G }}>
+                    <Package size={13} className="text-white" />
+                  </div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Routeur FENUASIMBOX</p>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={withRouter} onChange={e => setWithRouter(e.target.checked)} className="rounded" />
+                  <span className="text-xs text-gray-500">Inclure</span>
+                </label>
               </div>
-            ))}
+
+              {withRouter && (
+                <div className="space-y-3">
+                  <div>
+                    <label className={labelCls}>Routeur</label>
+                    <select value={selectedRouter?.id || ""} onChange={e => setSelectedRouter(routers.find(r => r.id === e.target.value) || null)} className={inputCls}>
+                      {routers.length === 0
+                        ? <option value="">Aucun routeur disponible</option>
+                        : routers.map(r => <option key={r.id} value={r.id}>{r.model} — S/N {r.serial_number}</option>)
+                      }
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded-lg flex items-center justify-center shrink-0" style={{ background: G }}>
+                      <Calendar size={9} className="text-white" />
+                    </div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Dates de location</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelCls}>Arrivée</label>
+                      <input type="date" value={rentalStart} min={today} onChange={e => setRentalStart(e.target.value)} className={inputCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Départ</label>
+                      <input type="date" value={rentalEnd} min={rentalStart || today} onChange={e => setRentalEnd(e.target.value)} className={inputCls} />
+                    </div>
+                  </div>
+                  {rentalDays > 0 && selectedRouter && (
+                    <div className="bg-orange-50 rounded-xl px-4 py-3 space-y-1">
+                      <div className="flex justify-between text-xs text-gray-500">
+                        <span>Location ({rentalDays}j × {currency === "xpf" ? fmtXpf(selectedRouter.rental_price_per_day * 119.33) : fmtEur(selectedRouter.rental_price_per_day)})</span>
+                        <span className="font-medium text-gray-700">{currency === "xpf" ? fmtXpf(rentalAmount) : fmtEur(rentalAmount)}</span>
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-500">
+                        <span>Caution (remboursable)</span>
+                        <span className="font-medium text-gray-700">{currency === "xpf" ? fmtXpf(DEPOSIT_XPF) : fmtEur(DEPOSIT_EUR)}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Récap total */}
+            {selectedPkg && (
+              <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-4">Récapitulatif</p>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">eSIM — {selectedPkg.name}</span>
+                    <span className="font-medium">{currency === "xpf" ? fmtXpf(esimPrice) : fmtEur(esimPrice)}</span>
+                  </div>
+                  {withRouter && rentalDays > 0 && (
+                    <>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Location routeur ({rentalDays}j)</span>
+                        <span className="font-medium">{currency === "xpf" ? fmtXpf(rentalAmount) : fmtEur(rentalAmount)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Caution (remboursable)</span>
+                        <span className="font-medium">{currency === "xpf" ? fmtXpf(DEPOSIT_XPF) : fmtEur(DEPOSIT_EUR)}</span>
+                      </div>
+                    </>
+                  )}
+                  <div className="flex justify-between font-bold text-base pt-2 border-t border-gray-100">
+                    <span>Total</span>
+                    <span style={{ color: "#A020F0" }}>{currency === "xpf" ? fmtXpf(total) : fmtEur(total)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">⚠️ {error}</div>
+            )}
+
+            <button onClick={handleSubmit} disabled={loading || !selectedPkg || !firstName || !email}
+              className="w-full py-4 rounded-2xl text-white font-bold text-base disabled:opacity-50 hover:opacity-90 transition-opacity flex items-center justify-center gap-2 shadow-lg"
+              style={{ background: G }}>
+              {loading
+                ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Création du lien…</>
+                : "Générer le lien de paiement →"
+              }
+            </button>
+
+            <p className="text-xs text-gray-400 text-center pb-8">
+              Un email de notification sera envoyé à hello@fenuasim.com · L'eSIM sera commandée automatiquement via Airalo à la réception du paiement
+            </p>
           </div>
         </div>
       </div>
     </>
   );
 }
+
+AdminFenuasimBox.getLayout = (page: ReactElement) => page;

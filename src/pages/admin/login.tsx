@@ -18,7 +18,7 @@ export default function AdminLogin() {
   useEffect(() => {
     if (!router.isReady) return;
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user?.email === ADMIN_EMAIL) router.push("/admin/assurance");
+      if (session?.user?.email === ADMIN_EMAIL) router.push("/admin");
     });
   }, [router.isReady]);
 
@@ -37,7 +37,7 @@ export default function AdminLogin() {
         setError("Ce compte n'a pas acces a l'espace admin.");
         return;
       }
-      await router.push("/admin/assurance");
+      await router.push("/admin");
     } catch (err) {
       setError("Une erreur inattendue est survenue.");
     } finally {

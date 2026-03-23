@@ -574,8 +574,10 @@ export default function AdminDashboard() {
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
   const [showCustom, setShowCustom] = useState(false);
-  const [markingAnset, setMarkingAnset] = useState<string | null>(null);
-  const [ansetRef, setAnsetRef] = useState("");
+  const [markingAnset, setMarkingAnset]           = useState<string | null>(null);
+  const [ansetRef, setAnsetRef]                   = useState("");
+  const [markingCommission, setMarkingCommission] = useState<string | null>(null);
+  const [commissionRef, setCommissionRef]         = useState("");
 
   const period = showCustom && customStart && customEnd
     ? { start: customStart, end: customEnd }
@@ -627,6 +629,34 @@ export default function AdminDashboard() {
     a.href = url;
     a.download = `bordereau-anset-${period}.pdf`;
     a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleMarkCommissionPaid = async (partnerCode: string) => {
+    if (!commissionRef.trim()) { alert("Saisis la référence de virement"); return; }
+    setMarkingCommission(partnerCode);
+    try {
+      const res = await fetch("/api/admin/bordereaux", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "mark_commission_paid", partner_code: partnerCode, period: period.start.slice(0, 7), reference: commissionRef.trim() }),
+      });
+      const data = await res.json();
+      if (data.success) { alert("Commission " + partnerCode + " marquee payee"); setCommissionRef(""); reload(); }
+      else alert("Erreur : " + (data.error || "inconnue"));
+    } finally { setMarkingCommission(null); }
+  };
+
+  const handleGenerateCommissionPdf = async (partnerCode: string) => {
+    const blob = await fetch("/api/admin/bordereaux", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "commissions", period: period.start.slice(0, 7), partner_code: partnerCode }),
+    }).then(r => r.blob()).catch(() => null);
+    if (!blob) { alert("Erreur PDF commission"); return; }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "commission-" + partnerCode + "-" + period.start.slice(0, 7) + ".pdf"; a.click();
     URL.revokeObjectURL(url);
   };
 

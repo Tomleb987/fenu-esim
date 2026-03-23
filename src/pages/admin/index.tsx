@@ -41,7 +41,7 @@ const MODULES = [
     key: "partenaires",
     title: "Partenaires",
     desc: "Accès au tunnel de vente partenaires, génération de liens eSIM et assurance",
-    href: "/admin/partenaires",
+    href: "/partner/login",
     icon: Users,
     color: "#0EA896",
     bg: "linear-gradient(135deg, #0EA896 0%, #0284C7 100%)",

@@ -198,7 +198,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
           ${router ? `
           <h3 style="color:#1a0533;margin:16px 0 8px">Routeur</h3>
-          <p style="margin:4px 0">${router.model} · ${rentalDays} jours (${rentalStart} → ${rentalEnd})</p>
+          <p style="margin:4px 0">${router.model} - ${rentalDays} nuit${rentalDays > 1 ? "s" : ""} (${new Date(rentalStart).toLocaleDateString("fr-FR")} au ${new Date(rentalEnd).toLocaleDateString("fr-FR")})</p>
           ` : ""}
 
           <h3 style="color:#1a0533;margin:16px 0 8px">Total</h3>
@@ -211,7 +211,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           </div>
 
           <div style="margin-top:16px;padding:12px;background:#f0fdf4;border-radius:8px">
-            <div style="text-align:center;margin-top:12px"><a href="${session.url}" style="display:inline-block;background:linear-gradient(135deg,#A020F0,#FF7F11);color:white;padding:10px 24px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:13px;">💳 Ouvrir le lien de paiement</a></div>
+            <table cellpadding="0" cellspacing="0" border="0" style="margin:12px auto 0;">
+              <tr><td style="background:#A020F0;border-radius:8px;padding:0;">
+                <a href="${session.url}" style="display:block;padding:12px 28px;color:white;text-decoration:none;font-weight:bold;font-size:14px;font-family:Arial,sans-serif;">
+                  Ouvrir le lien de paiement
+                </a>
+              </td></tr>
+            </table>
           </div>
         </div>
       </div>

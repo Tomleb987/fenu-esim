@@ -99,7 +99,7 @@ export default function AdminRouteurs() {
     const [routersRes, rentalsRes] = await Promise.all([
       supabase.from("routers").select("*").order("model"),
       supabase.from("router_rentals")
-        .select("*, routers(model, serial_number), orders(package_name, airalo_order_id)")
+        .select("*, routers(model, serial_number)")
         .order("created_at", { ascending: false })
         .limit(50),
     ]);
@@ -443,7 +443,7 @@ function RentalTable({ rentals, onReturn, onInvoice, onContract, onYouSign, onLi
                 {r.order_id ? (
                   <div className="flex items-center justify-end gap-1 text-xs text-purple-600">
                     <Wifi size={11} />
-                    <span>{r.orders?.package_name?.slice(0, 12) || "eSIM liée"}</span>
+                    <span>{(r as any).esim_package_name || "eSIM liée"}</span>
                   </div>
                 ) : (
                   <button onClick={() => onLinkEsim(r)}

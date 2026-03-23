@@ -155,6 +155,8 @@ export default function AdminFenuasimBox() {
 
   const today = new Date().toISOString().slice(0, 10);
 
+  const todayStr = new Date().toISOString().slice(0, 10);
+
   const rentalDays = rentalStart && rentalEnd
     ? Math.max(1, Math.round((new Date(rentalEnd).getTime() - new Date(rentalStart).getTime()) / 86400000))
     : 0;

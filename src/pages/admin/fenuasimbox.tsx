@@ -9,7 +9,7 @@ import { useRouter } from "next/router";
 import Head from "next/head";
 import { supabase } from "@/lib/supabaseClient";
 import {
-  Package as PackageIcon, Wifi, ChevronLeft, LogOut, CheckCircle,
+  Package, Wifi, ChevronLeft, LogOut, CheckCircle,
   Search, Copy, ExternalLink, User, Calendar,
 } from "lucide-react";
 
@@ -24,34 +24,15 @@ const inputCls = "w-full text-sm px-3 py-2.5 border border-gray-200 rounded-xl t
 const labelCls = "block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide";
 
 interface Package {
-  id: string; 
-  name: string; 
-  data_amount: string; 
-  data_unit: string;
-  validity_days: number; 
-  validity: string; 
-  price_eur: number;
-  final_price_eur: number; 
-  price_xpf: number; 
-  final_price_xpf: number;
-  region_fr: string; 
-  region: string; 
-  type: string; 
-  country: string;
-  operator_name: string; 
-  includes_voice: boolean; 
-  includes_sms: boolean;
+  id: string; name: string; data_amount: string; data_unit: string;
+  validity_days: number; validity: string; price_eur: number;
+  final_price_eur: number; price_xpf: number; final_price_xpf: number;
+  region_fr: string; region: string; type: string; country: string;
+  operator_name: string; includes_voice: boolean; includes_sms: boolean;
   flag_url: string;
 }
 
-interface Router {
-  id: string; 
-  model: string; 
-  serial_number: string;
-  rental_price_per_day: number; 
-  status: string;
-}
-
+// Même logique que le tunnel partenaire
 const REGION_TRANSLATIONS: Record<string, string> = {
   "Discover Global": "Monde", Asia: "Asie", Europe: "Europe", Japan: "Japon",
   "Canary Islands": "Iles Canaries", "South Korea": "Coree du Sud",
@@ -78,18 +59,21 @@ function getFrenchName(pkg: Package): string {
   return REGION_TRANSLATIONS[raw] || raw || "-";
 }
 
-// CORRECTION ICI : Utilisation de la concaténation simple pour éviter l'erreur de build
 function getData(pkg: Package): string {
   if (pkg.data_unit === "illimite" || pkg.data_unit === "unlimited") return "Illimite";
-  if (pkg.data_amount) return pkg.data_amount + " " + (pkg.data_unit || "Go");
+  if (pkg.data_amount) return `${pkg.data_amount} ${pkg.data_unit || "Go"}`;
   return pkg.data_unit || "Illimite";
 }
 
 function getValidity(pkg: Package): string {
-  if (pkg.validity_days) return pkg.validity_days + " jours";
+  if (pkg.validity_days) return `${pkg.validity_days} jours`;
   const v = pkg.validity?.toString() || pkg.name;
   const m = v.match(/(\d+)\s*jours?/i) || v.match(/(\d+)\s*days?/i);
-  return m ? m[1] + " jours" : "";
+  return m ? `${m[1]} jours` : "";
+}
+interface Router {
+  id: string; model: string; serial_number: string;
+  rental_price_per_day: number; status: string;
 }
 
 export default function AdminFenuasimBox() {
@@ -136,6 +120,7 @@ export default function AdminFenuasimBox() {
   // Chargement données
   useEffect(() => {
     if (!authChecked) return;
+    // Chargement paginé comme le tunnel partenaire
     (async () => {
       let allData: Package[] = [];
       let from = 0;
@@ -187,6 +172,7 @@ export default function AdminFenuasimBox() {
 
   const total = esimPrice + (withRouter ? rentalAmount + deposit : 0);
 
+  // Grouper par région comme le tunnel partenaire
   const packagesByRegion = packages.reduce((acc, pkg) => {
     const region = getFrenchName(pkg);
     if (!acc[region]) acc[region] = [];
@@ -195,8 +181,12 @@ export default function AdminFenuasimBox() {
   }, {} as Record<string, Package[]>);
 
   const allRegions = Object.keys(packagesByRegion).sort();
-  const filteredRegions = allRegions.filter(r => !search || r.toLowerCase().includes(search.toLowerCase()));
 
+  const filteredRegions = allRegions.filter(r =>
+    !search || r.toLowerCase().includes(search.toLowerCase())
+  );
+
+  // Filtrer les packages de la région sélectionnée
   const regionPackages = selectedRegion
     ? (packagesByRegion[selectedRegion] || []).sort((a, b) => {
         const pa = a.price_xpf || a.final_price_xpf || a.price_eur || 0;
@@ -204,6 +194,12 @@ export default function AdminFenuasimBox() {
         return pa - pb;
       })
     : [];
+
+  // Pour la recherche directe de forfait par nom
+  const filteredPackages = search && !selectedRegion
+    ? packages.filter(p => p.name.toLowerCase().includes(search.toLowerCase()) ||
+        getFrenchName(p).toLowerCase().includes(search.toLowerCase()))
+    : regionPackages;
 
   const handleSubmit = async () => {
     if (!firstName || !lastName || !email || !selectedPkg) {
@@ -238,6 +234,55 @@ export default function AdminFenuasimBox() {
     }
   };
 
+  const buildDevis = () => ({
+    firstName, lastName, email, phone,
+    packageName: selectedPkg?.name ?? "",
+    packageData: selectedPkg ? getData(selectedPkg) : "",
+    packageValidity: selectedPkg ? getValidity(selectedPkg) : "",
+    currency,
+    esimPrice,
+    withRouter,
+    routerModel: selectedRouter?.model ?? "",
+    rentalStart, rentalEnd, rentalDays,
+    rentalAmount,
+    deposit,
+    total,
+    paymentUrl: result?.url ?? "",
+  });
+
+  const handleDownloadPdf = async () => {
+    setDownloadingPdf(true);
+    try {
+      const res = await fetch("/api/admin/fenuasimbox-devis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "pdf", devis: buildDevis() }),
+      });
+      if (!res.ok) throw new Error("Erreur PDF");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = "devis-fenuasimbox.pdf"; a.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) { alert("Erreur : " + err.message); }
+    finally { setDownloadingPdf(false); }
+  };
+
+  const handleSendEmail = async () => {
+    setSendingEmail(true);
+    try {
+      const res = await fetch("/api/admin/fenuasimbox-devis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "email", devis: buildDevis() }),
+      });
+      if (!res.ok) throw new Error("Erreur email");
+      setEmailSent(true);
+      setTimeout(() => setEmailSent(false), 3000);
+    } catch (err: any) { alert("Erreur : " + err.message); }
+    finally { setSendingEmail(false); }
+  };
+
   const handleCopy = () => {
     if (!result?.url) return;
     navigator.clipboard.writeText(result.url);
@@ -251,24 +296,28 @@ export default function AdminFenuasimBox() {
     </div>
   );
 
+  // ── Écran succès
   if (result) return (
     <>
       <Head><title>FENUASIMBOX — Lien créé</title></Head>
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl p-10 max-w-lg w-full text-center shadow-sm border border-gray-100">
+        <div className="bg-white rounded-2xl p-8 max-w-lg w-full text-center shadow-sm border border-gray-100">
           <CheckCircle size={52} className="text-green-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-gray-900 mb-2">Lien de paiement créé ✅</h2>
-          <p className="text-sm text-gray-500 mb-6">
-            Un email de notification a été envoyé à <strong>hello@fenuasim.com</strong>.<br />
+          <p className="text-sm text-gray-500 mb-4">
+            Notification envoyée à <strong>hello@fenuasim.com</strong>.<br />
             Envoie ce lien à <strong>{email}</strong>.
           </p>
-          <div className="bg-gray-50 rounded-xl px-4 py-3 text-xs text-gray-600 break-all mb-4 text-left">
+
+          <div className="bg-gray-50 rounded-xl px-4 py-3 text-xs text-gray-600 break-all mb-5 text-left">
             {result.url}
           </div>
-          <div className="flex gap-2 justify-center mb-6">
+
+          {/* Actions lien */}
+          <div className="flex gap-2 justify-center mb-5">
             <button onClick={handleCopy}
               className="flex items-center gap-1.5 text-sm px-4 py-2.5 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50">
-              <Copy size={14} /> {copied ? "Copié !" : "Copier"}
+              <Copy size={14} /> {copied ? "Copié !" : "Copier le lien"}
             </button>
             <a href={result.url} target="_blank" rel="noopener noreferrer"
               className="flex items-center gap-1.5 text-sm px-4 py-2.5 rounded-xl text-white font-medium hover:opacity-90"
@@ -276,9 +325,34 @@ export default function AdminFenuasimBox() {
               <ExternalLink size={14} /> Ouvrir
             </a>
           </div>
+
+          {/* Devis */}
+          <div className="border-t border-gray-100 my-4" />
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">Devis client</p>
+          <div className="flex gap-2 justify-center mb-6">
+            <button onClick={handleDownloadPdf} disabled={downloadingPdf}
+              className="flex items-center gap-1.5 text-sm px-4 py-2.5 border border-purple-200 rounded-xl text-purple-700 hover:bg-purple-50 disabled:opacity-50 transition-colors">
+              {downloadingPdf
+                ? <><div className="w-3.5 h-3.5 border-2 border-purple-200 border-t-purple-600 rounded-full animate-spin" /> Génération…</>
+                : <><Download size={13} /> Télécharger PDF</>
+              }
+            </button>
+            <button onClick={handleSendEmail} disabled={sendingEmail || emailSent}
+              className="flex items-center gap-1.5 text-sm px-4 py-2.5 rounded-xl text-white font-medium disabled:opacity-70 hover:opacity-90 transition-all"
+              style={{ background: emailSent ? "#16a34a" : G }}>
+              {emailSent
+                ? "✓ Email envoyé !"
+                : sendingEmail
+                ? <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Envoi…</>
+                : "📧 Envoyer au client"
+              }
+            </button>
+          </div>
+
           <button onClick={() => {
             setResult(null); setFirstName(""); setLastName(""); setEmail(""); setPhone("");
-            setSelectedPkg(null); setSearch(""); setRentalStart(""); setRentalEnd("");
+            setSelectedPkg(null); setSearch(""); setSelectedRegion(""); setRentalStart(""); setRentalEnd("");
+            setEmailSent(false);
           }} className="text-xs text-gray-400 hover:text-gray-600">
             ← Créer un nouveau dossier
           </button>
@@ -292,10 +366,12 @@ export default function AdminFenuasimBox() {
       <Head><title>FENUASIMBOX — Admin FENUA SIM</title><meta name="robots" content="noindex" /></Head>
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-3xl mx-auto px-4 py-8">
+
+          {/* Header */}
           <div className="flex items-center justify-between mb-8 flex-wrap gap-3">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: G }}>
-                <PackageIcon size={19} className="text-white" />
+                <Package size={19} className="text-white" />
               </div>
               <div>
                 <h1 className="text-lg font-bold text-gray-800">
@@ -307,7 +383,8 @@ export default function AdminFenuasimBox() {
               </div>
             </div>
             <div className="flex gap-2">
-              <a href="/admin" className="flex items-center gap-1 text-xs px-3 py-2 border border-gray-200 rounded-xl bg-white text-gray-500 hover:text-gray-800 shadow-sm">
+              <a href="/admin"
+                className="flex items-center gap-1 text-xs px-3 py-2 border border-gray-200 rounded-xl bg-white text-gray-500 hover:text-gray-800 shadow-sm">
                 <ChevronLeft size={12} /> Admin
               </a>
               <button onClick={async () => { await supabase.auth.signOut(); router.push("/admin/login"); }}
@@ -318,6 +395,8 @@ export default function AdminFenuasimBox() {
           </div>
 
           <div className="space-y-5">
+
+            {/* 1. Infos client */}
             <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
               <div className="flex items-center gap-2 mb-5">
                 <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: G }}>
@@ -347,6 +426,7 @@ export default function AdminFenuasimBox() {
               </div>
             </div>
 
+            {/* 2. Devise */}
             <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3">Devise</p>
               <div className="flex gap-2">
@@ -360,6 +440,7 @@ export default function AdminFenuasimBox() {
               </div>
             </div>
 
+            {/* 3. Forfait eSIM */}
             <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
               <div className="flex items-center gap-2 mb-5">
                 <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: G }}>
@@ -367,9 +448,11 @@ export default function AdminFenuasimBox() {
                 </div>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Forfait eSIM *</p>
               </div>
+
               <div className="relative mb-3">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input value={search} onChange={e => setSearch(e.target.value)} className={`${inputCls} pl-9`} placeholder="Rechercher par nom ou destination..." />
+                <input value={search} onChange={e => setSearch(e.target.value)}
+                  className={`${inputCls} pl-9`} placeholder="Rechercher par nom ou destination..." />
               </div>
 
               {selectedPkg && (
@@ -379,8 +462,11 @@ export default function AdminFenuasimBox() {
                     <p className="text-xs text-purple-500">{getData(selectedPkg)} · {getValidity(selectedPkg)}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <p className="font-bold text-purple-700">{currency === "xpf" ? fmtXpf(esimPrice) : fmtEur(esimPrice)}</p>
-                    <button onClick={() => { setSelectedPkg(null); setSelectedRegion(""); }} className="text-xs text-gray-400 hover:text-red-500">✕</button>
+                    <p className="font-bold text-purple-700">
+                      {currency === "xpf" ? fmtXpf(esimPrice) : fmtEur(esimPrice)}
+                    </p>
+                    <button onClick={() => { setSelectedPkg(null); setSelectedRegion(""); }}
+                      className="text-xs text-gray-400 hover:text-red-500">✕</button>
                   </div>
                 </div>
               )}
@@ -401,7 +487,8 @@ export default function AdminFenuasimBox() {
 
               {selectedRegion && !selectedPkg && (
                 <div>
-                  <button onClick={() => { setSelectedRegion(""); setSearch(""); }} className="flex items-center gap-1 text-xs text-purple-600 mb-2 hover:underline">
+                  <button onClick={() => { setSelectedRegion(""); setSearch(""); }}
+                    className="flex items-center gap-1 text-xs text-purple-600 mb-2 hover:underline">
                     ← {selectedRegion}
                   </button>
                   <div className="max-h-64 overflow-y-auto rounded-xl border border-gray-100 divide-y divide-gray-50">
@@ -410,7 +497,8 @@ export default function AdminFenuasimBox() {
                         ? (p.price_xpf || p.final_price_xpf || Math.round((p.price_eur || p.final_price_eur || 0) * 119.33))
                         : (p.price_eur || p.final_price_eur || 0);
                       return (
-                        <button key={p.id} onClick={() => setSelectedPkg(p)} className="w-full text-left px-4 py-3 hover:bg-purple-50 transition-colors">
+                        <button key={p.id} onClick={() => setSelectedPkg(p)}
+                          className="w-full text-left px-4 py-3 hover:bg-purple-50 transition-colors">
                           <div className="flex items-center justify-between">
                             <div>
                               <p className="text-sm font-medium text-gray-700">{getData(p)}</p>
@@ -421,7 +509,9 @@ export default function AdminFenuasimBox() {
                                 </span>
                               </div>
                             </div>
-                            <p className="text-sm font-bold text-purple-700 shrink-0 ml-4">{currency === "xpf" ? fmtXpf(price) : fmtEur(price)}</p>
+                            <p className="text-sm font-bold text-purple-700 shrink-0 ml-4">
+                              {currency === "xpf" ? fmtXpf(price) : fmtEur(price)}
+                            </p>
                           </div>
                         </button>
                       );
@@ -431,11 +521,12 @@ export default function AdminFenuasimBox() {
               )}
             </div>
 
+            {/* 4. Routeur */}
             <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
               <div className="flex items-center justify-between mb-5">
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: G }}>
-                    <PackageIcon size={13} className="text-white" />
+                    <Package size={13} className="text-white" />
                   </div>
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Routeur FENUASIMBOX</p>
                 </div>
@@ -488,6 +579,7 @@ export default function AdminFenuasimBox() {
               )}
             </div>
 
+            {/* Récap total */}
             {selectedPkg && (
               <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-4">Récapitulatif</p>
@@ -516,13 +608,19 @@ export default function AdminFenuasimBox() {
               </div>
             )}
 
-            {error && <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">⚠️ {error}</div>}
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">⚠️ {error}</div>
+            )}
 
             <button onClick={handleSubmit} disabled={loading || !selectedPkg || !firstName || !email}
               className="w-full py-4 rounded-2xl text-white font-bold text-base disabled:opacity-50 hover:opacity-90 transition-opacity flex items-center justify-center gap-2 shadow-lg"
               style={{ background: G }}>
-              {loading ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Création du lien…</> : "Générer le lien de paiement →"}
+              {loading
+                ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Création du lien…</>
+                : "Générer le lien de paiement →"
+              }
             </button>
+
             <p className="text-xs text-gray-400 text-center pb-8">
               Un email de notification sera envoyé à hello@fenuasim.com · L'eSIM sera commandée automatiquement via Airalo à la réception du paiement
             </p>

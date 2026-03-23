@@ -104,9 +104,12 @@ export default function AdminFenuasimBox() {
 
   // Résultat
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<{ url: string } | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [error, setError] = useState("");
+  const [result, setResult]             = useState<{ url: string } | null>(null);
+  const [copied, setCopied]             = useState(false);
+  const [error, setError]               = useState("");
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [sendingEmail, setSendingEmail]     = useState(false);
+  const [emailSent, setEmailSent]           = useState(false);
 
   // Auth
   useEffect(() => {

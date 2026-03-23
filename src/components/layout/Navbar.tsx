@@ -70,6 +70,13 @@ export default function Navbar() {
           <li><Link href="/" className="nav-link">Accueil</Link></li>
           <li><Link href="/shop" className="nav-link">Nos eSIM</Link></li>
           <li><Link href="/assurance" className="nav-link">Assurance</Link></li>
+          <li>
+            <Link href="/fenuasimbox" className={`nav-link font-semibold ${pathname === '/fenuasimbox' ? 'text-purple-600' : ''}`}>
+              <span style={{ background: 'linear-gradient(135deg, #A020F0, #FF7F11)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                FENUABOX
+              </span>
+            </Link>
+          </li>
           <li><Link href="/blog" className="nav-link">Blog</Link></li>
           <li><Link href="/compatibilite" className="nav-link">Compatibilité</Link></li>
           <li><Link href="/faq" className="nav-link">FAQ</Link></li>
@@ -152,6 +159,11 @@ export default function Navbar() {
           <Link href="/" onClick={() => setMenuOpen(false)}>Accueil</Link>
           <Link href="/shop" onClick={() => setMenuOpen(false)}>Nos eSIM</Link>
           <Link href="/assurance" onClick={() => setMenuOpen(false)}>Assurance</Link>
+          <Link href="/fenuasimbox" onClick={() => setMenuOpen(false)}>
+            <span style={{ background: 'linear-gradient(135deg, #A020F0, #FF7F11)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontWeight: '700' }}>
+              FENUABOX
+            </span>
+          </Link>
           <Link href="/blog" onClick={() => setMenuOpen(false)}>Blog</Link>
           <Link href="/compatibilite" onClick={() => setMenuOpen(false)}>Compatibilité</Link>
           <Link href="/faq" onClick={() => setMenuOpen(false)}>FAQ</Link>

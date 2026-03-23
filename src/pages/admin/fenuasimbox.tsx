@@ -105,6 +105,8 @@ export default function AdminFenuasimBox() {
   // Résultat
   const [loading, setLoading] = useState(false);
   const [result, setResult]             = useState<{ url: string } | null>(null);
+  const [checking, setChecking]         = useState(false);
+  const [routerAvail, setRouterAvail]   = useState<Record<string, { available: boolean; next_available: string | null }>>({});
   const [copied, setCopied]             = useState(false);
   const [error, setError]               = useState("");
   const [downloadingPdf, setDownloadingPdf] = useState(false);
@@ -203,6 +205,28 @@ export default function AdminFenuasimBox() {
     ? packages.filter(p => p.name.toLowerCase().includes(search.toLowerCase()) ||
         getFrenchName(p).toLowerCase().includes(search.toLowerCase()))
     : regionPackages;
+
+  const checkRouterAvailability = async (start: string, end: string) => {
+    if (!start || !end) return;
+    setChecking(true);
+    try {
+      const res = await fetch("/api/admin/router-availability", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ start, end }),
+      });
+      const data = await res.json();
+      const map: Record<string, { available: boolean; next_available: string | null }> = {};
+      (data.routers ?? []).forEach((r: any) => { map[r.id] = { available: r.available, next_available: r.next_available }; });
+      setRouterAvail(map);
+      // Auto-sélectionner le premier disponible
+      if (selectedRtr && map[selectedRtr.id] && !map[selectedRtr.id].available) {
+        const first = (data.available ?? [])[0];
+        if (first) setSelectedRtr(routers.find(r => r.id === first.id) || null);
+      }
+    } catch {}
+    setChecking(false);
+  };
 
   const handleSubmit = async () => {
     if (!firstName || !lastName || !email || !selectedPkg) {
@@ -541,15 +565,6 @@ export default function AdminFenuasimBox() {
 
               {withRouter && (
                 <div className="space-y-3">
-                  <div>
-                    <label className={labelCls}>Routeur</label>
-                    <select value={selectedRouter?.id || ""} onChange={e => setSelectedRouter(routers.find(r => r.id === e.target.value) || null)} className={inputCls}>
-                      {routers.length === 0
-                        ? <option value="">Aucun routeur disponible</option>
-                        : routers.map(r => <option key={r.id} value={r.id}>{r.model} — S/N {r.serial_number}</option>)
-                      }
-                    </select>
-                  </div>
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 rounded-lg flex items-center justify-center shrink-0" style={{ background: G }}>
                       <Calendar size={9} className="text-white" />
@@ -559,11 +574,17 @@ export default function AdminFenuasimBox() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className={labelCls}>Arrivée</label>
-                      <input type="date" value={rentalStart} min={today} onChange={e => setRentalStart(e.target.value)} className={inputCls} />
+                      <input type="date" value={rentalStart} min={todayStr} onChange={async e => {
+                        setRentalStart(e.target.value);
+                        if (e.target.value && rentalEnd) await checkRouterAvailability(e.target.value, rentalEnd);
+                      }} className={inputCls} />
                     </div>
                     <div>
                       <label className={labelCls}>Départ</label>
-                      <input type="date" value={rentalEnd} min={rentalStart || today} onChange={e => setRentalEnd(e.target.value)} className={inputCls} />
+                      <input type="date" value={rentalEnd} min={rentalStart || todayStr} onChange={async e => {
+                        setRentalEnd(e.target.value);
+                        if (rentalStart && e.target.value) await checkRouterAvailability(rentalStart, e.target.value);
+                      }} className={inputCls} />
                     </div>
                   </div>
                   {rentalDays > 0 && selectedRouter && (

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { InsuranceFormData } from "@/types/insurance";
 import { getOptionsForProduct, AvaOption } from "@/lib/ava_options";
 
@@ -11,6 +12,39 @@ interface OptionsStepProps {
 export const OptionsStep = ({ formData, updateFormData, productType = "ava_tourist_card" }: OptionsStepProps) => {
   const options = getOptionsForProduct(productType);
   const selectedIds = formData.selectedOptions || [];
+
+  // Dates spécifiques pour les options date-range (ex: CDW 728)
+  const [dateRangeValues, setDateRangeValues] = useState<Record<string, { from: string; to: string }>>({});
+
+  const handleDateRangeToggle = (opt: AvaOption, checked: boolean) => {
+    let newSelected = [...selectedIds];
+    if (checked) {
+      if (!newSelected.includes(opt.id)) newSelected.push(opt.id);
+    } else {
+      newSelected = newSelected.filter(id => id !== opt.id);
+      setDateRangeValues(prev => { const n = { ...prev }; delete n[opt.id]; return n; });
+    }
+    updateFormData({ selectedOptions: newSelected });
+  };
+
+  const handleDateRangeChange = (optId: string, field: "from" | "to", value: string) => {
+    setDateRangeValues(prev => ({
+      ...prev,
+      [optId]: { ...prev[optId], [field]: value }
+    }));
+    // Stocker les dates dans formData pour les transmettre à ava.ts
+    updateFormData({
+      optionDateRanges: {
+        ...(formData.optionDateRanges || {}),
+        [optId]: {
+          ...(formData.optionDateRanges?.[optId] || {}),
+          [field === "from" ? "from_date_option" : "to_date_option"]: value
+        }
+      }
+    });
+  };
+
+  const isDateRangeChecked = (opt: AvaOption) => selectedIds.includes(opt.id);
 
   const handleBooleanToggle = (opt: AvaOption, checked: boolean) => {
     const targetId = opt.defaultSubOptionId || opt.id;
@@ -89,6 +123,53 @@ export const OptionsStep = ({ formData, updateFormData, productType = "ava_touri
                     <option key={sub.id} value={sub.id}>{sub.label}</option>
                   ))}
                 </select>
+              </div>
+            )}
+
+            {opt.type === 'date-range' && (
+              <div>
+                <label className="flex items-start gap-3 cursor-pointer mb-3">
+                  <input
+                    type="checkbox"
+                    className="mt-1 w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+                    checked={isDateRangeChecked(opt)}
+                    onChange={(e) => handleDateRangeToggle(opt, e.target.checked)}
+                  />
+                  <div className="flex-1">
+                    <span className={labelClass}>{opt.label}</span>
+                    {opt.description && <span className={descClass}>{opt.description}</span>}
+                  </div>
+                </label>
+                {isDateRangeChecked(opt) && (
+                  <div className="grid grid-cols-2 gap-3 mt-2 pl-7">
+                    <div>
+                      <label className="text-xs font-semibold text-muted-foreground uppercase mb-1 block">
+                        Début de location
+                      </label>
+                      <input
+                        type="date"
+                        className="w-full h-10 px-3 rounded-md border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                        value={dateRangeValues[opt.id]?.from || ""}
+                        min={formData.departureDate || ""}
+                        max={formData.returnDate || ""}
+                        onChange={(e) => handleDateRangeChange(opt.id, "from", e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-muted-foreground uppercase mb-1 block">
+                        Fin de location
+                      </label>
+                      <input
+                        type="date"
+                        className="w-full h-10 px-3 rounded-md border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                        value={dateRangeValues[opt.id]?.to || ""}
+                        min={dateRangeValues[opt.id]?.from || formData.departureDate || ""}
+                        max={formData.returnDate || ""}
+                        onChange={(e) => handleDateRangeChange(opt.id, "to", e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

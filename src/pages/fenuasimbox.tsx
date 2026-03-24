@@ -92,15 +92,22 @@ export default function FenuaSimBox() {
 
             {/* Image */}
             <div className="flex-1 flex justify-center lg:justify-end">
-              <div className="relative">
-                <div className="absolute inset-0 rounded-3xl opacity-30 blur-3xl" style={{ background: G }} />
+              <div className="relative w-full max-w-md">
+                {/* Halo coloré derrière l'image */}
+                <div className="absolute inset-0 rounded-full opacity-40 blur-3xl scale-75" style={{ background: G }} />
                 <Image
                   src="/images/fenuasimbox.png"
                   alt="FENUASIM BOX — Routeur WiFi portable"
-                  width={420}
-                  height={480}
-                  className="relative z-10 drop-shadow-2xl"
-                  style={{ objectFit: "contain", maxHeight: 420 }}
+                  width={520}
+                  height={520}
+                  className="relative z-10 w-full h-auto"
+                  style={{
+                    objectFit: "contain",
+                    mixBlendMode: "luminosity",
+                    filter: "brightness(1.1) contrast(1.05)",
+                    maskImage: "radial-gradient(ellipse 90% 85% at 50% 45%, black 55%, transparent 100%)",
+                    WebkitMaskImage: "radial-gradient(ellipse 90% 85% at 50% 45%, black 55%, transparent 100%)",
+                  }}
                   priority
                 />
               </div>

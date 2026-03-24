@@ -56,7 +56,7 @@ export default function FenuaSimBox() {
     <>
       <Head>
         <title>FENUASIM BOX — Routeur WiFi de voyage | FENUA SIM</title>
-        <meta name="description" content="Pas de téléphone compatible eSIM ? En famille, en business ou petit budget ? Louez la FENUASIM BOX — routeur WiFi portable à partager. 10€/jour, caution 50€ remboursable." />
+        <meta name="description" content="Pas de téléphone compatible eSIM ? En famille, en business ou petit budget ? Louez la FENUASIM BOX — routeur WiFi portable à partager. 10€/jour, caution 67€ remboursable." />
         <link rel="canonical" href="https://www.fenuasim.com/fenuasimbox" />
       </Head>
 
@@ -172,7 +172,7 @@ export default function FenuaSimBox() {
               { icon: Wifi,    title: "Jusqu'à 8 appareils",   desc: "Connectés simultanément" },
               { icon: Globe,   title: "Partout dans le monde", desc: "International" },
               { icon: Battery, title: "12h d'autonomie",       desc: "Batterie longue durée" },
-              { icon: Shield,  title: "Caution 12 000 XPF",    desc: "≈ 100 € · Remboursée au retour" },
+              { icon: Shield,  title: "Caution 8 000 XPF",     desc: "≈ 67 € · Remboursée au retour" },
             ].map(({ icon: Icon, title, desc }) => (
               <div key={title} className="bg-white rounded-2xl p-5 text-center shadow-sm border border-gray-100">
                 <div className="w-11 h-11 rounded-xl flex items-center justify-center mx-auto mb-3" style={{ background: G }}>
@@ -211,7 +211,7 @@ export default function FenuaSimBox() {
               },
               {
                 label: "Caution",
-                value: currency === "eur" ? "100 €" : "12 000 XPF",
+                value: currency === "eur" ? "67 €" : "8 000 XPF",
                 sub: "Remboursée au retour en bon état"
               },
               {
@@ -229,8 +229,8 @@ export default function FenuaSimBox() {
           </div>
           <div className="bg-purple-50 rounded-xl px-6 py-4 text-sm text-purple-700 inline-block">
             {currency === "eur"
-              ? <span>💡 Exemple : 7 nuits à 4 personnes = <strong>70 € de location</strong> soit <strong>17,50 € par personne</strong> (caution 100 € remboursée)</span>
-              : <span>💡 Exemple : 7 nuits à 4 personnes = <strong>8 351 XPF de location</strong> soit <strong>2 088 XPF par personne</strong> (caution 12 000 XPF remboursée)</span>
+              ? <span>💡 Exemple : 7 nuits à 4 personnes = <strong>70 € de location</strong> soit <strong>17,50 € par personne</strong> (caution 67 € remboursée)</span>
+              : <span>💡 Exemple : 7 nuits à 4 personnes = <strong>8 351 XPF de location</strong> soit <strong>2 088 XPF par personne</strong> (caution 8 000 XPF remboursée)</span>
             }
           </div>
         </div>
@@ -356,7 +356,7 @@ export default function FenuaSimBox() {
             {[
               { q: "Mon téléphone n'est pas compatible eSIM — la BOX fonctionne quand même ?", r: "Oui, c'est exactement pour ça qu'elle existe. La FENUASIM BOX fonctionne de manière totalement indépendante de votre téléphone. Elle crée un réseau WiFi auquel vous vous connectez comme à la maison." },
               { q: "Combien d'appareils peut-on connecter simultanément ?", r: "Jusqu'à 8 appareils en même temps — téléphones, tablettes, ordinateurs, consoles... Idéal pour toute une famille ou équipe." },
-              { q: "Comment fonctionne la caution ?", r: "Une caution de 12 000 XPF (≈ 100 €) est demandée à la remise du routeur. Elle est intégralement remboursée au retour en bon état, sans délai ni justification." },
+              { q: "Comment fonctionne la caution ?", r: "Une caution de 8 000 XPF (≈ 67 €) est demandée à la remise du routeur. Elle est intégralement remboursée au retour en bon état, sans délai ni justification." },
               { q: "Peut-on utiliser la BOX à l'international ?", r: "Oui. Il suffit d'y insérer une eSIM FENUA SIM adaptée à votre destination. Nous pouvons vous conseiller sur le forfait le plus adapté." },
               { q: "Comment récupère-t-on le routeur ?", r: "Nous vous indiquons le point de remise dans notre email de confirmation. Une remise en main propre sur rendez-vous est également possible." },
             ].map(({ q, r }) => (

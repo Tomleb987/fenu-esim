@@ -15,7 +15,7 @@ export const TravelersStep = ({ formData, updateFormData }: Props) => {
     updateFormData({
       additionalTravelers: [
         ...formData.additionalTravelers,
-        { firstName: "", lastName: "", birthDate: "" },
+        { firstName: "", lastName: "", birthDate: "", parental_link: "13" },
       ],
     });
   };
@@ -31,7 +31,7 @@ export const TravelersStep = ({ formData, updateFormData }: Props) => {
   // Mettre à jour un champ spécifique d'un voyageur
   const updateTraveler = (
     index: number,
-    field: "firstName" | "lastName" | "birthDate",
+    field: "firstName" | "lastName" | "birthDate" | "parental_link",
     value: string
   ) => {
     const newTravelers = [...formData.additionalTravelers];
@@ -73,51 +73,64 @@ export const TravelersStep = ({ formData, updateFormData }: Props) => {
               </Button>
             </div>
 
-            {/* Grille des 3 champs obligatoires */}
+            {/* Ligne 1 : Prénom + Nom + Date de naissance */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Prénom */}
               <div className="space-y-2">
                 <Label className="text-xs uppercase font-semibold text-muted-foreground">
-                  Prénom
+                  Prénom *
                 </Label>
                 <Input
                   placeholder="Ex: Thomas"
                   value={traveler.firstName}
-                  onChange={(e) =>
-                    updateTraveler(index, "firstName", e.target.value)
-                  }
+                  onChange={(e) => updateTraveler(index, "firstName", e.target.value)}
                   className="bg-white"
                 />
               </div>
 
-              {/* Nom */}
               <div className="space-y-2">
                 <Label className="text-xs uppercase font-semibold text-muted-foreground">
-                  Nom
+                  Nom *
                 </Label>
                 <Input
                   placeholder="Ex: Dupuis"
                   value={traveler.lastName}
-                  onChange={(e) =>
-                    updateTraveler(index, "lastName", e.target.value)
-                  }
+                  onChange={(e) => updateTraveler(index, "lastName", e.target.value)}
                   className="bg-white"
                 />
               </div>
 
-              {/* Date de naissance */}
               <div className="space-y-2">
                 <Label className="text-xs uppercase font-semibold text-muted-foreground">
-                  Date de naissance
+                  Date de naissance *
                 </Label>
                 <Input
                   type="date"
                   value={traveler.birthDate}
-                  onChange={(e) =>
-                    updateTraveler(index, "birthDate", e.target.value)
-                  }
+                  onChange={(e) => updateTraveler(index, "birthDate", e.target.value)}
                   className="bg-white"
                 />
+              </div>
+            </div>
+
+            {/* Ligne 2 : Lien de parenté */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+              <div className="space-y-2">
+                <Label className="text-xs uppercase font-semibold text-muted-foreground">
+                  Lien avec l'assuré principal *
+                </Label>
+                <select
+                  className="w-full h-10 px-3 rounded-md border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  value={traveler.parental_link || "13"}
+                  onChange={(e) => updateTraveler(index, "parental_link", e.target.value)}
+                >
+                  <option value="4">Conjoint(e)</option>
+                  <option value="6">Enfant</option>
+                  <option value="1">Père / Mère</option>
+                  <option value="3">Frère / Sœur</option>
+                  <option value="17">Collaborateur / Collègue</option>
+                  <option value="21">Autre parenté</option>
+                  <option value="13">Sans parenté</option>
+                </select>
               </div>
             </div>
           </div>

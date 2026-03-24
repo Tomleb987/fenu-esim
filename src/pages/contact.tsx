@@ -12,7 +12,7 @@ import {
 /* ------------------------------------------------- 
    CONFIGURATION
 --------------------------------------------------*/
-const ODOO_EMAIL = "sav@fenua-sim.odoo.com";
+const CONTACT_EMAIL = "contact@fenuasim.com";
 const WHATSAPP_NUMBER = "33749782101"; // Format international sans le +
 const EMAIL_SUBJECT = "Contact : Demande d'information Fenuasim";
 const EMAIL_BODY = `Bonjour,
@@ -41,7 +41,7 @@ export default function Contact() {
             mainEntity: {
               "@type": "Organization",
               name: "FENUA SIM",
-              email: "sav@fenua-sim.odoo.com",
+              email: "contact@fenuasim.com",
               url: "https://www.fenuasim.com",
               areaServed: "Polynésie française",
               availableLanguage: "French",
@@ -53,7 +53,7 @@ export default function Contact() {
                 {
                   "@type": "ContactPoint",
                   contactType: "customer support",
-                  email: "sav@fenua-sim.odoo.com",
+                  email: "contact@fenuasim.com",
                   availableLanguage: "French",
                   hoursAvailable: "Mo-Su 00:00-23:59"
                 },
@@ -84,18 +84,18 @@ export default function Contact() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
         
-        {/* --- CARTE 1 : SUPPORT TICKET (ODOO) --- */}
+        {/* --- CARTE 1 : EMAIL --- */}
         <div className="bg-white rounded-2xl shadow-lg border border-purple-100 p-8 flex flex-col items-start hover:shadow-xl transition-shadow duration-300">
           <div className="bg-purple-100 p-4 rounded-full mb-6 text-purple-600">
             <Mail className="w-8 h-8" />
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Service Client & Support</h2>
           <p className="text-gray-600 mb-8 flex-grow">
-            Pour toute question technique, remboursement ou suivi de commande. Nous créons un ticket et vous répondons sous 24h max.
+            Pour toute question technique, remboursement ou suivi de commande. Nous vous répondons sous 24h max.
           </p>
           
           <a 
-            href={`mailto:${ODOO_EMAIL}?subject=${encodeURIComponent(EMAIL_SUBJECT)}&body=${encodeURIComponent(EMAIL_BODY)}`}
+            href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(EMAIL_SUBJECT)}&body=${encodeURIComponent(EMAIL_BODY)}`}
             className="w-full flex items-center justify-center gap-2 bg-purple-600 text-white px-6 py-4 rounded-xl font-bold hover:bg-purple-700 transition-all transform hover:scale-[1.02]"
           >
             Envoyer un email

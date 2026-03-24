@@ -1,18 +1,22 @@
-// src/pages/api/create-payment-link.ts
+// src/pages/api/admin/create-insurance-link.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import Stripe from "stripe";
 import nodemailer from "nodemailer";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { createAvaAdhesion } from "@/lib/ava";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-04-30.basil",
+  apiVersion: "2023-10-16",
 });
+
+const FRAIS_DISTRIBUTION = 10; // € frais FENUASIM
 
 export const config = { api: { bodyParser: true } };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
+  // ── Authentification admin
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) return res.status(401).json({ error: "Non authentifié" });
   const token = authHeader.replace("Bearer ", "");
@@ -29,279 +33,295 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (partnerError || !partner || !partner.is_active)
     return res.status(403).json({ error: "Compte partenaire introuvable ou inactif" });
 
-  const { packageId, clientFirstName, clientLastName, clientEmail, clientPhone, destination, sellerName,
-    resendOnly, paymentUrl: resendPaymentUrl, packageName: resendPackageName,
-    amount: resendAmount, currency: resendCurrency, advisorName: resendAdvisorName } = req.body;
+  const { quoteData, clientEmail, clientNote, packageId } = req.body;
 
-  // ── Mode renvoi email uniquement (pas de nouvelle session Stripe)
-  if (resendOnly && resendPaymentUrl && clientEmail) {
-    const formattedAmount = `${Math.round(resendAmount || 0).toLocaleString("fr")} ${(resendCurrency || "xpf").toUpperCase()}`;
+  // ══════════════════════════════════════════════════
+  // CAS 1 : Flux eSIM partenaire (packageId présent)
+  // ══════════════════════════════════════════════════
+  if (packageId) {
+    const { clientFirstName, clientLastName, clientPhone, destination, sellerName } = req.body;
+
+    if (!clientFirstName || !clientLastName || !clientEmail)
+      return res.status(400).json({ error: "Champs requis manquants" });
+
+    const { data: packageData, error: packageError } = await supabaseAdmin
+      .from("airalo_packages")
+      .select("id, airalo_id, name, price_eur, final_price_eur, price_xpf, final_price_xpf, currency, data_amount, data_unit, validity_days, validity")
+      .eq("id", packageId)
+      .single();
+
+    if (packageError || !packageData) return res.status(404).json({ error: "Forfait introuvable" });
+
+    let rawPrice = packageData.price_xpf || packageData.final_price_xpf || packageData.price_eur || packageData.final_price_eur || 0;
+
+    if (partner.promo_code) {
+      const { data: promoData } = await supabaseAdmin
+        .from("promo_codes")
+        .select("discount_percentage, discount_amount, is_active")
+        .eq("code", partner.promo_code)
+        .maybeSingle();
+
+      if (promoData?.is_active) {
+        if (promoData.discount_percentage) rawPrice = rawPrice * (1 - promoData.discount_percentage / 100);
+        else if (promoData.discount_amount) rawPrice = Math.max(0, rawPrice - promoData.discount_amount);
+      }
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      mode: "payment",
+      customer_email: clientEmail,
+      line_items: [{
+        price_data: {
+          currency: "xpf",
+          product_data: {
+            name: packageData.name,
+            description: `eSIM ${packageData.data_amount || ""}${packageData.data_unit || ""} — ${packageData.validity_days || packageData.validity || ""} jours`,
+          },
+          unit_amount: Math.round(rawPrice),
+        },
+        quantity: 1,
+      }],
+      metadata: {
+        packageId: packageData.id,
+        firstName: clientFirstName,
+        lastName: clientLastName,
+        email: clientEmail,
+        promo_code: partner.promo_code || "",
+        partner_code: partner.partner_code,
+        origin: "partner_dashboard",
+      },
+      success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/`,
+    });
+
+    await supabaseAdmin.from("partner_orders").insert({
+      partner_code: partner.partner_code,
+      advisor_name: partner.advisor_name,
+      package_id: packageData.id,
+      package_name: packageData.name,
+      client_first_name: clientFirstName,
+      client_last_name: clientLastName,
+      client_email: clientEmail,
+      client_phone: clientPhone || null,
+      stripe_session_id: session.id,
+      payment_url: session.url,
+      status: "pending",
+      amount: Math.round(rawPrice),
+      currency: "xpf",
+      seller_name: sellerName || null,
+      created_at: new Date().toISOString(),
+    });
+
+    return res.status(200).json({ paymentUrl: session.url, sessionId: session.id });
+  }
+
+  // ══════════════════════════════════════════════════
+  // CAS 2 : Flux Assurance AVA (quoteData présent)
+  // ══════════════════════════════════════════════════
+  if (!quoteData || !clientEmail) {
+    return res.status(400).json({ error: "quoteData et clientEmail requis pour l'assurance" });
+  }
+
+  try {
+    const internalRef = `ADMIN-${Date.now()}`;
+
+    // 1️⃣ Création adhésion AVA (brouillon)
+    const avaResult = await createAvaAdhesion({
+      ...quoteData,
+      internalReference: internalRef,
+    });
+
+    const adhesionNumber = avaResult.adhesion_number;
+    const contractNumber = avaResult.contract_number || null;
+    const contractLink = avaResult.contract_link || null;
+
+    if (!adhesionNumber) {
+      return res.status(400).json({
+        error: "Numéro d'adhésion manquant dans la réponse AVA",
+        details: avaResult.raw ?? avaResult,
+      });
+    }
+
+    // 2️⃣ Montant : priorité à manualAmount (saisi par l'admin), sinon réponse AVA
+    let premiumAva = typeof quoteData.manualAmount === "number" && quoteData.manualAmount > 0
+      ? quoteData.manualAmount
+      : typeof avaResult.montant_total === "number"
+        ? avaResult.montant_total
+        : 0;
+
+    premiumAva = Number(premiumAva);
+
+    if (!Number.isFinite(premiumAva) || premiumAva <= 0) {
+      return res.status(400).json({ error: "Montant de prime invalide", details: { montant_total: avaResult.montant_total, manualAmount: quoteData.manualAmount } });
+    }
+
+    const totalTtc = premiumAva + FRAIS_DISTRIBUTION;
+
+    // 3️⃣ Enregistrement Supabase
+    const { data: insertData, error: supaError } = await supabaseAdmin
+      .from("insurances")
+      .insert({
+        user_email: clientEmail,
+        subscriber_first_name: quoteData.subscriber?.firstName ?? null,
+        subscriber_last_name: quoteData.subscriber?.lastName ?? null,
+        product_type: quoteData.productType,
+        adhesion_number: adhesionNumber,
+        contract_number: contractNumber,
+        premium_ava: premiumAva,
+        frais_distribution: FRAIS_DISTRIBUTION,
+        total_amount: totalTtc,
+        contract_link: contractLink,
+        cg_link: avaResult.cg_link || null,
+        ipid_link: avaResult.ipid_link || null,
+        ficp_link: avaResult.ficp_link || null,
+        status: "pending_payment",
+        start_date: quoteData.startDate ?? null,
+        end_date: quoteData.endDate ?? null,
+        internal_note: clientNote || null,
+        created_by: "admin",
+        ava_raw: avaResult.raw ?? null,
+      })
+      .select()
+      .single();
+
+    if (supaError) {
+      console.error("❌ Supabase insert error:", supaError);
+      return res.status(500).json({ error: "Erreur enregistrement Supabase", details: supaError });
+    }
+
+    // 4️⃣ Session Stripe Checkout
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+    if (!baseUrl) return res.status(500).json({ error: "NEXT_PUBLIC_BASE_URL manquant" });
+
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      payment_method_types: ["card"],
+      line_items: [
+        {
+          price_data: {
+            currency: "eur",
+            product_data: {
+              name: `Assurance AVA – ${adhesionNumber}`,
+              description: contractNumber ? `Contrat ${contractNumber}` : undefined,
+            },
+            unit_amount: Math.round(premiumAva * 100),
+          },
+          quantity: 1,
+        },
+        {
+          price_data: {
+            currency: "eur",
+            product_data: { name: "Frais de distribution FENUASIM" },
+            unit_amount: Math.round(FRAIS_DISTRIBUTION * 100),
+          },
+          quantity: 1,
+        },
+      ],
+      success_url: `${baseUrl}/assurance/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/assurance`,
+      customer_email: clientEmail,
+      metadata: {
+        type: "insurance_ava",
+        adhesion_number: adhesionNumber,
+        contract_number: contractNumber || "",
+        insurance_id: insertData?.id?.toString() ?? "",
+        internal_ref: internalRef,
+        origin: "admin",
+      },
+    });
+
+    // 5️⃣ Email au client avec le lien de paiement
     try {
       const transporter = nodemailer.createTransport({
-        host: "smtp-relay.brevo.com", port: 587, secure: false,
+        host: "smtp-relay.brevo.com",
+        port: 587,
+        secure: false,
         auth: { user: process.env.BREVO_SMTP_USER, pass: process.env.BREVO_SMTP_PASS },
       });
+
+      const productLabels: Record<string, string> = {
+        ava_tourist_card: "AVA Tourist Card",
+        ava_carte_sante: "AVA Carte Santé",
+        avantages_pom: "AVAntages POM",
+        avantages_360: "AVAntages 360",
+      };
+      const productLabel = productLabels[quoteData.productType] ?? "Assurance Voyage AVA";
+      const firstName = quoteData.subscriber?.firstName || "";
+      const lastName = quoteData.subscriber?.lastName || "";
+
       await transporter.sendMail({
         from: `"FENUA SIM" <hello@fenuasim.com>`,
         to: clientEmail,
         bcc: "clients@fenua-sim.odoo.com",
         replyTo: `"FENUA SIM" <hello@fenuasim.com>`,
-        subject: `Rappel — Votre lien de paiement eSIM`,
-        html: createEmailHTML({
-          clientFirstName, clientLastName, packageName: resendPackageName || "",
-          destination: "", dataAmount: "", validityDays: "",
-          formattedAmount, paymentUrl: resendPaymentUrl,
-          advisorName: resendAdvisorName || partner.advisor_name,
-        }),
-        text: `Bonjour ${clientFirstName},
-
-Rappel : voici votre lien de paiement eSIM :
-${resendPaymentUrl}
-
-Montant : ${formattedAmount}
-
-L'équipe FENUA SIM`,
-      });
-      console.log("✅ Email renvoyé à:", clientEmail);
-    } catch (err: any) {
-      console.error("❌ Erreur renvoi email:", err.message);
-    }
-    return res.status(200).json({ success: true });
-  }
-
-  if (!packageId || !clientFirstName || !clientLastName || !clientEmail)
-    return res.status(400).json({ error: "Champs requis manquants" });
-
-  const { data: packageData, error: packageError } = await supabaseAdmin
-    .from("airalo_packages")
-    .select("id, airalo_id, name, price_eur, final_price_eur, price_xpf, final_price_xpf, currency, data_amount, data_unit, validity_days, validity")
-    .eq("id", packageId)
-    .single();
-
-  if (packageError || !packageData) return res.status(404).json({ error: "Forfait introuvable" });
-
-  const basePrice = packageData.price_xpf || packageData.final_price_xpf || packageData.price_eur || packageData.final_price_eur || 0;
-
-  // ── Appliquer la remise du code promo si présent
-  let rawPrice = basePrice;
-  console.log("partner.promo_code:", partner.promo_code);
-  console.log("basePrice:", basePrice);
-
-  if (partner.promo_code) {
-    const { data: promoData, error: promoError } = await supabaseAdmin
-      .from("promo_codes")
-      .select("discount_percentage, discount_amount, is_active")
-      .eq("code", partner.promo_code)
-      .maybeSingle();
-
-    console.log("promoData:", JSON.stringify(promoData));
-    console.log("promoError:", JSON.stringify(promoError));
-
-    if (promoData?.is_active) {
-      if (promoData.discount_percentage) {
-        rawPrice = basePrice * (1 - promoData.discount_percentage / 100);
-        console.log("Applied discount_percentage:", promoData.discount_percentage, "-> rawPrice:", rawPrice);
-      } else if (promoData.discount_amount) {
-        rawPrice = Math.max(0, basePrice - promoData.discount_amount);
-        console.log("Applied discount_amount:", promoData.discount_amount, "-> rawPrice:", rawPrice);
-      }
-    }
-  }
-
-  // ── Créer la session Stripe
-  const session = await stripe.checkout.sessions.create({
-    payment_method_types: ["card"],
-    mode: "payment",
-    customer_email: clientEmail,
-    line_items: [{
-      price_data: {
-        currency: "xpf",
-        product_data: {
-          name: packageData.name,
-          description: `eSIM ${packageData.data_amount || ""}${packageData.data_unit || ""} — ${packageData.validity_days || packageData.validity || ""} jours`,
-        },
-        unit_amount: Math.round(rawPrice),
-      },
-      quantity: 1,
-    }],
-    metadata: {
-      packageId: packageData.id,
-      firstName: clientFirstName,
-      lastName: clientLastName,
-      email: clientEmail,
-      promo_code: partner.promo_code || "",
-      partner_code: partner.partner_code,
-      origin: "partner_dashboard",
-    },
-    // expires_at: Stripe limite a 24h maximum - lien valable 24h par defaut
-    success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/`,
-  });
-
-  // ── Sauvegarder la commande partenaire
-  await supabaseAdmin.from("partner_orders").insert({
-    partner_code: partner.partner_code,
-    advisor_name: partner.advisor_name,
-    package_id: packageData.id,
-    package_name: packageData.name,
-    client_first_name: clientFirstName,
-    client_last_name: clientLastName,
-    client_email: clientEmail,
-    client_phone: clientPhone || null,
-    stripe_session_id: session.id,
-    payment_url: session.url,
-    status: "pending",
-    amount: Math.round(rawPrice),
-    currency: "xpf",
-    seller_name: sellerName || null,
-    created_at: new Date().toISOString(),
-  });
-
-  // ── Envoyer l'email automatiquement
-  const formattedAmount = `${Math.round(rawPrice).toLocaleString("fr")} XPF`;
-  const validityDisplay = packageData.validity_days
-    ? `${packageData.validity_days} jours`
-    : (() => {
-        const v = packageData.validity?.toString() || packageData.name;
-        const m = v.match(/(\d+)\s*jours?/i) || v.match(/(\d+)\s*days?/i);
-        return m ? `${m[1]} jours` : "";
-      })();
-  const dataDisplay = packageData.data_unit === "illimité" || packageData.data_unit === "unlimited"
-    ? "Illimité"
-    : packageData.data_amount
-      ? `${packageData.data_amount} ${packageData.data_unit || "Go"}`
-      : packageData.data_unit || "Illimité";
-
-  try {
-    const transporter = nodemailer.createTransport({
-      host: "smtp-relay.brevo.com",
-      port: 587,
-      secure: false,
-      auth: {
-        user: process.env.BREVO_SMTP_USER,
-        pass: process.env.BREVO_SMTP_PASS,
-      },
-    });
-
-    await transporter.sendMail({
-      from: `"FENUA SIM" <hello@fenuasim.com>`,
-      to: clientEmail,
-      bcc: "clients@fenua-sim.odoo.com",
-      replyTo: `"FENUA SIM" <hello@fenuasim.com>`,
-      subject: `Votre lien de paiement eSIM — ${destination || packageData.name}`,
-      html: createEmailHTML({
-        clientFirstName, clientLastName, packageName: packageData.name,
-        destination: destination || "", dataAmount: dataDisplay,
-        validityDays: validityDisplay, formattedAmount,
-        paymentUrl: session.url!, advisorName: partner.advisor_name,
-      }),
-      text: `Bonjour ${clientFirstName},\n\nVoici votre lien de paiement sécurisé pour votre eSIM :\n${session.url}\n\nMontant : ${formattedAmount}\n\nCe lien est valable 24h.\n\nL'équipe FENUA SIM`,
-    });
-    console.log("✅ Email lien paiement envoyé à:", clientEmail);
-  } catch (emailErr: any) {
-    // L'email échoue silencieusement — le lien est quand même retourné
-    console.error("❌ Erreur envoi email:", emailErr.message);
-  }
-
-  return res.status(200).json({
-    paymentUrl: session.url,
-    sessionId: session.id,
-  });
-}
-
-function createEmailHTML({ clientFirstName, clientLastName, packageName, destination, dataAmount, validityDays, formattedAmount, paymentUrl, advisorName }: {
-  clientFirstName: string; clientLastName: string; packageName: string;
-  destination: string; dataAmount: string; validityDays: string;
-  formattedAmount: string; paymentUrl: string; advisorName: string;
-}) {
-  return `<!DOCTYPE html>
+        subject: `Votre lien de paiement — ${productLabel}`,
+        html: `<!DOCTYPE html>
 <html lang="fr">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background:#f4f6f9;font-family:'Helvetica Neue',Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f9;padding:40px 20px;">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f8f7ff;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8f7ff;padding:40px 20px;">
     <tr><td align="center">
-      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
-
-        <!-- Header -->
-        <tr><td style="background:linear-gradient(135deg,#A020F0 0%,#FF4D6D 50%,#FF7F11 100%);padding:36px 40px;text-align:center;">
-          <div style="font-size:26px;font-weight:800;color:#fff;letter-spacing:-0.5px;">FENUA<span style="opacity:.6;">•</span>SIM</div>
-          <div style="color:rgba(255,255,255,0.7);font-size:12px;margin-top:4px;letter-spacing:1px;text-transform:uppercase;">Connectez-vous partout dans le monde</div>
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#fff;border-radius:16px;overflow:hidden;">
+        <tr><td style="background:linear-gradient(135deg,#A020F0,#FF4D6D,#FF7F11);padding:32px 40px;text-align:center;">
+          <div style="font-size:24px;font-weight:800;color:#fff;">FENUA SIM</div>
+          <div style="color:rgba(255,255,255,0.75);font-size:12px;margin-top:4px;text-transform:uppercase;letter-spacing:1px;">Assurance Voyage — Partenaire AVA</div>
         </td></tr>
-
-        <!-- Body -->
-        <tr><td style="padding:36px 40px;">
-          <p style="font-size:18px;font-weight:600;color:#1a0533;margin:0 0 8px;">Bonjour ${clientFirstName} ${clientLastName} 👋</p>
-          <p style="font-size:14px;color:#4a5568;margin:0 0 28px;line-height:1.6;">
-            ${advisorName || "Votre conseiller FENUA SIM"} vous a préparé un lien de paiement sécurisé pour votre eSIM. Cliquez ci-dessous pour finaliser votre commande.
+        <tr><td style="padding:32px 40px;">
+          <p style="font-size:17px;font-weight:600;color:#1a0533;margin:0 0 12px;">Bonjour ${firstName} ${lastName},</p>
+          <p style="font-size:14px;color:#4a5568;line-height:1.6;margin:0 0 24px;">
+            Votre conseiller FENUA SIM a préparé votre devis <strong>${productLabel}</strong>.<br>
+            Cliquez ci-dessous pour finaliser votre souscription en toute sécurité.
           </p>
-
-          <!-- Forfait -->
-          <table width="100%" cellpadding="0" cellspacing="0" style="background:#faf5ff;border-radius:12px;border:1.5px solid #e9d5ff;margin-bottom:28px;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#faf5ff;border-radius:12px;border:1.5px solid #e9d5ff;margin-bottom:24px;">
             <tr><td style="padding:20px;">
-              <div style="font-size:11px;font-weight:700;color:#A020F0;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">📦 Votre forfait</div>
-              <div style="font-size:18px;font-weight:800;color:#1a0533;margin-bottom:14px;">${packageName}</div>
-              <table width="100%" cellpadding="0" cellspacing="0">
-                ${destination ? `<tr><td style="padding:5px 0;border-bottom:1px solid #e9d5ff;font-size:13px;color:#6b7280;">🌍 Destination</td><td style="text-align:right;font-weight:600;color:#1a0533;font-size:13px;">${destination}</td></tr>` : ""}
-                <tr><td style="padding:5px 0;border-bottom:1px solid #e9d5ff;font-size:13px;color:#6b7280;">📶 Données</td><td style="text-align:right;font-weight:600;color:#1a0533;font-size:13px;">${dataAmount}</td></tr>
-                <tr><td style="padding:5px 0;border-bottom:1px solid #e9d5ff;font-size:13px;color:#6b7280;">📅 Validité</td><td style="text-align:right;font-weight:600;color:#1a0533;font-size:13px;">${validityDays}</td></tr>
-                <tr><td style="padding:10px 0 0;font-size:14px;font-weight:700;color:#A020F0;">💰 Montant total</td><td style="text-align:right;font-size:20px;font-weight:800;color:#A020F0;">${formattedAmount}</td></tr>
+              <div style="font-size:11px;font-weight:700;color:#A020F0;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">🛡️ Votre contrat</div>
+              <table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;">
+                <tr><td style="color:#6b7280;padding:5px 0;border-bottom:1px solid #e9d5ff;">Produit</td><td style="text-align:right;font-weight:600;color:#1a0533;">${productLabel}</td></tr>
+                <tr><td style="color:#6b7280;padding:5px 0;border-bottom:1px solid #e9d5ff;">N° Adhésion</td><td style="text-align:right;font-family:monospace;font-weight:700;color:#A020F0;">${adhesionNumber}</td></tr>
+                <tr><td style="color:#6b7280;padding:10px 0 0;">Montant total TTC</td><td style="text-align:right;font-size:18px;font-weight:800;color:#A020F0;">${totalTtc.toFixed(2)} €</td></tr>
               </table>
             </td></tr>
           </table>
-
-          <!-- CTA — compatible Outlook/iPhone (VML + fallback) -->
-          <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
-            <tr><td align="center">
-              <!--[if mso]>
-              <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${paymentUrl}" style="height:52px;v-text-anchor:middle;width:240px;" arcsize="15%" strokecolor="#A020F0" fillcolor="#A020F0">
-                <w:anchorlock/>
-                <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">Payer maintenant</center>
-              </v:roundrect>
-              <![endif]-->
-              <!--[if !mso]><!-->
-              <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
-                <tr>
-                  <td style="background-color:#A020F0;border-radius:10px;padding:0;">
-                    <a href="${paymentUrl}" target="_blank" style="display:inline-block;padding:16px 48px;font-family:Arial,sans-serif;font-size:16px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:10px;background-color:#A020F0;">
-                      Payer maintenant
-                    </a>
-                  </td>
-                </tr>
-              </table>
-              <!--<![endif]-->
+          <table cellpadding="0" cellspacing="0" style="margin:0 auto 24px;">
+            <tr><td style="background:#A020F0;border-radius:10px;">
+              <a href="${session.url}" target="_blank" style="display:inline-block;padding:16px 48px;font-size:16px;font-weight:700;color:#fff;text-decoration:none;">
+                Payer et souscrire →
+              </a>
             </td></tr>
           </table>
-
-          <!-- Lien texte fallback -->
-          <div style="background:#f8fafc;border-radius:8px;padding:14px;margin-bottom:20px;border:1px solid #e2e8f0;text-align:center;">
-            <p style="font-size:11px;color:#94a3b8;margin:0 0 8px;">Si le bouton ne fonctionne pas :</p>
-            <a href="${paymentUrl}" target="_blank" style="font-size:12px;color:#A020F0;text-decoration:underline;font-weight:600;">Accéder au paiement sécurisé →</a>
-          </div>
-
-          <!-- Sécurité -->
-          <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0;margin-bottom:20px;">
-            <tr><td style="padding:14px;">
-              <p style="font-size:13px;font-weight:600;color:#15803d;margin:0 0 3px;">🔒 Paiement 100% sécurisé</p>
-              <p style="font-size:12px;color:#166534;margin:0;">Traité par Stripe. Vos données bancaires ne sont jamais partagées.</p>
-            </td></tr>
-          </table>
-
-          <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0;">⏱ Ce lien est valable <strong>24 heures</strong>.</p>
+          <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0;">⏱ Ce lien est valable 24 heures</p>
+          ${clientNote ? `<div style="margin-top:20px;background:#f0fdf4;border-radius:8px;padding:14px;border:1px solid #bbf7d0;"><p style="font-size:13px;color:#15803d;margin:0;"><strong>Note :</strong> ${clientNote}</p></div>` : ""}
         </td></tr>
-
-        <!-- Footer -->
-        <tr><td style="background:#faf5ff;padding:20px 40px;border-top:1px solid #f0e8ff;text-align:center;">
-          <p style="font-size:13px;font-weight:700;color:#A020F0;margin:0 0 3px;">FENUA SIM</p>
+        <tr><td style="background:#faf5ff;padding:16px 40px;border-top:1px solid #f0e8ff;text-align:center;">
           <p style="font-size:11px;color:#cbd5e1;margin:0;">
-            <a href="https://fenuasim.com" style="color:#A020F0;text-decoration:none;">fenuasim.com</a>
-            &nbsp;·&nbsp;
+            <a href="https://fenuasim.com" style="color:#A020F0;text-decoration:none;">fenuasim.com</a> · 
             <a href="mailto:hello@fenuasim.com" style="color:#A020F0;text-decoration:none;">hello@fenuasim.com</a>
           </p>
         </td></tr>
-
       </table>
     </td></tr>
   </table>
 </body>
-</html>`;
+</html>`,
+      });
+      console.log("✅ Email lien paiement assurance envoyé à:", clientEmail);
+    } catch (emailErr: any) {
+      console.error("❌ Erreur envoi email assurance:", emailErr.message);
+    }
+
+    return res.status(200).json({
+      paymentUrl: session.url,
+      sessionId: session.id,
+      adhesionNumber,
+      contractNumber,
+    });
+
+  } catch (error: any) {
+    console.error("❌ Erreur create-insurance-link (assurance):", error);
+    return res.status(500).json({
+      error: "Erreur serveur lors de la création du contrat",
+      details: error?.message ?? error,
+    });
+  }
 }

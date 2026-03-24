@@ -184,6 +184,7 @@ const initialFormData: InsuranceFormData = {
   city: "",
   additionalTravelers: [],
   selectedOptions: [],
+  optionDateRanges: {},
   acceptTerms: false,
   acceptPrivacy: false,
   acceptMarketing: false,
@@ -237,7 +238,8 @@ export default function InsuranceForm() {
               city: formData.city
             },
             companions: formData.additionalTravelers,
-            options: formData.selectedOptions
+            options: formData.selectedOptions,
+            optionDateRanges: formData.optionDateRanges,
           }
         })
       });
@@ -350,6 +352,7 @@ export default function InsuranceForm() {
               },
               companions: formData.additionalTravelers,
               options: formData.selectedOptions,
+              optionDateRanges: formData.optionDateRanges,
             },
             userEmail: formData.email,
             amount: quote?.premium,

@@ -1,8 +1,7 @@
 // src/lib/ava.ts
 import axios from 'axios';
 import { format, isValid } from 'date-fns';
-import { AVA_TOURIST_OPTIONS } from './ava_options';
-import { supabaseAdmin } from './supabaseAdmin';
+import { AVA_TOURIST_OPTIONS, getOptionsForProduct } from './ava_options';
 
 const AVA_API_URL = process.env.AVA_API_URL || "https://api-ava.fr/api";
 const PARTNER_ID = process.env.AVA_PARTNER_ID;
@@ -10,7 +9,10 @@ const PASSWORD = process.env.AVA_PASSWORD;
 const IS_PROD = process.env.AVA_ENV === 'prod' ? 'true' : 'false';
 const CODE_PRODUIT = "ava_tourist_card";
 
-// 🔧 LOG DU MODE AU DÉMARRAGE
+// Token cache — valide 15 minutes selon doc AVA
+let _cachedToken: string | null = null;
+let _tokenExpiry: number = 0;
+
 console.log(`🔧 Mode AVA: IS_PROD=${IS_PROD} (AVA_ENV=${process.env.AVA_ENV})`);
 
 function assertEnvVar(name: string, value: string | undefined) {
@@ -18,7 +20,13 @@ function assertEnvVar(name: string, value: string | undefined) {
 }
 
 /* --- 1. AUTHENTIFICATION --- */
-export async function getAvaToken() {
+export async function getAvaToken(): Promise<string> {
+  // Retourner le token caché s'il est encore valide (marge de 60s)
+  if (_cachedToken && Date.now() < _tokenExpiry - 60_000) {
+    console.log("🔑 Token AVA depuis cache");
+    return _cachedToken;
+  }
+
   assertEnvVar('AVA_PARTNER_ID', PARTNER_ID);
   assertEnvVar('AVA_PASSWORD', PASSWORD);
 
@@ -32,15 +40,22 @@ export async function getAvaToken() {
     });
 
     const d = response.data;
-    console.log("🔑 Réponse Auth AVA:", JSON.stringify(d));
+    console.log("🔑 Nouveau token AVA obtenu");
 
-    if (d && d.Token) return d.Token;
-    if (d && d.token) return d.token;
-    if (typeof d === 'string' && d.length > 20) return d;
+    let token: string | null = null;
+    if (d && d.Token) token = d.Token;
+    else if (d && d.token) token = d.token;
+    else if (typeof d === 'string' && d.length > 20) token = d;
 
-    throw new Error("Token non reçu");
+    if (!token) throw new Error("Token non reçu");
+
+    // Mise en cache — token valide 15 minutes
+    _cachedToken = token;
+    _tokenExpiry = Date.now() + 15 * 60 * 1000;
+
+    return _cachedToken;
   } catch (error: any) {
-    console.error("❌ Erreur Auth:", error.message);
+    console.error("❌ Erreur Auth AVA:", error.message);
     throw error;
   }
 }
@@ -76,18 +91,28 @@ function buildTarificationPayload(data: any): URLSearchParams {
   const params = new URLSearchParams();
 
   const productType = data.productType || CODE_PRODUIT;
+  // TODO: confirmer le code produit AVA exact pour avantages_pom (en attente retour AVA/ANSET)
   params.append('productType', productType);
   params.append('journeyStartDate', journeyStartDate);
   params.append('journeyEndDate', journeyEndDate);
-  if (productType !== 'avantages_pom') {
+  const isPOM = productType === 'avantages_pom';
+  if (!isPOM) {
     params.append('journeyAmount', String(costPerPerson));
   }
-  if (productType === 'ava_pass') {
+  // journeyRegion : requis pour ava_pass et avantages_360, optionnel pour les autres
+  if (productType === 'ava_pass' || isPOM) {
     params.append('journeyRegion', String(data.destinationRegion || "102"));
+  } else {
+    // Pour tourist_card et carte_sante : envoi de la région si fournie
+    if (data.destinationRegion) {
+      params.append('journeyRegion', String(data.destinationRegion));
+    }
   }
-  if (productType !== 'avantages_pom') {
+
+  if (!isPOM) {
     params.append('numberAdultCompanions', String(companions.length));
   }
+
   if (productType === 'ava_carte_sante') {
     const childCount = companions.filter((c: any) => {
       const birth = new Date(c.birthDate);
@@ -95,33 +120,41 @@ function buildTarificationPayload(data: any): URLSearchParams {
       return age < 20;
     }).length;
     params.append('numberChildrenCompanions', String(childCount));
-  } else {
+  } else if (!isPOM) {
     params.append('numberChildrenCompanions', "0");
   }
-  params.append('numberCompanions', String(companions.length));
+
+  // numberCompanions : requis pour ava_pass et avantages_360 uniquement
+  if (productType === 'ava_pass' || isPOM) {
+    params.append('numberCompanions', String(companions.length));
+  }
 
   const sub = data.subscriber || {};
-  const subscriberInfos = {
+  const subscriberInfos: Record<string, any> = {
       subscriberCountry: data.subscriberCountry || "PF",
       birthdate: subscriberBirth,
-      firstName: sub.firstName || "Prénom",
-      lastName: sub.lastName || "Nom",
-      subscriberEmail: sub.email || "devis@fenuasim.com",
-      address: {
-          street: sub.address || "Rue Test",
-          zip: sub.postalCode || "75000",
-          city: sub.city || "Paris"
-      }
+      firstName: sub.firstName || "",
+      lastName: sub.lastName || "",
+      subscriberEmail: sub.email || "",
   };
+
+  // Adresse : n'inclure que si les champs sont remplis
+  if (sub.address || sub.postalCode || sub.city) {
+      subscriberInfos.address = {
+          street: sub.address || "",
+          zip: sub.postalCode || "",
+          city: sub.city || "",
+      };
+  }
 
   console.log("👤 subscriberInfos envoyé à AVA:", JSON.stringify(subscriberInfos));
   params.append('subscriberInfos', JSON.stringify(subscriberInfos));
 
   const companionsInfos = companions.map((c: any) => ({
-      firstName: c.firstName || "Accompagnant",
-      lastName: c.lastName || "Inconnu",
-      birthdate: toFrDate(c.birthDate) || "01/01/1990",
-      parental_link: "13"
+      firstName: c.firstName || "",
+      lastName: c.lastName || "",
+      birthdate: toFrDate(c.birthDate) || "",
+      parental_link: c.parental_link || "13"
   }));
   params.append('companionsInfos', JSON.stringify(companionsInfos));
 
@@ -141,10 +174,19 @@ function buildTarificationPayload(data: any): URLSearchParams {
               if (!optionsJson[parentId]) optionsJson[parentId] = {};
 
               if (parentOption.type === 'date-range') {
+                  // Utiliser les dates spécifiques saisies par le client, sinon fallback sur les dates du voyage
+                  const dateRange = data.optionDateRanges?.[parentId];
+                  const fromDate = dateRange?.from_date_option
+                      ? toFrDate(dateRange.from_date_option) || journeyStartDate
+                      : journeyStartDate;
+                  const toDate = dateRange?.to_date_option
+                      ? toFrDate(dateRange.to_date_option) || journeyEndDate
+                      : journeyEndDate;
+
                   for (let i = 0; i < totalTravelers; i++) {
                       optionsJson[parentId][String(i)] = {
-                          from_date_option: journeyStartDate,
-                          to_date_option: journeyEndDate,
+                          from_date_option: fromDate,
+                          to_date_option: toDate,
                       };
                   }
               } else {
@@ -162,57 +204,6 @@ function buildTarificationPayload(data: any): URLSearchParams {
   console.log(`📦 Payload AVA — prod=${IS_PROD}, region=${data.destinationRegion}, montant=${costPerPerson}€/pax, options=${JSON.stringify(optionsJson)}`);
 
   return params;
-}
-
-/* --- FETCH + UPLOAD ATTESTATION PDF → Supabase Storage --- */
-async function fetchAndStoreAttestation(
-  attestationUrl: string,
-  adhesionNumber: string,
-  token: string
-): Promise<string | null> {
-  try {
-    console.log(`📥 Fetch attestation PDF: ${attestationUrl}`);
-
-    const pdfResponse = await axios.get(attestationUrl, {
-      headers: { 'Authorization': `Bearer ${token}` },
-      responseType: 'arraybuffer',
-      timeout: 15000,
-    });
-
-    const contentType = pdfResponse.headers['content-type'] || '';
-    if (!contentType.includes('pdf')) {
-      console.warn(`⚠️ Attestation non-PDF reçue (${contentType}) — URL AVA nécessite auth navigateur`);
-      return null;
-    }
-
-    const pdfBuffer = Buffer.from(pdfResponse.data);
-    const fileName = `attestations/${adhesionNumber}-${Date.now()}.pdf`;
-
-    const { error: uploadError } = await supabaseAdmin
-      .storage
-      .from('insurance-documents')
-      .upload(fileName, pdfBuffer, {
-        contentType: 'application/pdf',
-        upsert: true,
-      });
-
-    if (uploadError) {
-      console.error("❌ Erreur upload Supabase Storage:", uploadError.message);
-      return null;
-    }
-
-    const { data: publicUrlData } = supabaseAdmin
-      .storage
-      .from('insurance-documents')
-      .getPublicUrl(fileName);
-
-    console.log(`✅ Attestation stockée: ${publicUrlData.publicUrl}`);
-    return publicUrlData.publicUrl;
-
-  } catch (error: any) {
-    console.error("❌ Erreur fetch/upload attestation:", error.message);
-    return null;
-  }
 }
 
 /* --- 2. CALCUL DU PRIX --- */
@@ -270,16 +261,24 @@ export async function createAvaAdhesion(data: any) {
         console.log("📥 Réponse Adhésion AVA (brut):", JSON.stringify(d));
 
         const adhesionNumber = d?.["Numéro AD"] || d?.numeroAD || d?.adhesion_number;
+        const contractNumber = d?.["Numéro IN"] || d?.numeroIN || null;
         const price = d?.["Prix total avec options (en €)"] || d?.montant_total;
         const contractLink = d?.["Certificat de garantie"] || null;
+        const cgLink = d?.["CG"] || null;
+        const ipidLink = d?.["IPID"] || null;
+        const ficpLink = d?.["FICP"] || null;
 
-        console.log(`✅ Adhésion créée: ${adhesionNumber} | Prix: ${price} | Certificat: ${contractLink}`);
+        console.log(`✅ Adhésion créée: ${adhesionNumber} | Contrat: ${contractNumber} | Prix: ${price} | Certificat: ${contractLink}`);
 
         if (!adhesionNumber) throw new Error("Pas de numéro d'adhésion reçu");
 
         return {
             adhesion_number: adhesionNumber,
+            contract_number: contractNumber,
             contract_link: contractLink,
+            cg_link: cgLink,
+            ipid_link: ipidLink,
+            ficp_link: ficpLink,
             montant_total: price ? parseFloat(String(price)) : 0,
             raw: d,
         };
@@ -311,25 +310,19 @@ export async function validateAvaAdhesion(adhesionNumber: string) {
 
         const certificatUrl = d?.["Certificat de garantie"] || d?.certificat || d?.certificate_url || null;
         const attestationUrlRaw = d?.["Attestation d'assurance"] || d?.attestation || null;
-        const message = d?.message || d?.Message || null;
+        const message = d?.["Succès"] || d?.message || d?.Message || null;
 
-        console.log(`✅ Validation OK | Certificat: ${certificatUrl} | Attestation brute: ${attestationUrlRaw}`);
+        console.log(`✅ Validation OK | Message: ${message} | Certificat: ${certificatUrl} | Attestation brute: ${attestationUrlRaw}`);
 
-        // 📎 Fetch + upload attestation dans Supabase Storage
-        let attestationUrl: string | null = null;
-        if (attestationUrlRaw) {
-            attestationUrl = await fetchAndStoreAttestation(attestationUrlRaw, adhesionNumber, token);
-            // Fallback : si le fetch échoue, on garde l'URL AVA directe
-            if (!attestationUrl) {
-                console.warn("⚠️ Fallback : utilisation URL AVA directe pour l'attestation");
-                attestationUrl = attestationUrlRaw;
-            }
-        }
+        // ℹ️ L'attestation AVA nécessite une session navigateur AVA pour être téléchargée.
+        // Elle est transmise manuellement par l'équipe FENUASIM après validation.
+        console.log(`📎 URL attestation AVA (envoi manuel) : ${attestationUrlRaw}`);
 
         return {
             success: true,
             certificat_url: certificatUrl,
-            attestation_url: attestationUrl,
+            attestation_url: null, // envoi manuel — ne pas transmettre l'URL AVA directe
+            attestation_url_ava: attestationUrlRaw, // conservé pour usage interne/admin
             message,
         };
 

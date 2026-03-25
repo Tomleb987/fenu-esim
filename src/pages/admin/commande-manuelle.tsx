@@ -59,8 +59,14 @@ export default function CommandeManuelle() {
   const [selectedPkg, setSelectedPkg] = useState<Pkg | null>(null);
 
   // Formulaire
-  const [email, setEmail] = useState("");
-  const [currency, setCurrency] = useState<"eur" | "xpf">("eur");
+  const [email, setEmail]         = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName]   = useState("");
+  const [phone, setPhone]         = useState("");
+  const [isCompany, setIsCompany] = useState(false);
+  const [companyName, setCompanyName] = useState("");
+  const [address, setAddress]     = useState("");
+  const [currency, setCurrency]   = useState<"eur" | "xpf">("eur");
   const [amount, setAmount] = useState("");
   const [reference, setReference] = useState("");
   const [partnerCode, setPartnerCode] = useState("");
@@ -131,6 +137,9 @@ export default function CommandeManuelle() {
     if (!email || !selectedPkg || !amount) {
       setError("Email, forfait et montant sont obligatoires"); return;
     }
+    if (isCompany && !companyName.trim()) {
+      setError("La raison sociale est obligatoire"); return;
+    }
     setLoading(true); setError("");
     try {
       const priceNum = parseFloat(amount.replace(",", "."));
@@ -139,6 +148,13 @@ export default function CommandeManuelle() {
       // Insérer dans orders
       const { error: insertErr } = await supabase.from("orders").insert({
         email,
+        customer_name: isCompany ? companyName : (firstName + " " + lastName).trim(),
+        customer_first_name: firstName || null,
+        customer_last_name: lastName || null,
+        customer_phone: phone || null,
+        customer_address: address || null,
+        company_name: isCompany ? companyName : null,
+        is_company: isCompany,
         package_id: selectedPkg.id,
         package_name: selectedPkg.name,
         price: currency === "xpf" ? priceNum : priceNum,
@@ -150,7 +166,7 @@ export default function CommandeManuelle() {
         partner_code: partnerCode || null,
         notes: notes || null,
         created_at: new Date(orderDate).toISOString(),
-        stripe_session_id: null,
+        stripe_session_id: "vir_" + Date.now().toString() + "_" + Math.random().toString(36).slice(2, 8),
       });
 
       if (insertErr) throw new Error(insertErr.message);
@@ -164,6 +180,8 @@ export default function CommandeManuelle() {
 
   const reset = () => {
     setSuccess(false); setEmail(""); setSelectedPkg(null);
+    setFirstName(""); setLastName(""); setPhone(""); setAddress("");
+    setIsCompany(false); setCompanyName("");
     setAmount(""); setReference(""); setPartnerCode(""); setNotes("");
     setSearch(""); setSelectedRegion("");
     setOrderDate(new Date().toISOString().slice(0, 10));
@@ -187,7 +205,8 @@ export default function CommandeManuelle() {
             Elle apparaîtra dans le dashboard et les statistiques.
           </p>
           <div className="bg-gray-50 rounded-xl px-5 py-4 text-sm text-left text-gray-600 mb-6 space-y-1">
-            <p><span className="text-gray-400">Client :</span> <strong>{email}</strong></p>
+            <p><span className="text-gray-400">Client :</span> <strong>{isCompany ? companyName : (firstName + " " + lastName).trim() || email}</strong></p>
+            <p><span className="text-gray-400">Email :</span> {email}</p>
             <p><span className="text-gray-400">Forfait :</span> {selectedPkg?.name}</p>
             <p><span className="text-gray-400">Montant :</span> {currency === "xpf" ? fmtXpf(parseFloat(amount)) : fmtEur(parseFloat(amount))}</p>
             {reference && <p><span className="text-gray-400">Référence :</span> {reference}</p>}
@@ -238,10 +257,54 @@ export default function CommandeManuelle() {
           <div className="space-y-5">
 
             {/* Client */}
-            <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
-              <p className={labelCls}>Client *</p>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-                className={inputCls} placeholder="client@email.com" />
+            <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm space-y-3">
+              <div className="flex items-center justify-between mb-1">
+                <p className={labelCls}>Client *</p>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={isCompany} onChange={e => setIsCompany(e.target.checked)} className="rounded" />
+                  <span className="text-xs text-gray-500">Société</span>
+                </label>
+              </div>
+
+              {isCompany ? (
+                <div>
+                  <label className={labelCls}>Raison sociale *</label>
+                  <input value={companyName} onChange={e => setCompanyName(e.target.value)}
+                    className={inputCls} placeholder="SAS Mon Entreprise" />
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelCls}>Prénom</label>
+                    <input value={firstName} onChange={e => setFirstName(e.target.value)}
+                      className={inputCls} placeholder="Jean" />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Nom</label>
+                    <input value={lastName} onChange={e => setLastName(e.target.value)}
+                      className={inputCls} placeholder="Dupont" />
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className={labelCls}>Email *</label>
+                <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                  className={inputCls} placeholder="client@email.com" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Téléphone</label>
+                  <input type="tel" value={phone} onChange={e => setPhone(e.target.value)}
+                    className={inputCls} placeholder="+689 XX XX XX XX" />
+                </div>
+                <div>
+                  <label className={labelCls}>Adresse</label>
+                  <input value={address} onChange={e => setAddress(e.target.value)}
+                    className={inputCls} placeholder="Ville, Pays" />
+                </div>
+              </div>
             </div>
 
             {/* Devise */}

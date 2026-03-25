@@ -9,7 +9,7 @@ import { useRouter } from "next/router";
 import Head from "next/head";
 import Image from "next/image";
 import {
-  TrendingUp, Shield, Users, Package, LogOut, ChevronRight, Wifi,
+  TrendingUp, Shield, Users, Package, LogOut, ChevronRight, Wifi, PlusCircle,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -65,6 +65,16 @@ const MODULES = [
     icon: Wifi,
     color: "#0284C7",
     bg: "linear-gradient(135deg, #0284C7 0%, #0EA896 100%)",
+    badge: null,
+  },
+  {
+    key: "virement",
+    title: "Vente par virement",
+    desc: "Enregistrer manuellement une vente eSIM reglée par virement bancaire",
+    href: "/admin/commande-manuelle",
+    icon: PlusCircle,
+    color: "#0EA896",
+    bg: "linear-gradient(135deg, #0EA896 0%, #1D9E75 100%)",
     badge: null,
   },
 ];

@@ -15,14 +15,18 @@ import {
 
 const ADMIN_EMAIL = "admin@fenuasim.com";
 const G = "linear-gradient(135deg, #A020F0 0%, #FF4D6D 50%, #FF7F11 100%)";
-const DEPOSIT_AMOUNT = 67;
+const DAILY_RATE_XPF = 500;
+const WEEK_RATE_XPF = 3000;
+const FIXED_DEPOSIT_XPF = 8000;
+const COMMERCIAL_META_PREFIX = "[COMMERCIAL_META]";
 
 // ── Formatage ─────────────────────────────────────────────────
-const fmtEur = (n: number) =>
+const fmtXpf = (n: number) =>
   new Intl.NumberFormat("fr-FR", {
     style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: 2,
+    currency: "XPF",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   }).format(n || 0);
 
 const fmtDate = (s: string) => (s ? new Date(s).toLocaleDateString("fr-FR") : "-");
@@ -50,6 +54,81 @@ const getRentalStatus = (rental: { rental_start: string; rental_end: string; sta
   if (currentDay < startDay) return "upcoming";
   if (currentDay > endDay) return "completed";
   return "active";
+};
+
+const safeJson = async (res: Response) => {
+  const text = await res.text();
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch {
+    return { error: text || "Réponse invalide du serveur" };
+  }
+};
+
+interface CommercialMeta {
+  pricingMode: "daily" | "7days";
+  rentalBase: number;
+  rentalDiscount: number;
+  rentalCharged: number;
+  rentalOffered: boolean;
+  depositReference: number;
+  depositCharged: number;
+  depositOffered: boolean;
+  totalCharged: number;
+  reason: string;
+}
+
+const parseCommercialMeta = (notes?: string | null): CommercialMeta | null => {
+  if (!notes) return null;
+  const line = notes.split("\n").find((item) => item.startsWith(COMMERCIAL_META_PREFIX));
+  if (!line) return null;
+
+  try {
+    return JSON.parse(line.slice(COMMERCIAL_META_PREFIX.length)) as CommercialMeta;
+  } catch {
+    return null;
+  }
+};
+
+const stripCommercialMeta = (notes?: string | null) => {
+  if (!notes) return "";
+  return notes
+    .split("\n")
+    .filter((line) => !line.startsWith(COMMERCIAL_META_PREFIX))
+    .join("\n")
+    .trim();
+};
+
+const buildNotesWithMeta = (userNotes: string, meta: CommercialMeta) => {
+  const clean = userNotes.trim();
+  const metaLine = `${COMMERCIAL_META_PREFIX}${JSON.stringify(meta)}`;
+  return clean ? `${metaLine}\n${clean}` : metaLine;
+};
+
+const getRentalDisplay = (rental: Rental) => {
+  const meta = parseCommercialMeta(rental.notes);
+  const reference = meta?.rentalBase ?? rental.original_rental_amount ?? rental.rental_amount;
+  const charged = meta?.rentalCharged ?? rental.rental_amount;
+  const discount = meta?.rentalDiscount ?? Math.max(0, reference - charged);
+  const offered = meta?.rentalOffered ?? rental.rental_offered ?? false;
+
+  return {
+    reference,
+    charged,
+    discount,
+    offered,
+    meta,
+  };
+};
+
+const getDepositDisplay = (rental: Rental) => {
+  const meta = parseCommercialMeta(rental.notes);
+  return {
+    reference: meta?.depositReference ?? FIXED_DEPOSIT_XPF,
+    charged: meta?.depositCharged ?? rental.deposit_amount,
+    offered: meta?.depositOffered ?? false,
+    meta,
+  };
 };
 
 // ── Types ─────────────────────────────────────────────────────
@@ -224,8 +303,8 @@ export default function AdminRouteurs() {
         body: JSON.stringify({ rentalId: rental.id }),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      const data = await safeJson(res);
+      if (!res.ok) throw new Error(data.error || "Erreur inconnue");
 
       alert("✅ Lien de signature envoyé à " + rental.customer_email);
       load();
@@ -488,6 +567,8 @@ export default function AdminRouteurs() {
                       ? "maintenance"
                       : "available";
 
+                  const rentalDisplay = currentRental ? getRentalDisplay(currentRental) : null;
+
                   return (
                     <div key={r.id} className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
                       <div className="flex items-center justify-between mb-3">
@@ -516,10 +597,10 @@ export default function AdminRouteurs() {
 
                       <p className="text-xs text-gray-400">S/N : {r.serial_number}</p>
                       <p className="text-xs text-gray-400 mt-1">
-                        {fmtEur(r.rental_price_per_day)}/jour · Caution {fmtEur(r.deposit_amount)}
+                        {fmtXpf(r.rental_price_per_day)}/jour · Caution {fmtXpf(r.deposit_amount || FIXED_DEPOSIT_XPF)}
                       </p>
 
-                      {(computedRouterStatus === "active" || computedRouterStatus === "upcoming") && currentRental && (
+                      {(computedRouterStatus === "active" || computedRouterStatus === "upcoming") && currentRental && rentalDisplay && (
                         <div className="mt-3 pt-3 border-t border-gray-100">
                           <p className="text-xs font-medium text-gray-700">
                             {currentRental.customer_name || currentRental.customer_email}
@@ -533,9 +614,9 @@ export default function AdminRouteurs() {
 
                           <p className="text-xs text-gray-400 mt-0.5">
                             {currentRental.rental_days}j ·{" "}
-                            {currentRental.rental_offered
-                              ? `Offerte (valeur ${fmtEur(currentRental.original_rental_amount ?? currentRental.rental_amount)})`
-                              : fmtEur(currentRental.rental_amount)}
+                            {rentalDisplay.offered
+                              ? `Offerte (valeur ${fmtXpf(rentalDisplay.reference)})`
+                              : fmtXpf(rentalDisplay.charged)}
                           </p>
 
                           <div className="flex gap-1.5 mt-2">
@@ -665,116 +746,129 @@ function RentalTable({
         </thead>
 
         <tbody>
-          {rentals.map((r) => (
-            <tr key={r.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50">
-              <td className="px-4 py-3">
-                <p className="font-medium text-gray-800">{r.customer_name || "-"}</p>
-                <p className="text-xs text-gray-400">{r.customer_email}</p>
-                {r.customer_phone && <p className="text-xs text-gray-400">{r.customer_phone}</p>}
-              </td>
+          {rentals.map((r) => {
+            const rentalDisplay = getRentalDisplay(r);
+            const depositDisplay = getDepositDisplay(r);
 
-              <td className="px-4 py-3">
-                <p className="text-gray-700">{r.routers?.model || "-"}</p>
-                <p className="text-xs text-gray-400">{r.routers?.serial_number}</p>
-              </td>
+            return (
+              <tr key={r.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50">
+                <td className="px-4 py-3">
+                  <p className="font-medium text-gray-800">{r.customer_name || "-"}</p>
+                  <p className="text-xs text-gray-400">{r.customer_email}</p>
+                  {r.customer_phone && <p className="text-xs text-gray-400">{r.customer_phone}</p>}
+                </td>
 
-              <td className="px-4 py-3">
-                <p className="text-gray-700">
-                  {fmtDate(r.rental_start)} → {fmtDate(r.rental_end)}
-                </p>
-                <p className="text-xs text-gray-400">
-                  {r.rental_days} jour{r.rental_days > 1 ? "s" : ""}
-                </p>
-              </td>
+                <td className="px-4 py-3">
+                  <p className="text-gray-700">{r.routers?.model || "-"}</p>
+                  <p className="text-xs text-gray-400">{r.routers?.serial_number}</p>
+                </td>
 
-              <td className="px-4 py-3 text-right">
-                <p className="font-semibold text-gray-800">
-                  {r.rental_offered ? "Offerte" : fmtEur(r.rental_amount)}
-                </p>
-                <p className="text-xs text-gray-400">
-                  {r.rental_offered
-                    ? `Valeur ${fmtEur(r.original_rental_amount ?? r.rental_amount)}`
-                    : r.payment_status === "paid"
-                      ? "✓ Payé"
-                      : "En attente"}
-                </p>
-              </td>
+                <td className="px-4 py-3">
+                  <p className="text-gray-700">
+                    {fmtDate(r.rental_start)} → {fmtDate(r.rental_end)}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {r.rental_days} jour{r.rental_days > 1 ? "s" : ""}
+                  </p>
+                </td>
 
-              <td className="px-4 py-3 text-right">
-                <p className="text-gray-700">{fmtEur(r.deposit_amount)}</p>
-                <Badge
-                  label={
-                    r.deposit_status === "held"
-                      ? "Détenue"
-                      : r.deposit_status === "refunded"
-                        ? "Restituée"
-                        : "Retenue"
-                  }
-                  color={
-                    r.deposit_status === "held"
-                      ? "amber"
-                      : r.deposit_status === "refunded"
-                        ? "green"
-                        : "red"
-                  }
-                />
-              </td>
+                <td className="px-4 py-3 text-right">
+                  <p className="font-semibold text-gray-800">
+                    {rentalDisplay.offered ? "Offerte" : fmtXpf(rentalDisplay.charged)}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {rentalDisplay.offered
+                      ? `Valeur ${fmtXpf(rentalDisplay.reference)}`
+                      : rentalDisplay.discount > 0
+                        ? `Remise ${fmtXpf(rentalDisplay.discount)}`
+                        : r.payment_status === "paid"
+                          ? "✓ Payé"
+                          : "En attente"}
+                  </p>
+                </td>
 
-              <td className="px-4 py-3 text-right">
-                {r.order_id ? (
-                  <div className="flex items-center justify-end gap-1 text-xs text-purple-600">
-                    <Wifi size={11} />
-                    <span>{r.esim_package_name || "eSIM liée"}</span>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => onLinkEsim(r)}
-                    className="text-xs text-gray-400 hover:text-purple-600 flex items-center gap-1 ml-auto"
-                  >
-                    <Wifi size={11} /> Lier
-                  </button>
-                )}
-              </td>
+                <td className="px-4 py-3 text-right">
+                  <p className="text-gray-700">
+                    {depositDisplay.offered ? "Offerte" : fmtXpf(depositDisplay.charged)}
+                  </p>
+                  <Badge
+                    label={
+                      r.deposit_status === "pending"
+                        ? "En attente"
+                        : r.deposit_status === "held"
+                          ? "Détenue"
+                          : r.deposit_status === "refunded"
+                            ? "Restituée"
+                            : "Retenue"
+                    }
+                    color={
+                      r.deposit_status === "pending"
+                        ? "gray"
+                        : r.deposit_status === "held"
+                          ? "amber"
+                          : r.deposit_status === "refunded"
+                            ? "green"
+                            : "red"
+                    }
+                  />
+                </td>
 
-              <td className="px-4 py-3 text-right">
-                <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                  <button
-                    onClick={() => onInvoice(r)}
-                    className="text-xs px-2 py-1 rounded-lg border border-purple-200 text-purple-700 hover:bg-purple-50"
-                    title="Télécharger la facture"
-                  >
-                    <Download size={11} />
-                  </button>
-
-                  <button
-                    onClick={() => onContract(r)}
-                    className="text-xs px-2 py-1 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50"
-                    title="Télécharger le contrat"
-                  >
-                    Contrat
-                  </button>
-
-                  <button
-                    onClick={() => onYouSign(r)}
-                    disabled={sendingContract === r.id}
-                    className="text-xs px-2 py-1 rounded-lg border border-blue-200 text-blue-700 hover:bg-blue-50 disabled:opacity-50"
-                    title="Envoyer le lien de signature"
-                  >
-                    {sendingContract === r.id ? "Envoi…" : "Signature"}
-                  </button>
-
-                  {(getRentalStatus(r) === "active" || getRentalStatus(r) === "upcoming") && (
+                <td className="px-4 py-3 text-right">
+                  {r.order_id ? (
+                    <div className="flex items-center justify-end gap-1 text-xs text-purple-600">
+                      <Wifi size={11} />
+                      <span>{r.esim_package_name || "eSIM liée"}</span>
+                    </div>
+                  ) : (
                     <button
-                      onClick={() => onReturn(r)}
-                      className="text-xs px-2 py-1 rounded-lg border border-green-200 text-green-700 hover:bg-green-50"
+                      onClick={() => onLinkEsim(r)}
+                      className="text-xs text-gray-400 hover:text-purple-600 flex items-center gap-1 ml-auto"
                     >
-                      Retour
+                      <Wifi size={11} /> Lier
                     </button>
                   )}
-                </div>
-              </td>
-            </tr>
-          ))}
+                </td>
+
+                <td className="px-4 py-3 text-right">
+                  <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                    <button
+                      onClick={() => onInvoice(r)}
+                      className="text-xs px-2 py-1 rounded-lg border border-purple-200 text-purple-700 hover:bg-purple-50"
+                      title="Télécharger la facture"
+                    >
+                      <Download size={11} />
+                    </button>
+
+                    <button
+                      onClick={() => onContract(r)}
+                      className="text-xs px-2 py-1 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50"
+                      title="Télécharger le contrat"
+                    >
+                      Contrat
+                    </button>
+
+                    <button
+                      onClick={() => onYouSign(r)}
+                      disabled={sendingContract === r.id}
+                      className="text-xs px-2 py-1 rounded-lg border border-blue-200 text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                      title="Envoyer le lien de signature"
+                    >
+                      {sendingContract === r.id ? "Envoi…" : "Signature"}
+                    </button>
+
+                    {(getRentalStatus(r) === "active" || getRentalStatus(r) === "upcoming") && (
+                      <button
+                        onClick={() => onReturn(r)}
+                        className="text-xs px-2 py-1 rounded-lg border border-green-200 text-green-700 hover:bg-green-50"
+                      >
+                        Retour
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -799,8 +893,12 @@ function NewRentalModal({
     customer_phone: "",
     rental_start: todayStr,
     rental_end: "",
+    pricing_mode: "daily" as "daily" | "7days",
+    discount_amount: "0",
+    offer_rental: false,
+    offer_deposit: false,
+    commercial_reason: "",
     notes: "",
-    rental_offered: false,
   });
 
   const [saving, setSaving] = useState(false);
@@ -823,9 +921,14 @@ function NewRentalModal({
         )
       : 0;
 
-  const originalRentalAmount = days * (selectedRouter?.rental_price_per_day ?? 0);
-  const rentalAmount = form.rental_offered ? 0 : originalRentalAmount;
-  const totalWithDeposit = rentalAmount + DEPOSIT_AMOUNT;
+  const pricingMode = form.pricing_mode;
+  const rentalBase = pricingMode === "7days" ? WEEK_RATE_XPF : days * DAILY_RATE_XPF;
+  const customDiscount = Math.max(0, parseFloat(form.discount_amount) || 0);
+  const rentalDiscount = form.offer_rental ? rentalBase : Math.min(customDiscount, rentalBase);
+  const rentalCharged = Math.max(0, rentalBase - rentalDiscount);
+  const depositReference = FIXED_DEPOSIT_XPF;
+  const depositCharged = form.offer_deposit ? 0 : depositReference;
+  const totalCharged = rentalCharged + depositCharged;
 
   const set = (k: string, v: string | boolean) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -841,7 +944,7 @@ function NewRentalModal({
         body: JSON.stringify({ start, end }),
       });
 
-      const data = await res.json();
+      const data = await safeJson(res);
       const map: Record<string, { available: boolean; next_available: string | null }> = {};
 
       (data.routers ?? []).forEach((r: any) => {
@@ -880,6 +983,18 @@ function NewRentalModal({
 
     try {
       const computedStatus = form.rental_start <= today() ? "active" : "upcoming";
+      const commercialMeta: CommercialMeta = {
+        pricingMode,
+        rentalBase,
+        rentalDiscount,
+        rentalCharged,
+        rentalOffered: form.offer_rental,
+        depositReference,
+        depositCharged,
+        depositOffered: form.offer_deposit,
+        totalCharged,
+        reason: form.commercial_reason.trim(),
+      };
 
       const { data: rental, error } = await supabase
         .from("router_rentals")
@@ -891,15 +1006,15 @@ function NewRentalModal({
           rental_start: form.rental_start,
           rental_end: form.rental_end,
           rental_days: days,
-          price_per_day: selectedRouter?.rental_price_per_day ?? 0,
-          original_rental_amount: originalRentalAmount,
-          rental_amount: rentalAmount,
-          rental_offered: form.rental_offered,
-          deposit_amount: DEPOSIT_AMOUNT,
-          deposit_status: "held",
-          payment_status: "pending",
+          price_per_day: pricingMode === "7days" ? WEEK_RATE_XPF : DAILY_RATE_XPF,
+          original_rental_amount: rentalBase,
+          rental_amount: rentalCharged,
+          rental_offered: form.offer_rental,
+          deposit_amount: depositCharged,
+          deposit_status: depositCharged > 0 ? "pending" : "refunded",
+          payment_status: totalCharged > 0 ? "pending" : "paid",
           status: computedStatus,
-          notes: form.notes,
+          notes: buildNotesWithMeta(form.notes, commercialMeta),
         })
         .select("id")
         .single();
@@ -908,21 +1023,41 @@ function NewRentalModal({
 
       setCreatedRentalId(rental.id);
 
-      const stripeRes = await fetch("/api/admin/router-payment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "create_checkout", rentalId: rental.id }),
-      });
-
-      if (stripeRes.ok) {
-        const { url } = await stripeRes.json();
-        setStripeLink(url);
-      } else {
-        const err = await stripeRes.json();
-        alert(`Erreur Stripe : ${err.error}`);
+      if (totalCharged <= 0) {
+        alert("Location créée sans montant à encaisser.");
+        onDone();
+        return;
       }
 
-      await supabase.from("routers").update({ status: "rented" }).eq("id", form.router_id);
+      let paymentLinkError = "";
+
+      try {
+        const stripeRes = await fetch("/api/admin/router-payment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "create_checkout", rentalId: rental.id }),
+        });
+
+        const payload = await safeJson(stripeRes);
+
+        if (stripeRes.ok && payload?.url) {
+          setStripeLink(payload.url);
+        } else {
+          paymentLinkError =
+            payload?.error ||
+            "Le module de paiement routeur n'est pas encore configuré.";
+        }
+      } catch {
+        paymentLinkError = "Le module de paiement routeur n'est pas disponible.";
+      }
+
+      if (paymentLinkError) {
+        alert(
+          `Location créée, mais le lien de paiement n'a pas pu être généré.\n\n${paymentLinkError}\n\nLa location reste enregistrée en attente de paiement.`
+        );
+        onDone();
+        return;
+      }
     } catch (err: any) {
       alert(`Erreur : ${err.message}`);
     } finally {
@@ -981,7 +1116,7 @@ function NewRentalModal({
             return (
               <option key={r.id} value={r.id} disabled={unavail}>
                 {unavail ? "⛔ " : form.rental_start && form.rental_end ? "✓ " : ""}
-                {r.model} — {r.serial_number} ({fmtEur(r.rental_price_per_day)}/j)
+                {r.model} — {r.serial_number} ({fmtXpf(r.rental_price_per_day || DAILY_RATE_XPF)}/j)
                 {unavail && avail.next_available
                   ? " — libre le " + new Date(avail.next_available).toLocaleDateString("fr-FR")
                   : ""}
@@ -1042,6 +1177,31 @@ function NewRentalModal({
         </Field>
       </div>
 
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Tarification">
+          <select
+            value={form.pricing_mode}
+            onChange={(e) => set("pricing_mode", e.target.value)}
+            className={inputCls}
+          >
+            <option value="daily">Journalier — {fmtXpf(DAILY_RATE_XPF)}/jour</option>
+            <option value="7days">Forfait 7 jours — {fmtXpf(WEEK_RATE_XPF)}</option>
+          </select>
+        </Field>
+
+        <Field label="Remise location (XPF)">
+          <input
+            type="number"
+            min="0"
+            value={form.discount_amount}
+            onChange={(e) => set("discount_amount", e.target.value)}
+            className={inputCls}
+            disabled={form.offer_rental}
+            placeholder="0"
+          />
+        </Field>
+      </div>
+
       <Field label="Email client *">
         <input
           type="email"
@@ -1072,19 +1232,41 @@ function NewRentalModal({
         />
       </Field>
 
-      <Field label="Offre commerciale">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={form.rental_offered}
-            onChange={(e) => set("rental_offered", e.target.checked)}
-            className="rounded"
-          />
-          <span className="text-sm text-gray-700">Offrir la location du routeur</span>
-        </label>
-        <p className="text-xs text-gray-400 mt-1">
-          Le client paiera uniquement la caution de {fmtEur(DEPOSIT_AMOUNT)}.
+      <Field label="Gestes commerciaux">
+        <div className="space-y-2">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.offer_rental}
+              onChange={(e) => set("offer_rental", e.target.checked)}
+              className="rounded"
+            />
+            <span className="text-sm text-gray-700">Offrir la location</span>
+          </label>
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.offer_deposit}
+              onChange={(e) => set("offer_deposit", e.target.checked)}
+              className="rounded"
+            />
+            <span className="text-sm text-gray-700">Offrir la caution</span>
+          </label>
+        </div>
+        <p className="text-xs text-gray-400 mt-2">
+          Tu peux offrir la location, la caution, ou appliquer une remise libre sur la location.
         </p>
+      </Field>
+
+      <Field label="Motif commercial">
+        <input
+          type="text"
+          value={form.commercial_reason}
+          onChange={(e) => set("commercial_reason", e.target.value)}
+          className={inputCls}
+          placeholder="Ex : geste commercial, influenceur, partenaire..."
+        />
       </Field>
 
       <Field label="Notes">
@@ -1101,31 +1283,38 @@ function NewRentalModal({
         <div className="bg-gray-50 rounded-xl p-4 mb-4 text-sm">
           <div className="flex justify-between mb-1">
             <span className="text-gray-500">
-              Loyer théorique ({days}j × {fmtEur(selectedRouter?.rental_price_per_day ?? 0)})
+              {pricingMode === "7days"
+                ? `Forfait 7 jours`
+                : `Loyer théorique (${days}j × ${fmtXpf(DAILY_RATE_XPF)})`}
             </span>
-            <span className="font-medium">{fmtEur(originalRentalAmount)}</span>
+            <span className="font-medium">{fmtXpf(rentalBase)}</span>
           </div>
 
-          {form.rental_offered && (
+          {rentalDiscount > 0 && (
             <div className="flex justify-between mb-1">
               <span className="text-green-600">Remise commerciale</span>
-              <span className="font-medium text-green-600">- {fmtEur(originalRentalAmount)}</span>
+              <span className="font-medium text-green-600">- {fmtXpf(rentalDiscount)}</span>
             </div>
           )}
 
           <div className="flex justify-between mb-1">
-            <span className="text-gray-500">Loyer facturé</span>
-            <span className="font-medium">{fmtEur(rentalAmount)}</span>
+            <span className="text-gray-500">Location facturée</span>
+            <span className="font-medium">{form.offer_rental ? "Offerte" : fmtXpf(rentalCharged)}</span>
           </div>
 
           <div className="flex justify-between mb-1">
-            <span className="text-gray-500">Caution (remboursable)</span>
-            <span className="font-medium">{fmtEur(DEPOSIT_AMOUNT)}</span>
+            <span className="text-gray-500">Caution standard</span>
+            <span className="font-medium">{fmtXpf(depositReference)}</span>
+          </div>
+
+          <div className="flex justify-between mb-1">
+            <span className="text-gray-500">Caution facturée</span>
+            <span className="font-medium">{form.offer_deposit ? "Offerte" : fmtXpf(depositCharged)}</span>
           </div>
 
           <div className="flex justify-between pt-2 border-t border-gray-200 font-semibold">
             <span>Total à encaisser</span>
-            <span style={{ color: "#A020F0" }}>{fmtEur(totalWithDeposit)}</span>
+            <span style={{ color: "#A020F0" }}>{fmtXpf(totalCharged)}</span>
           </div>
         </div>
       )}
@@ -1144,7 +1333,7 @@ function NewRentalModal({
           className="flex-1 text-sm px-4 py-2.5 rounded-xl text-white font-medium disabled:opacity-50"
           style={{ background: G }}
         >
-          {saving ? "Création…" : "Créer + lien Stripe"}
+          {saving ? "Création…" : "Créer la location"}
         </button>
       </div>
     </Modal>
@@ -1161,7 +1350,11 @@ function ReturnModal({
   onClose: () => void;
   onDone: () => void;
 }) {
-  const [depositAction, setDepositAction] = useState<"refund" | "retain_partial" | "retain_full">("refund");
+  const depositDisplay = getDepositDisplay(rental);
+  const effectiveDeposit = depositDisplay.charged;
+  const [depositAction, setDepositAction] = useState<"refund" | "retain_partial" | "retain_full">(
+    effectiveDeposit > 0 ? "refund" : "retain_full"
+  );
   const [retainAmount, setRetainAmount] = useState("");
   const [retainReason, setRetainReason] = useState("");
   const [saving, setSaving] = useState(false);
@@ -1172,29 +1365,37 @@ function ReturnModal({
     try {
       const retained =
         depositAction === "retain_full"
-          ? rental.deposit_amount
+          ? effectiveDeposit
           : depositAction === "retain_partial"
-            ? parseFloat(retainAmount) || 0
+            ? Math.min(parseFloat(retainAmount) || 0, effectiveDeposit)
             : 0;
 
-      const refunded = rental.deposit_amount - retained;
+      const refunded = Math.max(0, effectiveDeposit - retained);
 
       if (rental.stripe_payment_intent && refunded > 0) {
-        const refundRes = await fetch("/api/admin/router-payment", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "refund_deposit",
-            rentalId: rental.id,
-            amount: refunded,
-          }),
-        });
+        try {
+          const refundRes = await fetch("/api/admin/router-payment", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "refund_deposit",
+              rentalId: rental.id,
+              amount: refunded,
+            }),
+          });
 
-        if (!refundRes.ok) {
-          const err = await refundRes.json();
-          const proceed = confirm(`Remboursement Stripe échoué : ${err.error}
+          const payload = await safeJson(refundRes);
 
-Continuer quand même et marquer manuellement ?`);
+          if (!refundRes.ok) {
+            const proceed = confirm(`Remboursement Stripe échoué : ${payload.error || "Erreur inconnue"}\n\nContinuer quand même et marquer manuellement ?`);
+
+            if (!proceed) {
+              setSaving(false);
+              return;
+            }
+          }
+        } catch {
+          const proceed = confirm(`Le module de remboursement Stripe n'est pas disponible.\n\nContinuer quand même et marquer le remboursement manuellement ?`);
 
           if (!proceed) {
             setSaving(false);
@@ -1209,11 +1410,13 @@ Continuer quand même et marquer manuellement ?`);
           status: "completed",
           actual_return: today(),
           deposit_status:
-            depositAction === "refund"
+            effectiveDeposit === 0
               ? "refunded"
-              : depositAction === "retain_full"
-                ? "fully_retained"
-                : "partially_retained",
+              : depositAction === "refund"
+                ? "refunded"
+                : depositAction === "retain_full"
+                  ? "fully_retained"
+                  : "partially_retained",
           deposit_refunded_amount: refunded,
           deposit_retained_amount: retained,
           deposit_retention_reason: retainReason || null,
@@ -1237,66 +1440,76 @@ Continuer quand même et marquer manuellement ?`);
         <p className="font-medium text-gray-700">
           {rental.customer_name} — {rental.routers?.model}
         </p>
-        <p className="text-xs text-gray-400 mt-1">Caution détenue : {fmtEur(rental.deposit_amount)}</p>
-        {rental.stripe_payment_intent ? (
+        <p className="text-xs text-gray-400 mt-1">Caution encaissée : {fmtXpf(effectiveDeposit)}</p>
+        {effectiveDeposit === 0 ? (
+          <p className="text-xs text-blue-600 mt-1">✓ Aucune caution à restituer</p>
+        ) : rental.stripe_payment_intent ? (
           <p className="text-xs text-green-600 mt-1">✓ Remboursement Stripe automatique</p>
         ) : (
           <p className="text-xs text-amber-600 mt-1">⚠ Pas de paiement Stripe — remboursement manuel</p>
         )}
       </div>
 
-      <Field label="Caution">
-        <div className="space-y-2">
-          {[
-            {
-              key: "refund",
-              label: `Restituer intégralement (${fmtEur(rental.deposit_amount)})`,
-              color: "text-green-600",
-            },
-            { key: "retain_partial", label: "Retenue partielle", color: "text-amber-600" },
-            {
-              key: "retain_full",
-              label: `Retenue totale (${fmtEur(rental.deposit_amount)})`,
-              color: "text-red-600",
-            },
-          ].map((opt) => (
-            <label key={opt.key} className="flex items-center gap-2 cursor-pointer">
+      {effectiveDeposit > 0 ? (
+        <>
+          <Field label="Caution">
+            <div className="space-y-2">
+              {[
+                {
+                  key: "refund",
+                  label: `Restituer intégralement (${fmtXpf(effectiveDeposit)})`,
+                  color: "text-green-600",
+                },
+                { key: "retain_partial", label: "Retenue partielle", color: "text-amber-600" },
+                {
+                  key: "retain_full",
+                  label: `Retenue totale (${fmtXpf(effectiveDeposit)})`,
+                  color: "text-red-600",
+                },
+              ].map((opt) => (
+                <label key={opt.key} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="deposit"
+                    value={opt.key}
+                    checked={depositAction === opt.key}
+                    onChange={() => setDepositAction(opt.key as "refund" | "retain_partial" | "retain_full")}
+                  />
+                  <span className={`text-sm ${opt.color}`}>{opt.label}</span>
+                </label>
+              ))}
+            </div>
+          </Field>
+
+          {depositAction === "retain_partial" && (
+            <Field label="Montant retenu (XPF)">
               <input
-                type="radio"
-                name="deposit"
-                value={opt.key}
-                checked={depositAction === opt.key}
-                onChange={() => setDepositAction(opt.key as "refund" | "retain_partial" | "retain_full")}
+                type="number"
+                value={retainAmount}
+                onChange={(e) => setRetainAmount(e.target.value)}
+                className={inputCls}
+                placeholder="Ex: 2000"
+                max={effectiveDeposit}
               />
-              <span className={`text-sm ${opt.color}`}>{opt.label}</span>
-            </label>
-          ))}
+            </Field>
+          )}
+
+          {depositAction !== "refund" && (
+            <Field label="Motif de retenue">
+              <input
+                type="text"
+                value={retainReason}
+                onChange={(e) => setRetainReason(e.target.value)}
+                className={inputCls}
+                placeholder="Ex: Câble manquant, écran rayé..."
+              />
+            </Field>
+          )}
+        </>
+      ) : (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-3 text-xs text-blue-700 mb-4">
+          Cette location a été créée avec une caution offerte. Le retour peut être clôturé directement.
         </div>
-      </Field>
-
-      {depositAction === "retain_partial" && (
-        <Field label="Montant retenu (€)">
-          <input
-            type="number"
-            value={retainAmount}
-            onChange={(e) => setRetainAmount(e.target.value)}
-            className={inputCls}
-            placeholder="Ex: 20"
-            max={rental.deposit_amount}
-          />
-        </Field>
-      )}
-
-      {depositAction !== "refund" && (
-        <Field label="Motif de retenue">
-          <input
-            type="text"
-            value={retainReason}
-            onChange={(e) => setRetainReason(e.target.value)}
-            className={inputCls}
-            placeholder="Ex: Câble manquant, écran rayé..."
-          />
-        </Field>
       )}
 
       <div className="flex gap-2 mt-4">
@@ -1325,8 +1538,8 @@ function AddRouterModal({ onClose, onDone }: { onClose: () => void; onDone: () =
   const [form, setForm] = useState({
     model: "",
     serial_number: "",
-    rental_price_per_day: "5",
-    deposit_amount: "67",
+    rental_price_per_day: String(DAILY_RATE_XPF),
+    deposit_amount: String(FIXED_DEPOSIT_XPF),
     imei: "",
   });
   const [saving, setSaving] = useState(false);
@@ -1368,7 +1581,7 @@ function AddRouterModal({ onClose, onDone }: { onClose: () => void; onDone: () =
           value={form.model}
           onChange={(e) => set("model", e.target.value)}
           className={inputCls}
-          placeholder="Ex: Glocalme G4 Pro"
+          placeholder="Ex: GlocalMe UPP"
         />
       </Field>
 
@@ -1393,7 +1606,7 @@ function AddRouterModal({ onClose, onDone }: { onClose: () => void; onDone: () =
       </Field>
 
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Prix/jour (€)">
+        <Field label="Prix/jour (XPF)">
           <input
             type="number"
             value={form.rental_price_per_day}
@@ -1402,7 +1615,7 @@ function AddRouterModal({ onClose, onDone }: { onClose: () => void; onDone: () =
           />
         </Field>
 
-        <Field label="Caution (€)">
+        <Field label="Caution (XPF)">
           <input
             type="number"
             value={form.deposit_amount}
@@ -1498,12 +1711,11 @@ function LinkEsimModal({
         {orders.map((o) => (
           <div key={o.id} className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
             <div>
-              <p className="text-sm font-medium text-gray-700">{o.package_name}</p>
+              <p className="text-sm font-medium text-gray-800">{o.package_name}</p>
               <p className="text-xs text-gray-400">
                 {o.email} · {fmtDate(o.created_at)}
               </p>
             </div>
-
             <button
               onClick={() => handleLink(o.id)}
               disabled={saving}
@@ -1514,7 +1726,7 @@ function LinkEsimModal({
           </div>
         ))}
 
-        {orders.length === 0 && search && (
+        {!searching && orders.length === 0 && (
           <p className="text-xs text-gray-400 text-center py-4">Aucune commande trouvée</p>
         )}
       </div>
@@ -1522,4 +1734,7 @@ function LinkEsimModal({
   );
 }
 
-AdminRouteurs.getLayout = (page: ReactElement) => page;
+// ── Layout admin ──────────────────────────────────────────────
+AdminRouteurs.getLayout = function getLayout(page: ReactElement) {
+  return page;
+};

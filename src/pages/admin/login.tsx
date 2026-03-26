@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -11,16 +12,43 @@ export default function AdminLoginPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    let isMounted = true;
+
+    const checkSession = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!isMounted) return;
+
+      if (session) {
+        router.replace("/admin");
+      } else {
+        setCheckingSession(false);
+      }
+    };
+
+    checkSession();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!isMounted) return;
+
       if (session) {
         router.replace("/admin");
       } else {
         setCheckingSession(false);
       }
     });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, [router]);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setError("");
@@ -40,7 +68,11 @@ export default function AdminLoginPage() {
   };
 
   if (checkingSession) {
-    return <div className="p-6">Vérification de la session…</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50">
+        <div className="text-sm text-gray-600">Vérification de la session…</div>
+      </div>
+    );
   }
 
   return (
@@ -64,6 +96,7 @@ export default function AdminLoginPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="w-full rounded-xl border px-3 py-2"
+            autoComplete="email"
             required
           />
         </div>
@@ -75,6 +108,7 @@ export default function AdminLoginPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="w-full rounded-xl border px-3 py-2"
+            autoComplete="current-password"
             required
           />
         </div>

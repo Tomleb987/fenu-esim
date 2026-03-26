@@ -26,17 +26,29 @@ const fmtEur = (n: number) =>
   }).format(n || 0);
 
 const fmtDate = (s: string) => (s ? new Date(s).toLocaleDateString("fr-FR") : "-");
-const today = () => new Date().toISOString().slice(0, 10);
+
+const today = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const dateOnly = (value: string) => {
+  if (!value) return "";
+  return value.slice(0, 10);
+};
 
 const getRentalStatus = (rental: { rental_start: string; rental_end: string; status?: string }) => {
   if (rental.status === "completed" || rental.status === "cancelled") return rental.status;
 
-  const now = new Date();
-  const start = new Date(`${rental.rental_start}T00:00:00`);
-  const end = new Date(`${rental.rental_end}T23:59:59`);
+  const currentDay = today();
+  const startDay = dateOnly(rental.rental_start);
+  const endDay = dateOnly(rental.rental_end);
 
-  if (now < start) return "upcoming";
-  if (now > end) return "completed";
+  if (currentDay < startDay) return "upcoming";
+  if (currentDay > endDay) return "completed";
   return "active";
 };
 
@@ -281,7 +293,14 @@ export default function AdminRouteurs() {
     return computed === "completed" || computed === "cancelled";
   });
 
-  const availableCount = routers.filter((r) => r.status === "available").length;
+  const availableCount = routers.filter((routerItem) => {
+    const hasBlockingRental = rentals.some(
+      (r) =>
+        r.router_id === routerItem.id &&
+        (getRentalStatus(r) === "active" || getRentalStatus(r) === "upcoming")
+    );
+    return !hasBlockingRental;
+  }).length;
 
   return (
     <>
@@ -463,12 +482,11 @@ export default function AdminRouteurs() {
                       (getRentalStatus(rl) === "active" || getRentalStatus(rl) === "upcoming")
                   );
 
-                  const computedRouterStatus =
-                    r.status === "available"
-                      ? "available"
-                      : currentRental
-                        ? getRentalStatus(currentRental)
-                        : "maintenance";
+                  const computedRouterStatus = currentRental
+                    ? getRentalStatus(currentRental)
+                    : r.status === "maintenance"
+                      ? "maintenance"
+                      : "available";
 
                   return (
                     <div key={r.id} className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
@@ -787,8 +805,8 @@ function NewRentalModal({
 
   const [saving, setSaving] = useState(false);
   const [stripeLink, setStripeLink] = useState("");
-  const [checking, setChecking] = useState(false);
   const [createdRentalId, setCreatedRentalId] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
   const [availability, setAvailability] = useState<
     Record<string, { available: boolean; next_available: string | null }>
   >({});
@@ -848,7 +866,7 @@ function NewRentalModal({
       return;
     }
 
-    if (new Date(form.rental_end) <= new Date(form.rental_start)) {
+    if (form.rental_end <= form.rental_start) {
       alert("La date de fin doit être après la date de début");
       return;
     }
@@ -861,8 +879,7 @@ function NewRentalModal({
     setSaving(true);
 
     try {
-      const computedStatus =
-        new Date(`${form.rental_start}T00:00:00`) <= new Date() ? "active" : "upcoming";
+      const computedStatus = form.rental_start <= today() ? "active" : "upcoming";
 
       const { data: rental, error } = await supabase
         .from("router_rentals")

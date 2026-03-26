@@ -84,15 +84,41 @@ export default function AdminHome() {
   const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
-    if (!router.isReady) return;
+    let isMounted = true;
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        router.replace("/admin/login");
-      } else {
+    const checkSession = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!isMounted) return;
+
+      if (session) {
         setAuthChecked(true);
+      } else {
+        router.replace("/admin/login");
+      }
+    };
+
+    checkSession();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!isMounted) return;
+
+      if (session) {
+        setAuthChecked(true);
+      } else {
+        setAuthChecked(false);
+        router.replace("/admin/login");
       }
     });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, [router]);
 
   const handleLogout = async () => {
@@ -205,7 +231,7 @@ export default function AdminHome() {
               Bonjour 👋
             </h1>
             <p style={{ color: "#9CA3AF", fontSize: 14, margin: 0 }}>
-              Que souhaitez-vous gérer aujourd'hui ?
+              Que souhaitez-vous gérer aujourd&apos;hui ?
             </p>
           </div>
 

@@ -56,7 +56,7 @@ export default function FenuaSimBox() {
     <>
       <Head>
         <title>FENUASIM BOX — Routeur WiFi de voyage | FENUA SIM</title>
-        <meta name="description" content="Pas de téléphone compatible eSIM ? En famille, en business ou petit budget ? Louez la FENUASIM BOX — routeur WiFi portable à partager. 10€/jour, caution 67€ remboursable." />
+        <meta name="description" content="Pas de téléphone compatible eSIM ? En famille, en business ou petit budget ? Louez la FENUASIM BOX — routeur WiFi portable à partager. À partir de 5€/jour, caution 67€ remboursable." />
         <link rel="canonical" href="https://www.fenuasim.com/fenuasimbox" />
       </Head>
 
@@ -209,7 +209,7 @@ export default function FenuaSimBox() {
             {[
               {
                 label: "Location",
-                value: currency === "eur" ? "10 €/jour" : "1 193 XPF/j",
+                value: currency === "eur" ? "5 €/jour" : "596 XPF/j",
                 sub: "Quel que soit le nombre d'appareils"
               },
               {
@@ -219,7 +219,7 @@ export default function FenuaSimBox() {
               },
               {
                 label: "À 4 voyageurs",
-                value: currency === "eur" ? "2,50 €/j" : "298 XPF/j",
+                value: currency === "eur" ? "1,25 €/j" : "149 XPF/j",
                 sub: "Par personne en partageant"
               },
             ].map(t => (
@@ -232,8 +232,8 @@ export default function FenuaSimBox() {
           </div>
           <div className="bg-purple-50 rounded-xl px-6 py-4 text-sm text-purple-700 inline-block">
             {currency === "eur"
-              ? <span>💡 Exemple : 7 nuits à 4 personnes = <strong>70 € de location</strong> soit <strong>17,50 € par personne</strong> (caution 67 € remboursée)</span>
-              : <span>💡 Exemple : 7 nuits à 4 personnes = <strong>8 351 XPF de location</strong> soit <strong>2 088 XPF par personne</strong> (caution 8 000 XPF remboursée)</span>
+              ? <span>💡 Exemple : 7 nuits à 4 personnes = <strong>35 € de location</strong> soit <strong>8,75 € par personne</strong> (caution 67 € remboursée)</span>
+              : <span>💡 Exemple : 7 nuits à 4 personnes = <strong>4 172 XPF de location</strong> soit <strong>1 043 XPF par personne</strong> (caution 8 000 XPF remboursée)</span>
             }
           </div>
         </div>

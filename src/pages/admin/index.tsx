@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
-const ADMIN_EMAIL = "admin@fenuasim.com";
 const G = "linear-gradient(135deg, #A020F0 0%, #FF4D6D 50%, #FF7F11 100%)";
 
 const MODULES = [
@@ -86,24 +85,47 @@ export default function AdminHome() {
 
   useEffect(() => {
     if (!router.isReady) return;
+
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session || session.user?.email !== ADMIN_EMAIL) router.push("/admin/login");
-      else setAuthChecked(true);
+      if (!session) {
+        router.replace("/admin/login");
+      } else {
+        setAuthChecked(true);
+      }
     });
-  }, [router.isReady]);
+  }, [router]);
 
   const handleLogout = async () => {
     setLoggingOut(true);
     await supabase.auth.signOut();
-    router.push("/admin/login");
+    router.replace("/admin/login");
   };
 
-  if (!authChecked) return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f8f7ff" }}>
-      <div style={{ width: 32, height: 32, border: "2px solid #E9D5FF", borderTopColor: "#A020F0", borderRadius: "50%", animation: "spin .7s linear infinite" }} />
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-    </div>
-  );
+  if (!authChecked) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#f8f7ff",
+        }}
+      >
+        <div
+          style={{
+            width: 32,
+            height: 32,
+            border: "2px solid #E9D5FF",
+            borderTopColor: "#A020F0",
+            borderRadius: "50%",
+            animation: "spin .7s linear infinite",
+          }}
+        />
+        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -119,31 +141,65 @@ export default function AdminHome() {
       </Head>
 
       <div style={{ minHeight: "100vh", background: "#f8f7ff", fontFamily: "Arial, Helvetica, sans-serif" }}>
-
-        {/* Header */}
-        <div style={{ background: "#fff", borderBottom: "1px solid #F0E8FF", padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 10 }}>
+        <div
+          style={{
+            background: "#fff",
+            borderBottom: "1px solid #F0E8FF",
+            padding: "16px 24px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            position: "sticky",
+            top: 0,
+            zIndex: 10,
+          }}
+        >
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <Image src="/logo.png" alt="FENUA SIM" width={44} height={44} style={{ objectFit: "contain" }} />
             <div>
               <div style={{ fontSize: 15, fontWeight: 800 }}>
-                <span style={{ background: G, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>FENUA</span>
+                <span style={{ background: G, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+                  FENUA
+                </span>
                 <span style={{ color: "#D1D5DB", margin: "0 4px" }}>·</span>
                 <span style={{ color: "#374151" }}>Admin</span>
               </div>
-              <p style={{ color: "#9CA3AF", fontSize: 11, margin: 0, letterSpacing: "0.5px", textTransform: "uppercase" }}>Espace de gestion</p>
+              <p
+                style={{
+                  color: "#9CA3AF",
+                  fontSize: 11,
+                  margin: 0,
+                  letterSpacing: "0.5px",
+                  textTransform: "uppercase",
+                }}
+              >
+                Espace de gestion
+              </p>
             </div>
           </div>
-          <button onClick={handleLogout} disabled={loggingOut}
-            style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#9CA3AF", background: "none", border: "1px solid #E5E7EB", borderRadius: 10, padding: "6px 12px", cursor: "pointer" }}>
+
+          <button
+            onClick={handleLogout}
+            disabled={loggingOut}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 12,
+              color: "#9CA3AF",
+              background: "none",
+              border: "1px solid #E5E7EB",
+              borderRadius: 10,
+              padding: "6px 12px",
+              cursor: "pointer",
+            }}
+          >
             <LogOut size={13} />
             {loggingOut ? "Déconnexion…" : "Déconnexion"}
           </button>
         </div>
 
-        {/* Contenu */}
         <div style={{ maxWidth: 860, margin: "0 auto", padding: "48px 24px" }}>
-
-          {/* Titre */}
           <div className="card-ani" style={{ textAlign: "center", marginBottom: 48 }}>
             <h1 style={{ fontSize: 28, fontWeight: 800, color: "#1a0533", margin: "0 0 8px" }}>
               Bonjour 👋
@@ -153,12 +209,13 @@ export default function AdminHome() {
             </p>
           </div>
 
-          {/* Vignettes */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 20 }}>
             {MODULES.map((m, i) => {
               const Icon = m.icon;
               return (
-                <a key={m.key} href={m.href}
+                <a
+                  key={m.key}
+                  href={m.href}
                   className="module-card card-ani"
                   style={{
                     display: "block",
@@ -170,18 +227,24 @@ export default function AdminHome() {
                     textDecoration: "none",
                     animationDelay: `${i * 0.07}s`,
                     cursor: "pointer",
-                  }}>
-                  {/* Icône */}
-                  <div style={{
-                    width: 52, height: 52, borderRadius: 14,
-                    background: m.bg,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    marginBottom: 16, boxShadow: `0 4px 14px ${m.color}40`,
-                  }}>
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 52,
+                      height: 52,
+                      borderRadius: 14,
+                      background: m.bg,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      marginBottom: 16,
+                      boxShadow: `0 4px 14px ${m.color}40`,
+                    }}
+                  >
                     <Icon size={24} color="#fff" />
                   </div>
 
-                  {/* Texte */}
                   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
                     <div style={{ flex: 1 }}>
                       <h2 style={{ fontSize: 16, fontWeight: 700, color: "#1a0533", margin: "0 0 6px" }}>
@@ -194,14 +257,12 @@ export default function AdminHome() {
                     <ChevronRight size={18} color="#D1D5DB" style={{ marginTop: 2, flexShrink: 0 }} />
                   </div>
 
-                  {/* Barre colorée en bas */}
                   <div style={{ height: 3, borderRadius: 99, background: m.bg, marginTop: 20, opacity: 0.4 }} />
                 </a>
               );
             })}
           </div>
 
-          {/* Footer */}
           <p style={{ textAlign: "center", marginTop: 48, fontSize: 11, color: "#D1D5DB" }}>
             FENUASIM · Espace admin · {new Date().getFullYear()}
           </p>

@@ -134,11 +134,11 @@ function useDashboard(period: { start: string; end: string }) {
       const insPendA  = insPend.reduce((s, i) => s + (i.amount_to_transfer ?? ((i.premium_ava ?? 0) * 0.90)), 0);
       const insFees   = ins.reduce((s, i) => s + (i.stripe_fee ?? 0), 0);
 
-      // rental_amount peut être en XPF — convertir en EUR si besoin
+      // rental_amount en XPF (tarifs 500 XPF/j, 3000 XPF/semaine) → convertir en EUR
       const rentToEur = (r: any) => {
         const amt = r.rental_amount ?? 0;
-        // Si montant > 1000 c'est probablement du XPF
-        return amt > 500 ? amt / 119.33 : amt;
+        // Les locations routeurs sont toujours en XPF (jamais en EUR)
+        return amt / 119.33;
       };
       const rentRev   = rent.reduce((s, r) => s + rentToEur(r), 0);
       const rentDep   = rent.filter(r => r.deposit_status === "held").reduce((s, r) => s + (r.deposit_amount ?? 0) / 119.33, 0);
@@ -169,9 +169,9 @@ function useDashboard(period: { start: string; end: string }) {
         if (!mMap[m]) mMap[m] = { month: m, esim: 0, insurance: 0, routers: 0 };
         mMap[m][type] += v;
       };
-      esim.forEach(o => addM(o.created_at, "esim", o.price ?? 0));
-      ins.forEach(i  => addM(i.created_at, "insurance", i.frais_distribution ?? 0));
-      rent.forEach(r => addM(r.created_at, "routers", r.rental_amount ?? 0));
+      esim.forEach(o => { if (o.created_at) addM(o.created_at, "esim", o.price ?? 0); });
+      ins.forEach(i  => { if (i.created_at) addM(i.created_at, "insurance", i.frais_distribution ?? 0); });
+      rent.forEach(r => { if (r.created_at) addM(r.created_at, "routers", rentToEur(r)); });
       setMonthly(Object.values(mMap).sort((a, b) => a.month.localeCompare(b.month)));
 
       // Sources
@@ -198,6 +198,7 @@ function useDashboard(period: { start: string; end: string }) {
       const pendingIns = pendingInsRes.data ?? [];
       const pendingByMonth: Record<string, any> = {};
       pendingIns.forEach((i: any) => {
+        if (!i.created_at) return;
         const m = (i.created_at as string).slice(0, 7);
         if (!pendingByMonth[m]) pendingByMonth[m] = {
           period: m,

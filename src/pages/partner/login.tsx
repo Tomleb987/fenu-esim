@@ -1,4 +1,5 @@
 // src/pages/partner/login.tsx
+import type { ReactElement } from "react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
@@ -465,3 +466,5 @@ export default function PartnerLogin() {
     </>
   );
 }
+
+PartnerLogin.getLayout = (page: ReactElement) => page;

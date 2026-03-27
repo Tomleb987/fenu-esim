@@ -928,11 +928,14 @@ function NewRentalModal({
       : 0;
 
   const pricingMode = form.pricing_mode;
-  const rentalBase = pricingMode === "7days" ? WEEK_RATE_EUR : days * DAILY_RATE_EUR;
+  // Tarifs lus depuis la table routers (pas des constantes)
+  const dailyRate = selectedRouter?.rental_price_per_day ?? DAILY_RATE_EUR;
+  const weekRate  = dailyRate * 7;
+  const rentalBase = pricingMode === "7days" ? weekRate : days * dailyRate;
   const customDiscount = Math.max(0, parseFloat(form.discount_amount) || 0);
   const rentalDiscount = form.offer_rental ? rentalBase : Math.min(customDiscount, rentalBase);
   const rentalCharged = Math.max(0, rentalBase - rentalDiscount);
-  const depositReference = FIXED_DEPOSIT_XPF;
+  const depositReference = selectedRouter?.deposit_amount ?? FIXED_DEPOSIT_EUR;
   const depositCharged = form.offer_deposit ? 0 : depositReference;
   const totalCharged = rentalCharged + depositCharged;
 
@@ -1190,8 +1193,8 @@ function NewRentalModal({
             onChange={(e) => set("pricing_mode", e.target.value)}
             className={inputCls}
           >
-            <option value="daily">Journalier — {fmtEur(DAILY_RATE_EUR)}/jour</option>
-            <option value="7days">Forfait 7 jours — {fmtEur(WEEK_RATE_EUR)}</option>
+            <option value="daily">Journalier — {fmtEur(selectedRouter?.rental_price_per_day ?? DAILY_RATE_EUR)}/jour</option>
+            <option value="7days">Forfait 7 jours — {fmtEur((selectedRouter?.rental_price_per_day ?? DAILY_RATE_EUR) * 7)}</option>
           </select>
         </Field>
 

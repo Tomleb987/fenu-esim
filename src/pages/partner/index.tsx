@@ -455,6 +455,48 @@ export default function PartnerDashboard() {
     }
   };
 
+  // Vérifie si un lien est expiré (> 24h et non payé)
+  const isExpired = (order: PartnerOrder) => {
+    if (order.status !== "pending") return false;
+    const created = new Date(order.created_at).getTime();
+    return Date.now() - created > 24 * 60 * 60 * 1000;
+  };
+
+  // Recrée un nouveau lien Stripe pour une commande expirée
+  const recreateLink = async (order: PartnerOrder) => {
+    setResendingId(order.id);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch("/api/create-payment-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({
+          clientEmail: order.client_email,
+          clientFirstName: order.client_name.split(" ")[0],
+          clientLastName: order.client_name.split(" ").slice(1).join(" "),
+          packageId: order.package_id,
+          packageName: order.package_name,
+          amount: order.amount,
+          currency: order.currency,
+          partnerCode: partnerProfile?.partner_code,
+          advisorName: partnerProfile?.advisor_name,
+          orderId: order.id,
+        }),
+      });
+      const data = await res.json();
+      if (data.paymentUrl) {
+        // Mettre à jour le lien en base
+        await supabase.from("orders").update({
+          payment_url: data.paymentUrl,
+          created_at: new Date().toISOString(),
+        }).eq("id", order.id);
+        setResentId(order.id);
+        setTimeout(() => { setResentId(null); loadOrders(); }, 3000);
+      }
+    } catch (err) { console.error("Erreur recréation lien:", err); }
+    finally { setResendingId(null); }
+  };
+
   const resendPaymentLink = async (order: PartnerOrder) => {
     const paymentUrl = (order as any).payment_url;
     if (!paymentUrl) return;
@@ -533,6 +575,7 @@ export default function PartnerDashboard() {
 
   const statusConfig: { [key: string]: { label: string; bg: string; text: string } } = {
     pending: { label: "En attente", bg: "#FFF7ED", text: "#C2410C" },
+    expired: { label: "Expiré", bg: "#FEF2F2", text: "#DC2626" },
     paid: { label: "Paye", bg: "#EDE9FE", text: "#7C3AED" },
     esim_sent: { label: "eSIM envoyee", bg: "#F0FDF4", text: "#15803D" },
     error: { label: "Erreur", bg: "#FEF2F2", text: "#DC2626" },
@@ -2019,8 +2062,9 @@ export default function PartnerDashboard() {
                       </thead>
                       <tbody>
                         {orders.map((order) => {
-                          const s = statusConfig[order.status] || {
-                            label: order.status,
+                          const displayStatus = order.status === "pending" && isExpired(order) ? "expired" : order.status;
+                                const s = statusConfig[displayStatus] || {
+                            label: displayStatus,
                             bg: "#f3f4f6",
                             text: "#374151",
                           };
@@ -2100,30 +2144,36 @@ export default function PartnerDashboard() {
                               </td>
 
                               <td style={{ padding: "13px 18px" }}>
-                                {order.status === "pending" && (
+                                {isExpired(order) ? (
+                                  <button
+                                    onClick={() => recreateLink(order)}
+                                    disabled={resendingId === order.id}
+                                    style={{
+                                      fontSize: 12, fontWeight: 600,
+                                      color: "#DC2626", background: "#FEF2F2",
+                                      border: "1px solid #FECACA",
+                                      borderRadius: 7, padding: "5px 12px",
+                                      cursor: "pointer", whiteSpace: "nowrap",
+                                      opacity: resendingId === order.id ? 0.6 : 1,
+                                    }}
+                                  >
+                                    {resendingId === order.id ? "..." : "🔄 Recréer le lien"}
+                                  </button>
+                                ) : order.status === "pending" && (
                                   <button
                                     onClick={() => resendPaymentLink(order)}
                                     disabled={resendingId === order.id}
                                     style={{
-                                      fontSize: 12,
-                                      fontWeight: 600,
+                                      fontSize: 12, fontWeight: 600,
                                       color: resentId === order.id ? "#15803d" : "#A020F0",
                                       background: resentId === order.id ? "#f0fdf4" : "#faf5ff",
-                                      border: `1px solid ${
-                                        resentId === order.id ? "#bbf7d0" : "#e9d5ff"
-                                      }`,
-                                      borderRadius: 7,
-                                      padding: "5px 12px",
-                                      cursor: "pointer",
-                                      whiteSpace: "nowrap",
+                                      border: `1px solid ${resentId === order.id ? "#bbf7d0" : "#e9d5ff"}`,
+                                      borderRadius: 7, padding: "5px 12px",
+                                      cursor: "pointer", whiteSpace: "nowrap",
                                       opacity: resendingId === order.id ? 0.6 : 1,
                                     }}
                                   >
-                                    {resentId === order.id
-                                      ? "✓ Envoyé"
-                                      : resendingId === order.id
-                                      ? "..."
-                                      : "↩ Renvoyer"}
+                                    {resentId === order.id ? "✓ Envoyé" : resendingId === order.id ? "..." : "↩ Renvoyer"}
                                   </button>
                                 )}
                               </td>

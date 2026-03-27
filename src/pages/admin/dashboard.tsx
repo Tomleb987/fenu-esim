@@ -17,7 +17,9 @@ import {
   RefreshCw, Upload, ChevronRight, CheckCircle, Clock, LogOut, Calendar,
 } from "lucide-react";
 
-const ADMIN_EMAIL = "admin@fenuasim.com";
+const ADMIN_EMAILS = ["admin@fenuasim.com", "hello@fenuasim.com", "tomleb987@gmail.com"];
+const isAdmin = (email?: string | null) =>
+  !!email && (ADMIN_EMAILS.includes(email) || email.endsWith("@fenuasim.com"));
 const G = "linear-gradient(135deg, #A020F0 0%, #FF4D6D 50%, #FF7F11 100%)";
 const C = { esim: "#A020F0", insurance: "#FF4D6D", routers: "#FF7F11", partner: "#0EA896" };
 
@@ -78,7 +80,7 @@ function useDashboard(period: { start: string; end: string }) {
     try {
       const [esimRes, insRes, rentRes, stockRes, ansetRes, partnerRes, pendingInsRes, activeRentsRes] = await Promise.all([
         supabase.from("orders")
-          .select("price, margin_net, commission_amount, source, partner_code, stripe_fee, created_at")
+          .select("price, amount, currency, margin_net, cost_airalo, stripe_fee, commission_amount, source, partner_code, promo_code, created_at")
           .gte("created_at", `${period.start}T00:00:00`)
           .lte("created_at", `${period.end}T23:59:59`)
           .in("status", ["completed", "paid"]),
@@ -117,22 +119,46 @@ function useDashboard(period: { start: string; end: string }) {
       const activeRents = activeRentsRes?.data ?? [];
 
       // Convertir price en EUR selon la devise
+      // Conversion en EUR selon la devise stockée
       const priceEur = (o: any) => {
         const c = (o.currency || "EUR").toUpperCase();
-        if (c === "XPF" || c === "CFP") return (o.price ?? 0) * 100 / 119.33;
-        return o.price ?? 0;
+        const p = Number(o.price ?? 0);
+        if (c === "XPF" || c === "CFP") return p / 119.33;
+        if (c === "USD") return p * 0.92;
+        return p; // EUR ou autre
       };
+      // Estimation frais Stripe : 2.9% + 0.30€
+      const stripeFeeEstimate = (price: number) => Math.round((price * 0.029 + 0.30) * 100) / 100;
+
       const esimRev   = esim.reduce((s, o) => s + priceEur(o), 0);
-      const esimMgn   = esim.reduce((s, o) => s + (o.margin_net ?? 0), 0);
+      // Marge nette : utiliser margin_net de la base (déjà calculé correctement)
+      const esimMgn = esim.reduce((s, o) => {
+        if (o.margin_net != null) return s + Number(o.margin_net);
+        // Fallback : calculer depuis cost_airalo si disponible
+        if (o.cost_airalo != null && o.cost_airalo > 0) {
+          const p = priceEur(o);
+          const fee = o.stripe_fee && o.stripe_fee > 0 ? Number(o.stripe_fee) : stripeFeeEstimate(p);
+          return s + (p - Number(o.cost_airalo) - fee);
+        }
+        return s;
+      }, 0);
       const esimCom   = esim.reduce((s, o) => s + (o.commission_amount ?? 0), 0);
-      const esimFees  = esim.reduce((s, o) => s + (o.stripe_fee ?? 0), 0);
+      const esimFees  = esim.reduce((s, o) => {
+        if (o.stripe_fee && o.stripe_fee > 0) return s + o.stripe_fee;
+        if (o.source === "virement") return s; // pas de frais Stripe pour les virements
+        return s + stripeFeeEstimate(o.price ?? 0);
+      }, 0);
 
       // CA réel assurance = frais_distribution + commission Fenua (10% de premium_ava)
       const insRev    = ins.reduce((s, i) => s + (i.frais_distribution ?? 0) + ((i.premium_ava ?? 0) * 0.10), 0);
       const insPrem   = ins.reduce((s, i) => s + (i.premium_ava ?? 0), 0);
       const insPend   = ins.filter(i => i.transfer_status === "pending");
       const insPendA  = insPend.reduce((s, i) => s + (i.amount_to_transfer ?? ((i.premium_ava ?? 0) * 0.90)), 0);
-      const insFees   = ins.reduce((s, i) => s + (i.stripe_fee ?? 0), 0);
+      const insFees   = ins.reduce((s, i) => {
+        if (i.stripe_fee && i.stripe_fee > 0) return s + i.stripe_fee;
+        const base = (i.frais_distribution ?? 0) + (i.premium_ava ?? 0);
+        return s + stripeFeeEstimate(base);
+      }, 0);
 
       // rental_amount en XPF (tarifs 500 XPF/j, 3000 XPF/semaine) → convertir en EUR
       const rentToEur = (r: any) => {
@@ -599,7 +625,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (!router.isReady) return;
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session || session.user?.email !== ADMIN_EMAIL) router.push("/admin/login");
+      if (!session || !isAdmin(session.user?.email)) router.push("/admin/login");
       else setAuthChecked(true);
     });
   }, [router.isReady]);
@@ -810,7 +836,7 @@ export default function AdminDashboard() {
             <KpiCard label="Marge nette"   value={loading ? "…" : fmtEur(kpis?.totals.margin ?? 0)}
               sub={kpis ? fmtPct(kpis.totals.margin, kpis.totals.revenue) + " du CA" : ""} />
             <KpiCard label="Frais Stripe"  value={loading ? "…" : fmtEur(kpis?.totals.stripe_fees ?? 0)}
-              badge={kpis?.totals.stripe_fees === 0 ? "Import CSV requis" : undefined} />
+               />
             <KpiCard label="Commandes"     value={loading ? "…" : fmtNum((kpis?.esim.count ?? 0) + (kpis?.insurance.count ?? 0) + (kpis?.routers.count ?? 0))}
               sub="toutes catégories" />
           </div>

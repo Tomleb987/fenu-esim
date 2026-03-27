@@ -15,11 +15,10 @@ import {
 
 const ADMIN_EMAIL = "admin@fenuasim.com";
 const G = "linear-gradient(135deg, #A020F0 0%, #FF4D6D 50%, #FF7F11 100%)";
-// Tarifs en EUR (valeurs stockées en base)
-const DAILY_RATE_EUR = 10;
-const WEEK_RATE_EUR = 60;
-const FIXED_DEPOSIT_EUR = 100;
-// Alias XPF pour compatibilité (convertis depuis EUR)
+// Tarifs de fallback (valeurs réelles lues depuis la table routers)
+const DAILY_RATE_EUR = 5;
+const WEEK_RATE_EUR = 30;
+const FIXED_DEPOSIT_EUR = 67;
 const DAILY_RATE_XPF = DAILY_RATE_EUR;
 const WEEK_RATE_XPF = WEEK_RATE_EUR;
 const FIXED_DEPOSIT_XPF = FIXED_DEPOSIT_EUR;

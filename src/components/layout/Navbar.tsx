@@ -81,6 +81,11 @@ export default function Navbar() {
           <li><Link href="/compatibilite" className="nav-link">Compatibilité</Link></li>
           <li><Link href="/faq" className="nav-link">FAQ</Link></li>
           <li><Link href="/contact" className="nav-link">Contact</Link></li>
+          <li>
+            <Link href="/partner/login" className="nav-link text-xs font-semibold px-3 py-1.5 rounded-full border border-purple-200 text-purple-600 hover:bg-purple-50 transition-colors">
+              Espace partenaire
+            </Link>
+          </li>
           
           {/* User Menu */}
           {user ? (
@@ -168,6 +173,10 @@ export default function Navbar() {
           <Link href="/compatibilite" onClick={() => setMenuOpen(false)}>Compatibilité</Link>
           <Link href="/faq" onClick={() => setMenuOpen(false)}>FAQ</Link>
           <Link href="/contact" onClick={() => setMenuOpen(false)}>Contact</Link>
+          <Link href="/partner/login" onClick={() => setMenuOpen(false)}
+            className="text-sm font-semibold text-purple-600">
+            Espace partenaire →
+          </Link>
           <Link href="/cart" onClick={() => setMenuOpen(false)}>Panier</Link>
           
           {user ? (

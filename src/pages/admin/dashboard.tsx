@@ -76,7 +76,7 @@ function useDashboard(period: { start: string; end: string }) {
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const [esimRes, insRes, rentRes, stockRes, ansetRes, partnerRes, pendingInsRes] = await Promise.all([
+      const [esimRes, insRes, rentRes, stockRes, ansetRes, partnerRes, pendingInsRes, activeRentsRes] = await Promise.all([
         supabase.from("orders")
           .select("price, margin_net, commission_amount, source, partner_code, stripe_fee, created_at")
           .gte("created_at", `${period.start}T00:00:00`)
@@ -88,11 +88,15 @@ function useDashboard(period: { start: string; end: string }) {
           .lte("created_at", `${period.end}T23:59:59`)
           .in("status", ["paid", "validated"]),
         supabase.from("router_rentals")
-          .select("rental_amount, deposit_amount, deposit_status, margin_net, stripe_fee, created_at")
+          .select("rental_amount, deposit_amount, deposit_status, margin_net, stripe_fee, created_at, status, rental_end")
           .gte("created_at", `${period.start}T00:00:00`)
           .lte("created_at", `${period.end}T23:59:59`)
-          .eq("payment_status", "paid"),
+          .in("payment_status", ["paid", "pending", "manual"]),
         supabase.from("v_router_stock").select("*"),
+        supabase.from("router_rentals")
+          .select("id, router_id, status, rental_end")
+          .eq("status", "active")
+          .gte("rental_end", new Date().toISOString().slice(0, 10)),
         supabase.from("insurer_settlements")
           .select("period, total_contracts, total_to_transfer, status")
           .order("period", { ascending: false }).limit(12),
@@ -106,10 +110,11 @@ function useDashboard(period: { start: string; end: string }) {
           .eq("transfer_status", "pending"),
       ]);
 
-      const esim = esimRes.data ?? [];
-      const ins  = insRes.data  ?? [];
-      const rent = rentRes.data ?? [];
-      const stk  = stockRes.data ?? [];
+      const esim        = esimRes.data ?? [];
+      const ins         = insRes.data  ?? [];
+      const rent        = rentRes.data ?? [];
+      const stk         = stockRes.data ?? [];
+      const activeRents = activeRentsRes?.data ?? [];
 
       // Convertir price en EUR selon la devise
       const priceEur = (o: any) => {
@@ -129,8 +134,14 @@ function useDashboard(period: { start: string; end: string }) {
       const insPendA  = insPend.reduce((s, i) => s + (i.amount_to_transfer ?? ((i.premium_ava ?? 0) * 0.90)), 0);
       const insFees   = ins.reduce((s, i) => s + (i.stripe_fee ?? 0), 0);
 
-      const rentRev   = rent.reduce((s, r) => s + (r.rental_amount ?? 0), 0);
-      const rentDep   = rent.filter(r => r.deposit_status === "held").reduce((s, r) => s + (r.deposit_amount ?? 0), 0);
+      // rental_amount peut être en XPF — convertir en EUR si besoin
+      const rentToEur = (r: any) => {
+        const amt = r.rental_amount ?? 0;
+        // Si montant > 1000 c'est probablement du XPF
+        return amt > 500 ? amt / 119.33 : amt;
+      };
+      const rentRev   = rent.reduce((s, r) => s + rentToEur(r), 0);
+      const rentDep   = rent.filter(r => r.deposit_status === "held").reduce((s, r) => s + (r.deposit_amount ?? 0) / 119.33, 0);
       const rentFees  = rent.reduce((s, r) => s + (r.stripe_fee ?? 0), 0);
 
       const totalFees = esimFees + insFees + rentFees;
@@ -147,7 +158,7 @@ function useDashboard(period: { start: string; end: string }) {
         insurance: { count: ins.length, revenue: insRev, premiums: insPrem,
           pending_transfer: allPendingAmount,
           pending_count: allPendingCount },
-        routers:   { count: rent.length, revenue: rentRev, deposits: rentDep, available: stk.filter(r => r.status === "available").length, rented: stk.filter(r => r.status === "rented").length, total: stk.length },
+        routers:   { count: rent.length, revenue: rentRev, deposits: rentDep, available: stk.filter(r => r.status === "available").length, rented: activeRents.length, total: stk.length },
         totals:    { revenue: totalRev, margin: esimMgn + insRev + rentRev - totalFees, stripe_fees: totalFees },
       });
 

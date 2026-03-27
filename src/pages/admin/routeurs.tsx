@@ -621,8 +621,8 @@ export default function AdminRouteurs() {
                           <p className="text-xs text-gray-400 mt-0.5">
                             {currentRental.rental_days}j ·{" "}
                             {rentalDisplay.offered
-                              ? `Offerte (valeur ${fmtXpf(rentalDisplay.reference)})`
-                              : fmtXpf(rentalDisplay.charged)}
+                              ? `Offerte (valeur ${fmtEur(rentalDisplay.reference)})`
+                              : fmtEur(rentalDisplay.charged)}
                           </p>
 
                           <div className="flex gap-1.5 mt-2">
@@ -780,13 +780,13 @@ function RentalTable({
 
                 <td className="px-4 py-3 text-right">
                   <p className="font-semibold text-gray-800">
-                    {rentalDisplay.offered ? "Offerte" : fmtXpf(rentalDisplay.charged)}
+                    {rentalDisplay.offered ? "Offerte" : fmtEur(rentalDisplay.charged)}
                   </p>
                   <p className="text-xs text-gray-400">
                     {rentalDisplay.offered
-                      ? `Valeur ${fmtXpf(rentalDisplay.reference)}`
+                      ? `Valeur ${fmtEur(rentalDisplay.reference)}`
                       : rentalDisplay.discount > 0
-                        ? `Remise ${fmtXpf(rentalDisplay.discount)}`
+                        ? `Remise ${fmtEur(rentalDisplay.discount)}`
                         : r.payment_status === "paid"
                           ? "✓ Payé"
                           : "En attente"}
@@ -1296,19 +1296,19 @@ function NewRentalModal({
                 ? `Forfait 7 jours`
                 : `Loyer théorique (${days}j × ${fmtEur(DAILY_RATE_EUR)})`}
             </span>
-            <span className="font-medium">{fmtXpf(rentalBase)}</span>
+            <span className="font-medium">{fmtEur(rentalBase)}</span>
           </div>
 
           {rentalDiscount > 0 && (
             <div className="flex justify-between mb-1">
               <span className="text-green-600">Remise commerciale</span>
-              <span className="font-medium text-green-600">- {fmtXpf(rentalDiscount)}</span>
+              <span className="font-medium text-green-600">- {fmtEur(rentalDiscount)}</span>
             </div>
           )}
 
           <div className="flex justify-between mb-1">
             <span className="text-gray-500">Location facturée</span>
-            <span className="font-medium">{form.offer_rental ? "Offerte" : fmtXpf(rentalCharged)}</span>
+            <span className="font-medium">{form.offer_rental ? "Offerte" : fmtEur(rentalCharged)}</span>
           </div>
 
           <div className="flex justify-between mb-1">
@@ -1323,7 +1323,7 @@ function NewRentalModal({
 
           <div className="flex justify-between pt-2 border-t border-gray-200 font-semibold">
             <span>Total à encaisser</span>
-            <span style={{ color: "#A020F0" }}>{fmtXpf(totalCharged)}</span>
+            <span style={{ color: "#A020F0" }}>{fmtEur(totalCharged)}</span>
           </div>
         </div>
       )}
@@ -1449,7 +1449,7 @@ function ReturnModal({
         <p className="font-medium text-gray-700">
           {rental.customer_name} — {rental.routers?.model}
         </p>
-        <p className="text-xs text-gray-400 mt-1">Caution encaissée : {fmtXpf(effectiveDeposit)}</p>
+        <p className="text-xs text-gray-400 mt-1">Caution encaissée : {fmtEur(effectiveDeposit)}</p>
         {effectiveDeposit === 0 ? (
           <p className="text-xs text-blue-600 mt-1">✓ Aucune caution à restituer</p>
         ) : rental.stripe_payment_intent ? (
@@ -1466,13 +1466,13 @@ function ReturnModal({
               {[
                 {
                   key: "refund",
-                  label: `Restituer intégralement (${fmtXpf(effectiveDeposit)})`,
+                  label: `Restituer intégralement (${fmtEur(effectiveDeposit)})`,
                   color: "text-green-600",
                 },
                 { key: "retain_partial", label: "Retenue partielle", color: "text-amber-600" },
                 {
                   key: "retain_full",
-                  label: `Retenue totale (${fmtXpf(effectiveDeposit)})`,
+                  label: `Retenue totale (${fmtEur(effectiveDeposit)})`,
                   color: "text-red-600",
                 },
               ].map((opt) => (

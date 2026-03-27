@@ -261,15 +261,49 @@ export default function PartnerDashboard() {
     setPackages(allData);
   };
 
-  const loadOrders = async (partnerCode: string) => {
-    const { data } = await supabase
+  const loadOrders = async (partnerCode?: string) => {
+    const code = partnerCode ?? partnerProfile?.partner_code;
+    if (!code) return;
+
+    // Essayer d'abord la vue
+    const { data: viewData, error: viewErr } = await supabase
       .from("partner_orders_view")
       .select("*")
-      .eq("partner_code", partnerCode)
+      .eq("partner_code", code)
       .order("created_at", { ascending: false })
-      .limit(50);
+      .limit(100);
 
-    if (data) setOrders(data as PartnerOrder[]);
+    if (!viewErr && viewData && viewData.length > 0) {
+      setOrders(viewData as PartnerOrder[]);
+      return;
+    }
+
+    // Fallback : requête directe sur orders si la vue ne retourne rien
+    const { data: directData } = await supabase
+      .from("orders")
+      .select("id, email, package_name, package_id, price, currency, status, created_at, partner_code, stripe_session_id, airalo_order_id, prenom, nom, first_name, last_name, commission_amount")
+      .eq("partner_code", code)
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    if (directData) {
+      const mapped = directData.map((o: any) => ({
+        id: o.id,
+        client_email: o.email,
+        client_name: o.customer_name || o.email || "-",
+        package_name: o.package_name || "-",
+        package_id: o.package_id,
+        amount: o.price,
+        currency: o.currency || "EUR",
+        status: o.status || "pending",
+        created_at: o.created_at,
+        partner_code: o.partner_code,
+        payment_url: "",
+        iccid: null,
+        advisor_name: null,
+      }));
+      setOrders(mapped as PartnerOrder[]);
+    }
   };
 
   const exportExcel = () => {
@@ -491,7 +525,7 @@ export default function PartnerDashboard() {
           created_at: new Date().toISOString(),
         }).eq("id", order.id);
         setResentId(order.id);
-        setTimeout(() => { setResentId(null); loadOrders(); }, 3000);
+        setTimeout(() => { setResentId(null); loadOrders(partnerProfile?.partner_code); }, 3000);
       }
     } catch (err) { console.error("Erreur recréation lien:", err); }
     finally { setResendingId(null); }
@@ -2102,9 +2136,24 @@ export default function PartnerDashboard() {
                                   color: "#1a0533",
                                 }}
                               >
-                                {order.currency === "xpf"
-                                  ? `${order.amount.toLocaleString("fr")} XPF`
-                                  : `${(order.amount / 100).toFixed(2)} €`}
+                                {(() => {
+                                  const cur = (order.currency || "EUR").toUpperCase();
+                                  const raw = Number(order.amount) || 0;
+                                  if (cur === "XPF" || cur === "CFP") {
+                                    // partner_orders : montants en XPF entiers (ex: 2501)
+                                    // orders (promo) : montants en EUR décimaux stockés avec currency XPF (ex: 6.93)
+                                    if (raw >= 50) {
+                                      // Vrai XPF
+                                      const eur = raw / 119.33;
+                                      return `${Math.round(raw).toLocaleString("fr")} XPF ≈ ${eur.toFixed(2)} €`;
+                                    } else {
+                                      // EUR mal étiqueté XPF
+                                      return `${raw.toFixed(2)} €`;
+                                    }
+                                  }
+                                  // EUR
+                                  return `${raw.toFixed(2)} €`;
+                                })()}
                               </td>
 
                               <td style={{ padding: "13px 18px" }}>

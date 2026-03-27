@@ -9,13 +9,13 @@ import { supabaseAdmin as supabase } from "@/lib/supabaseAdmin";
 
 const COMPANY = {
   legal:    "SAS FENUASIM",
-  address1: "XX Rue XXXX",
-  address2: "75000 Paris",
-  siret:    "XXX XXX XXX XXXXX",
+  address1: "58 rue MONCEAU",
+  address2: "75008 Paris",
+  siret:    "943 713 875",
   email:    "contact@fenuasim.com",
 };
 
-const ASSUREUR = { name: "ANSET", address: "À compléter" };
+const ASSUREUR = { name: "ANSET", address: "BP4656 98713 PAPEETE" };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });

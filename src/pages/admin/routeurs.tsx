@@ -15,12 +15,18 @@ import {
 
 const ADMIN_EMAIL = "admin@fenuasim.com";
 const G = "linear-gradient(135deg, #A020F0 0%, #FF4D6D 50%, #FF7F11 100%)";
-const DAILY_RATE_XPF = 500;
-const WEEK_RATE_XPF = 3000;
-const FIXED_DEPOSIT_XPF = 8000;
+// Tarifs en EUR (valeurs stockées en base)
+const DAILY_RATE_EUR = 10;
+const WEEK_RATE_EUR = 60;
+const FIXED_DEPOSIT_EUR = 100;
+// Alias XPF pour compatibilité (convertis depuis EUR)
+const DAILY_RATE_XPF = DAILY_RATE_EUR;
+const WEEK_RATE_XPF = WEEK_RATE_EUR;
+const FIXED_DEPOSIT_XPF = FIXED_DEPOSIT_EUR;
 const COMMERCIAL_META_PREFIX = "[COMMERCIAL_META]";
 
 // ── Formatage ─────────────────────────────────────────────────
+const fmtEur = (n: number) => new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", minimumFractionDigits: 0 }).format(Math.round(n));
 const fmtXpf = (n: number) =>
   new Intl.NumberFormat("fr-FR", {
     style: "currency",
@@ -597,7 +603,7 @@ export default function AdminRouteurs() {
 
                       <p className="text-xs text-gray-400">S/N : {r.serial_number}</p>
                       <p className="text-xs text-gray-400 mt-1">
-                        {fmtXpf(r.rental_price_per_day)}/jour · Caution {fmtXpf(r.deposit_amount || FIXED_DEPOSIT_XPF)}
+                        {fmtEur(r.rental_price_per_day)}/jour · Caution {fmtEur(r.deposit_amount || FIXED_DEPOSIT_EUR)}
                       </p>
 
                       {(computedRouterStatus === "active" || computedRouterStatus === "upcoming") && currentRental && rentalDisplay && (
@@ -789,7 +795,7 @@ function RentalTable({
 
                 <td className="px-4 py-3 text-right">
                   <p className="text-gray-700">
-                    {depositDisplay.offered ? "Offerte" : fmtXpf(depositDisplay.charged)}
+                    {depositDisplay.offered ? "Offerte" : fmtEur(depositDisplay.charged)}
                   </p>
                   <Badge
                     label={
@@ -922,7 +928,7 @@ function NewRentalModal({
       : 0;
 
   const pricingMode = form.pricing_mode;
-  const rentalBase = pricingMode === "7days" ? WEEK_RATE_XPF : days * DAILY_RATE_XPF;
+  const rentalBase = pricingMode === "7days" ? WEEK_RATE_EUR : days * DAILY_RATE_EUR;
   const customDiscount = Math.max(0, parseFloat(form.discount_amount) || 0);
   const rentalDiscount = form.offer_rental ? rentalBase : Math.min(customDiscount, rentalBase);
   const rentalCharged = Math.max(0, rentalBase - rentalDiscount);
@@ -1116,7 +1122,7 @@ function NewRentalModal({
             return (
               <option key={r.id} value={r.id} disabled={unavail}>
                 {unavail ? "⛔ " : form.rental_start && form.rental_end ? "✓ " : ""}
-                {r.model} — {r.serial_number} ({fmtXpf(r.rental_price_per_day || DAILY_RATE_XPF)}/j)
+                {r.model} — {r.serial_number} ({fmtEur(r.rental_price_per_day || DAILY_RATE_EUR)}/j)
                 {unavail && avail.next_available
                   ? " — libre le " + new Date(avail.next_available).toLocaleDateString("fr-FR")
                   : ""}
@@ -1184,8 +1190,8 @@ function NewRentalModal({
             onChange={(e) => set("pricing_mode", e.target.value)}
             className={inputCls}
           >
-            <option value="daily">Journalier — {fmtXpf(DAILY_RATE_XPF)}/jour</option>
-            <option value="7days">Forfait 7 jours — {fmtXpf(WEEK_RATE_XPF)}</option>
+            <option value="daily">Journalier — {fmtEur(DAILY_RATE_EUR)}/jour</option>
+            <option value="7days">Forfait 7 jours — {fmtEur(WEEK_RATE_EUR)}</option>
           </select>
         </Field>
 
@@ -1285,7 +1291,7 @@ function NewRentalModal({
             <span className="text-gray-500">
               {pricingMode === "7days"
                 ? `Forfait 7 jours`
-                : `Loyer théorique (${days}j × ${fmtXpf(DAILY_RATE_XPF)})`}
+                : `Loyer théorique (${days}j × ${fmtEur(DAILY_RATE_EUR)})`}
             </span>
             <span className="font-medium">{fmtXpf(rentalBase)}</span>
           </div>
@@ -1304,12 +1310,12 @@ function NewRentalModal({
 
           <div className="flex justify-between mb-1">
             <span className="text-gray-500">Caution standard</span>
-            <span className="font-medium">{fmtXpf(depositReference)}</span>
+            <span className="font-medium">{fmtEur(depositReference)}</span>
           </div>
 
           <div className="flex justify-between mb-1">
             <span className="text-gray-500">Caution facturée</span>
-            <span className="font-medium">{form.offer_deposit ? "Offerte" : fmtXpf(depositCharged)}</span>
+            <span className="font-medium">{form.offer_deposit ? "Offerte" : fmtEur(depositCharged)}</span>
           </div>
 
           <div className="flex justify-between pt-2 border-t border-gray-200 font-semibold">
@@ -1538,8 +1544,8 @@ function AddRouterModal({ onClose, onDone }: { onClose: () => void; onDone: () =
   const [form, setForm] = useState({
     model: "",
     serial_number: "",
-    rental_price_per_day: String(DAILY_RATE_XPF),
-    deposit_amount: String(FIXED_DEPOSIT_XPF),
+    rental_price_per_day: String(DAILY_RATE_EUR),
+    deposit_amount: String(FIXED_DEPOSIT_EUR),
     imei: "",
   });
   const [saving, setSaving] = useState(false);

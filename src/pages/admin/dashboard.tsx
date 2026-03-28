@@ -33,25 +33,36 @@ const fmtNum = (n: number) => new Intl.NumberFormat("fr-FR").format(n || 0);
 const fmtPct = (n: number, total: number) =>
   total === 0 ? "0 %" : `${((n / total) * 100).toFixed(1)} %`;
 
+// Convertir amount en EUR selon la devise
+// EUR/USD : amount en centimes Stripe → diviser par 100
+// XPF     : amount en unités entières → diviser par EUR_TO_XPF
+function getOrderAmount(o: any): number {
+  const amt = Number(o.amount ?? o.price ?? 0);
+  const c   = (o.currency || "EUR").toUpperCase();
+  if (c === "XPF" || c === "CFP") return amt / EUR_TO_XPF;
+  if (c === "USD") return (amt / 100) * 0.92;
+  return amt / 100; // EUR centimes → euros
+}
+
+// Alias pour compatibilité
 function toEur(price: number, currency: string): number {
-  if (!price) return 0;
-  const c = (currency || "EUR").toUpperCase();
-  if (c === "XPF" || c === "CFP") return price >= 200 ? price / EUR_TO_XPF : price;
-  if (c === "USD") return price * 0.92;
-  return price;
+  return getOrderAmount({ amount: price, currency });
 }
 
 function getPeriod(key: string) {
-  const now = new Date();
+  // Utiliser la timezone Polynésie française (UTC-10)
+  const TZ_OFFSET_HOURS = -10;
+  const nowUtc = new Date();
+  const nowLocal = new Date(nowUtc.getTime() + TZ_OFFSET_HOURS * 60 * 60 * 1000);
   const p   = (n: number) => String(n).padStart(2, "0");
-  const fmt = (d: Date)  => `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-  const today = fmt(now);
+  const fmt = (d: Date)  => `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}`;
+  const today = fmt(nowLocal);
   switch (key) {
     case "auj": return { start: today, end: today };
-    case "7j":  { const s = new Date(now); s.setDate(s.getDate() - 7);   return { start: fmt(s), end: today }; }
-    case "3m":  { const s = new Date(now); s.setMonth(s.getMonth() - 3); return { start: fmt(s), end: today }; }
-    case "ytd": return { start: `${now.getFullYear()}-01-01`, end: today };
-    default:    { const s = new Date(now); s.setDate(s.getDate() - 30);  return { start: fmt(s), end: today }; }
+    case "7j":  { const s = new Date(nowLocal); s.setUTCDate(s.getUTCDate() - 7);   return { start: fmt(s), end: today }; }
+    case "3m":  { const s = new Date(nowLocal); s.setUTCMonth(s.getUTCMonth() - 3); return { start: fmt(s), end: today }; }
+    case "ytd": return { start: `${nowLocal.getUTCFullYear()}-01-01`, end: today };
+    default:    { const s = new Date(nowLocal); s.setUTCDate(s.getUTCDate() - 30);  return { start: fmt(s), end: today }; }
   }
 }
 
@@ -83,19 +94,20 @@ function useDashboard(period: { start: string; end: string }) {
       const [ordersRes, insRes, rentRes, stockRes, pendingInsRes, activeRentsRes, ansetRes, partnerRes] =
         await Promise.all([
           supabase.from("orders")
-            .select("price, currency, margin_net, cost_airalo, stripe_fee, commission_amount, source, partner_code, promo_code, created_at")
-            .gte("created_at", `${period.start}T00:00:00`)
-            .lte("created_at", `${period.end}T23:59:59`)
+            .select("amount, price, currency, margin_net, cost_airalo, stripe_fee, commission_amount, source, partner_code, promo_code, created_at")
+            // Convertir dates locales (UTC-10) en UTC pour Supabase
+            .gte("created_at", `${period.start}T10:00:00Z`)
+            .lte("created_at", `${period.end}T09:59:59Z`)
             .in("status", ["completed", "paid"]),
           supabase.from("insurances")
             .select("frais_distribution, premium_ava, amount_to_transfer, transfer_status, stripe_fee, created_at")
-            .gte("created_at", `${period.start}T00:00:00`)
-            .lte("created_at", `${period.end}T23:59:59`)
+            .gte("created_at", `${period.start}T10:00:00Z`)
+            .lte("created_at", `${period.end}T09:59:59Z`)
             .in("status", ["paid", "validated"]),
           supabase.from("router_rentals")
             .select("rental_amount, deposit_amount, deposit_status, stripe_fee, created_at, rental_end, status")
-            .gte("created_at", `${period.start}T00:00:00`)
-            .lte("created_at", `${period.end}T23:59:59`),
+            .gte("created_at", `${period.start}T10:00:00Z`)
+            .lte("created_at", `${period.end}T09:59:59Z`),
           supabase.from("v_router_stock").select("*"),
           supabase.from("insurances")
             .select("id, created_at, premium_ava, frais_distribution, amount_to_transfer, transfer_status")
@@ -121,17 +133,17 @@ function useDashboard(period: { start: string; end: string }) {
       const activeRents = activeRentsRes.data ?? [];
 
       // eSIM
-      const esimRev = orders.reduce((s, o) => s + toEur(Number(o.price), o.currency), 0);
+      const esimRev = orders.reduce((s, o) => s + getOrderAmount(o), 0);
       const esimFee = orders.reduce((s, o) => {
         if (o.source === "virement") return s;
         if (o.stripe_fee && Number(o.stripe_fee) > 0) return s + Number(o.stripe_fee);
-        const p = toEur(Number(o.price), o.currency);
+        const p = getOrderAmount(o);
         return s + Math.round((p * 0.029 + 0.30) * 100) / 100;
       }, 0);
       const esimMgn = orders.reduce((s, o) => {
         if (o.margin_net != null && Number(o.margin_net) !== 0) return s + Number(o.margin_net);
         if (o.cost_airalo != null && Number(o.cost_airalo) > 0) {
-          const p   = toEur(Number(o.price), o.currency);
+          const p   = getOrderAmount(o);
           const fee = o.stripe_fee && Number(o.stripe_fee) > 0 ? Number(o.stripe_fee) : Math.round((p * 0.029 + 0.30) * 100) / 100;
           return s + (p - Number(o.cost_airalo) - fee);
         }
@@ -177,7 +189,7 @@ function useDashboard(period: { start: string; end: string }) {
         if (!mMap[m]) mMap[m] = { month: m, esim: 0, insurance: 0, routers: 0 };
         mMap[m][type] += v;
       };
-      orders.forEach(o     => addM(o.created_at, "esim",      toEur(Number(o.price), o.currency)));
+      orders.forEach(o     => addM(o.created_at, "esim",      getOrderAmount(o)));
       insurances.forEach(i => addM(i.created_at, "insurance", Number(i.frais_distribution ?? 0) + Number(i.premium_ava ?? 0) * 0.10));
       rentals.forEach(r    => addM(r.created_at, "routers",   rentToEur(r)));
       setMonthly(Object.values(mMap).sort((a, b) => a.month.localeCompare(b.month)));
@@ -235,7 +247,7 @@ function useStats() {
       try {
         const { data: orders } = await supabase
           .from("orders")
-          .select("price, currency, package_name, package_id, partner_code, created_at")
+          .select("amount, price, currency, package_name, package_id, partner_code, created_at")
           .gte("created_at", "2025-04-01T00:00:00")
           .in("status", ["completed", "paid"])
           .order("created_at", { ascending: true });
@@ -244,7 +256,7 @@ function useStats() {
         const mMap: Record<string, MonthStat>    = {};
         const pMap: Record<string, PackageStat> = {};
         (orders ?? []).forEach(o => {
-          const eur = toEur(Number(o.price ?? 0), o.currency ?? "EUR");
+          const eur = getOrderAmount(o);
           const m   = (o.created_at as string).slice(0, 7);
           const [y, mo] = m.split("-").map(Number);
           if (!mMap[m]) mMap[m] = { month: m, label: `${MONTH_FR[mo-1]} ${String(y).slice(2)}`, count: 0, revenue_eur: 0, direct: 0, partner: 0 };

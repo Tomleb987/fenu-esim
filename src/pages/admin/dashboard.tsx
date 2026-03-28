@@ -479,10 +479,19 @@ function CostsImportSection({ onDone }: { onDone: () => void }) {
         </div>
         <label className="cursor-pointer shrink-0">
           <input type="file" accept=".csv" className="hidden" onChange={handleImport} disabled={loading} />
-          <span className={`flex items-center gap-2 text-sm px-4 py-2.5 rounded-xl text-white font-medium shadow-sm transition-opacity ${loading ? "opacity-50" : "hover:opacity-90"}`}
-            style={{ background: G }}>
-            <Upload size={14} />
-            {loading ? "Import…" : "Importer CSV"}
+          <span className={`flex items-center gap-2 text-sm px-4 py-2.5 rounded-xl text-white font-medium shadow-sm transition-all ${loading ? "opacity-80 cursor-wait" : "hover:opacity-90 cursor-pointer"}`}
+            style={{ background: G, minWidth: 140 }}>
+            {loading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin shrink-0" />
+                <span>Import en cours…</span>
+              </>
+            ) : (
+              <>
+                <Upload size={14} />
+                <span>Importer CSV</span>
+              </>
+            )}
           </span>
         </label>
       </div>
@@ -513,13 +522,20 @@ export default function AdminDashboard() {
     });
   }, [router.isReady]);
 
+  const [csvImporting, setCsvImporting] = useState(false);
   const handleCSVImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
-    const text = await file.text();
-    const res  = await fetch("/api/admin/stripe-import", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ csv: text, batch: new Date().toISOString().slice(0, 7) }) });
-    const data = await res.json();
-    alert(`Import :\n✅ ${data.imported} transactions\n🔗 ${data.reconciled} réconciliées`);
-    reload(); e.target.value = "";
+    setCsvImporting(true);
+    try {
+      const text = await file.text();
+      const res  = await fetch("/api/admin/stripe-import", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ csv: text, batch: new Date().toISOString().slice(0, 7) }) });
+      const data = await res.json();
+      alert(`Import :\n✅ ${data.imported} transactions\n🔗 ${data.reconciled} réconciliées`);
+      reload();
+    } finally {
+      setCsvImporting(false);
+      e.target.value = "";
+    }
   };
 
   const handleGenerateBordereau = async (p: string) => {
@@ -879,10 +895,21 @@ export default function AdminDashboard() {
                 <p className="text-sm font-semibold text-gray-700">Réconciliation mensuelle</p>
                 <p className="text-xs text-gray-400 mt-1">Télécharge ton CSV depuis <strong>Stripe → Rapports → Paiements</strong> puis importe-le ici</p>
               </div>
-              <label className="cursor-pointer shrink-0">
-                <input type="file" accept=".csv" className="hidden" onChange={handleCSVImport} />
-                <span className="flex items-center gap-2 text-sm px-4 py-2.5 rounded-xl text-white font-medium shadow-sm hover:opacity-90" style={{ background: G }}>
-                  <Upload size={14} /> Importer CSV
+              <label className={csvImporting ? "cursor-wait" : "cursor-pointer"} style={{ flexShrink: 0 }}>
+                <input type="file" accept=".csv" className="hidden" onChange={handleCSVImport} disabled={csvImporting} />
+                <span className={`flex items-center gap-2 text-sm px-4 py-2.5 rounded-xl text-white font-medium shadow-sm transition-all ${csvImporting ? "opacity-80" : "hover:opacity-90"}`}
+                  style={{ background: G, minWidth: 140 }}>
+                  {csvImporting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin shrink-0" />
+                      <span>Import en cours…</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload size={14} />
+                      <span>Importer CSV</span>
+                    </>
+                  )}
                 </span>
               </label>
             </div>

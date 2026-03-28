@@ -429,6 +429,67 @@ function StatsSection() {
   );
 }
 
+
+// ── Section import coûts Airalo ───────────────────────────────
+function CostsImportSection({ onDone }: { onDone: () => void }) {
+  const [usdRate, setUsdRate] = useState("0.92");
+  const [result, setResult]   = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLoading(true); setResult(null);
+    const text = await file.text();
+    const res  = await fetch("/api/admin/import-costs", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ csv: text, usd_rate: parseFloat(usdRate) }),
+    });
+    const data = await res.json();
+    setResult(data); setLoading(false);
+    if (data.updated > 0) onDone();
+    e.target.value = "";
+  };
+
+  return (
+    <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+      <div className="flex items-start justify-between flex-wrap gap-4">
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-gray-700">Import prix de revient Airalo</p>
+          <p className="text-xs text-gray-400 mt-1">
+            CSV Airalo Partner avec colonnes <code className="bg-gray-100 px-1 rounded">package_id</code> et <code className="bg-gray-100 px-1 rounded">cost_eur</code> (ou <code className="bg-gray-100 px-1 rounded">cost_usd</code>)
+          </p>
+          <div className="flex items-center gap-2 mt-3">
+            <label className="text-xs text-gray-500 shrink-0">Taux USD → EUR</label>
+            <input type="number" step="0.001" value={usdRate}
+              onChange={e => setUsdRate(e.target.value)}
+              className="w-20 text-xs px-2 py-1.5 border border-gray-200 rounded-lg text-gray-700" />
+            <span className="text-xs text-gray-400">(ex: 0.920)</span>
+          </div>
+          {result && (
+            <div className={`mt-3 text-xs rounded-xl px-3 py-2 ${result.updated > 0 ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"}`}>
+              ✅ {result.updated} packages mis à jour
+              {result.notFound > 0 && <span className="ml-2">· ⚠️ {result.notFound} non trouvés</span>}
+              {result.marginsRecalculated && <span className="ml-2">· Marges recalculées</span>}
+              {result.notFoundIds?.length > 0 && (
+                <div className="mt-1 opacity-70">Non trouvés : {result.notFoundIds.join(", ")}</div>
+              )}
+            </div>
+          )}
+        </div>
+        <label className="cursor-pointer shrink-0">
+          <input type="file" accept=".csv" className="hidden" onChange={handleImport} disabled={loading} />
+          <span className={`flex items-center gap-2 text-sm px-4 py-2.5 rounded-xl text-white font-medium shadow-sm transition-opacity ${loading ? "opacity-50" : "hover:opacity-90"}`}
+            style={{ background: G }}>
+            <Upload size={14} />
+            {loading ? "Import…" : "Importer CSV"}
+          </span>
+        </label>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const router = useRouter();
   const [authChecked,       setAuthChecked]       = useState(false);
@@ -805,6 +866,10 @@ export default function AdminDashboard() {
           {/* Stats historiques */}
           <Section title="Statistiques — depuis le lancement" icon={TrendingUp} />
           <StatsSection />
+
+          {/* Import coûts Airalo */}
+          <Section title="Coûts d'achat Airalo" icon={Package} />
+          <CostsImportSection onDone={reload} />
 
           {/* Import CSV Stripe */}
           <Section title="Import CSV Stripe" icon={Upload} />

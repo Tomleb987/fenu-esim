@@ -9,8 +9,8 @@ import { useRouter } from "next/router";
 import Head from "next/head";
 import Image from "next/image";
 import {
-  TrendingUp, Shield, Users, Package, LogOut, ChevronRight, Wifi, PlusCircle,
-, FileText } from "lucide-react";
+  TrendingUp, Shield, Users, Package, LogOut, ChevronRight, Wifi, PlusCircle, FileText,
+} from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
 const G = "linear-gradient(135deg, #A020F0 0%, #FF4D6D 50%, #FF7F11 100%)";

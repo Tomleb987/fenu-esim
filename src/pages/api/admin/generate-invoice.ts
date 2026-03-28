@@ -1,432 +1,321 @@
 // ============================================================
-// FENUA SIM – API Route : Génération facture PDF
-// Fichier : src/pages/api/admin/generate-invoice.ts
-//
-// Utilise jspdf (déjà installé dans le projet)
-// Appelée automatiquement après paiement eSIM confirmé
-// ou manuellement depuis le dashboard
+// FENUA SIM – API Génération Devis / Facture PDF
+// Format fidèle au style Odoo FENUA SIM
+// src/pages/api/admin/generate-invoice.ts
 // ============================================================
 
 import type { NextApiRequest, NextApiResponse } from "next";
 import { supabaseAdmin as supabase } from "@/lib/supabaseAdmin";
 import { jsPDF } from "jspdf";
 
-// ── Constantes entreprise ────────────────────────────────────
-const COMPANY = {
-  name: "FENUASIM",
-  legal: "SAS FENUASIM",
-  address1: "58 RUE MONCEAU",     // ← À compléter
-  address2: "75000 Paris",      // ← À compléter
-  siret: "943 713 875",  // ← À compléter
-  email: "contact@fenuasim.com",
-  website: "www.fenuasim.com",
-  vat: "TVA non applicable, art. 293 B du CGI",
+const CO = {
+  name:    "FENUA SIM",
+  legal:   "FENUA SIM - SASU",
+  address: "58 RUE MONCEAU",
+  city:    "75008 PARIS",
+  country: "France",
+  siret:   "943 713 875 RCS Paris",
+  capital: "Capital social de 500 EUR",
+  email:   "contact@fenuasim.com",
+  site:    "https://www.fenuasim.com",
+  iban:    "FR76 4061 8804 7600 0405 1858 605",
+  bic:     "BOUS FRPP XXX",
+  rib:     "40618 80476 00040518586 05",
 };
 
-// ── Générateur numéro facture ────────────────────────────────
-async function nextInvoiceNumber(): Promise<string> {
-  const { data, error } = await supabase.rpc("generate_invoice_number");
-  if (error) throw new Error(`Numérotation facture : ${error.message}`);
-  return data as string;
+async function nextNumber(type: "devis" | "facture"): Promise<string> {
+  const year   = new Date().getFullYear();
+  const prefix = type === "devis" ? "D" : "F";
+  const key    = `${prefix}_${year}_counter`;
+  try {
+    const { data, error } = await supabase.rpc("increment_counter", { counter_key: key });
+    if (!error && data) return `${prefix}-${year}-${String(data).padStart(4, "0")}`;
+  } catch {}
+  return `${prefix}-${year}-${Date.now().toString().slice(-4)}`;
 }
 
-// ── Génération PDF (jspdf) ───────────────────────────────────
-function buildPDF(data: {
-  invoiceNumber: string;
-  date: string;
-  customerEmail: string;
-  customerName?: string;
-  productName: string;
-  destination?: string;
-  dataAmount?: string;
-  validity?: string;
-  amount: number;
-  currency: string;
-  stripePaymentId?: string;
-  type: "esim" | "router_rental";
-  // Champs spécifiques location routeur
-  routerModel?: string;
-  rentalStart?: string;
-  rentalEnd?: string;
-  rentalDays?: number;
-  pricePerDay?: number;
-  depositAmount?: number;
-}): Buffer {
+interface PDFLine {
+  description:  string;
+  qty:          number;
+  unite:        string;
+  prixUnitaire: number;
+  montant:      number;
+  currency:     string;
+}
+
+interface PDFData {
+  docType:       "devis" | "facture";
+  docNumber:     string;
+  date:          string;
+  echeance:      string;
+  vendeur:       string;
+  clientName:    string;
+  clientAddress: string;
+  clientCity:    string;
+  clientCountry: string;
+  lines:         PDFLine[];
+  notes?:        string;
+}
+
+function fmtMnt(n: number, currency: string): string {
+  if (currency === "XPF" || currency === "FCFP") return `${Math.round(n).toLocaleString("fr-FR")} XPF`;
+  return `${n.toFixed(2).replace(".", ",")} EUR`;
+}
+
+function buildPDF(d: PDFData): Buffer {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const W = 210;
-  const currSymbol = data.currency === "EUR" ? "€" : data.currency;
-  const amtStr = `${data.amount.toFixed(2)} ${currSymbol}`;
+  const W   = 210;
+  const MAR = 15;
 
-  // ── Couleurs ──
-  const VIOLET = [160, 32, 240] as [number, number, number];
-  const DARK   = [26, 5, 51]   as [number, number, number];
-  const GRAY   = [107, 114, 128] as [number, number, number];
-  const LGRAY  = [245, 247, 250] as [number, number, number];
-  const WHITE  = [255, 255, 255] as [number, number, number];
+  const VIOLET = [160, 32, 240]  as [number,number,number];
+  const DARK   = [30,  30,  40]  as [number,number,number];
+  const GRAY   = [120, 120, 130] as [number,number,number];
+  const LGRAY  = [248, 248, 250] as [number,number,number];
+  const WHITE  = [255, 255, 255] as [number,number,number];
+  const LINE   = [220, 220, 225] as [number,number,number];
 
-  // ── Header bande dégradée (simulée) ──
-  doc.setFillColor(...VIOLET);
-  doc.rect(0, 0, W, 28, "F");
-
-  // Nom société
+  // Logo FENUA.SIM
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(22);
-  doc.setTextColor(...WHITE);
-  doc.text("FENUASIM", 14, 16);
+  doc.setFontSize(16);
+  doc.setTextColor(...VIOLET);
+  doc.text("FENUA", MAR, 18);
+  doc.setTextColor(...DARK);
+  doc.setFontSize(14);
+  doc.text(" o ", MAR + 21, 18);
+  doc.setTextColor(...VIOLET);
+  doc.setFontSize(16);
+  doc.text("SIM", MAR + 28, 18);
 
-  // Tagline
+  // Adresse société en haut à droite
   doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...DARK);
+  doc.text(CO.name,    W - MAR, 10, { align: "right" });
+  doc.text(CO.address, W - MAR, 15, { align: "right" });
+  doc.text(CO.city,    W - MAR, 20, { align: "right" });
+  doc.text(CO.country, W - MAR, 25, { align: "right" });
+
+  // Titre Devis/Facture
+  const titre = d.docType === "devis" ? "Devis" : "Facture";
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(26);
+  doc.setTextColor(...VIOLET);
+  doc.text(`${titre} # ${d.docNumber}`, W - MAR, 44, { align: "right" });
+
+  // Séparateur
+  doc.setDrawColor(...LINE);
+  doc.setLineWidth(0.3);
+  doc.line(MAR, 49, W - MAR, 49);
+
+  // Bloc client
+  let y = 60;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(...DARK);
+  doc.text(d.clientName, MAR, y);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...GRAY);
+  if (d.clientAddress) { y += 5; doc.text(d.clientAddress, MAR, y); }
+  if (d.clientCity)    { y += 5; doc.text(d.clientCity,    MAR, y); }
+  if (d.clientCountry) { y += 5; doc.text(d.clientCountry, MAR, y); }
+
+  // Méta date/échéance/vendeur
+  const metaY = 57;
+  const col1  = 80, col2 = 130, col3 = 160;
+  doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
-  doc.setTextColor(220, 200, 255);
-  doc.text("eSIM · Assurance · Routeurs", 14, 22);
-
-  // Titre FACTURE à droite
-  const title = data.type === "esim" ? "FACTURE" : "FACTURE DE LOCATION";
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(18);
-  doc.setTextColor(...WHITE);
-  doc.text(title, W - 14, 14, { align: "right" });
-
-  // Numéro
+  doc.setTextColor(...VIOLET);
+  const lbl = d.docType === "devis" ? "Date du devis" : "Date de la facture";
+  doc.text(lbl,        col1, metaY);
+  doc.text("Echéance", col2, metaY);
+  doc.text("Vendeur",  col3, metaY);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.setTextColor(220, 200, 255);
-  doc.text(`N° ${data.invoiceNumber}`, W - 14, 21, { align: "right" });
-
-  // ── Séparateur ──
-  let y = 36;
-
-  // ── Bloc émetteur ──
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(7);
-  doc.setTextColor(...GRAY);
-  doc.text("DE", 14, y);
-
-  y += 5;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
   doc.setTextColor(...DARK);
-  doc.text(COMPANY.legal, 14, y);
+  doc.text(d.date,     col1, metaY + 6);
+  doc.text(d.echeance, col2, metaY + 6);
+  doc.text(d.vendeur,  col3, metaY + 6);
 
-  y += 5;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.setTextColor(...GRAY);
-  doc.text(COMPANY.address1, 14, y);
-  y += 4;
-  doc.text(COMPANY.address2, 14, y);
-  y += 4;
-  doc.text(`SIRET : ${COMPANY.siret}`, 14, y);
-  y += 4;
-  doc.text(COMPANY.email, 14, y);
-
-  // ── Bloc destinataire (milieu) ──
-  const midX = 80;
-  let yy = 36;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(7);
-  doc.setTextColor(...GRAY);
-  doc.text("FACTURÉ À", midX, yy);
-
-  yy += 5;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.setTextColor(...DARK);
-  doc.text(data.customerName || "Client", midX, yy);
-
-  yy += 5;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.setTextColor(...GRAY);
-  doc.text(data.customerEmail, midX, yy);
-
-  // ── Bloc date (droite) ──
-  const rightX = 155;
-  let yr = 36;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(7);
-  doc.setTextColor(...GRAY);
-  doc.text("DATE", rightX, yr);
-
-  yr += 5;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.setTextColor(...DARK);
-  doc.text(data.date, rightX, yr);
-
-  if (data.stripePaymentId) {
-    yr += 8;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(7);
-    doc.setTextColor(...GRAY);
-    doc.text("RÉFÉRENCE PAIEMENT", rightX, yr);
-    yr += 4;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
-    doc.text(data.stripePaymentId.slice(0, 22), rightX, yr);
-  }
-
-  // ── Tableau produit ──
-  y = 78;
+  // Tableau
+  let tY = Math.max(y + 6, 80);
 
   // En-tête tableau
-  doc.setFillColor(...DARK);
-  doc.rect(14, y, W - 28, 10, "F");
-
+  doc.setFillColor(...LGRAY);
+  doc.rect(MAR, tY, W - MAR * 2, 8, "F");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
-  doc.setTextColor(...WHITE);
-  doc.text("DÉSIGNATION", 18, y + 6.5);
-  doc.text("DÉTAILS", 100, y + 6.5);
-  doc.text("MONTANT", W - 18, y + 6.5, { align: "right" });
+  doc.setTextColor(...GRAY);
+  doc.text("Description",   MAR + 2, tY + 5.2);
+  doc.text("Quantite",      125,     tY + 5.2);
+  doc.text("Prix unitaire", 152,     tY + 5.2);
+  doc.text("Montant",       W - MAR, tY + 5.2, { align: "right" });
+  tY += 8;
 
-  y += 10;
+  doc.setDrawColor(...LINE);
+  doc.setLineWidth(0.2);
+  doc.line(MAR, tY, W - MAR, tY);
 
-  // Ligne produit
-  doc.setFillColor(...LGRAY);
-  doc.rect(14, y, W - 28, 16, "F");
+  // Lignes
+  for (const line of d.lines) {
+    const cur = line.currency;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(...DARK);
+    doc.text(line.description, MAR + 2, tY + 7);
+    doc.setTextColor(...GRAY);
+    doc.text(`${line.qty.toFixed(2)} ${line.unite}`, 125, tY + 7);
+    doc.text(fmtMnt(line.prixUnitaire, cur),          152, tY + 7);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...DARK);
+    doc.text(fmtMnt(line.montant, cur), W - MAR, tY + 7, { align: "right" });
+    tY += 10;
+    doc.setDrawColor(...LINE);
+    doc.line(MAR, tY, W - MAR, tY);
+  }
 
+  // RIB
+  tY += 5;
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(7.5);
+  doc.setTextColor(...GRAY);
+  doc.text(`RIB : ${CO.rib} / IBAN : ${CO.iban} /BIC : ${CO.bic}`, MAR, tY);
+
+  // Total
+  tY += 8;
+  const total = d.lines.reduce((s, l) => s + l.montant, 0);
+  const cur   = d.lines[0]?.currency ?? "EUR";
+  doc.setDrawColor(...VIOLET);
+  doc.setLineWidth(0.3);
+  doc.line(MAR, tY, W - MAR, tY);
+  tY += 1;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
-  doc.setTextColor(...DARK);
-  doc.text(data.productName, 18, y + 7);
+  doc.setTextColor(...VIOLET);
+  doc.text("Total", W / 2, tY + 6.5, { align: "center" });
+  doc.text(fmtMnt(total, cur), W - MAR, tY + 6.5, { align: "right" });
+  doc.setLineWidth(0.3);
+  doc.line(MAR, tY + 10, W - MAR, tY + 10);
 
-  // Détails
+  // Conditions
+  tY += 16;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(...GRAY);
+  doc.text(`Conditions generales : ${CO.site}`, MAR, tY);
+  if (d.notes) { tY += 5; doc.text(d.notes, MAR, tY); }
 
-  if (data.type === "esim") {
-    const details = [
-      data.destination ? `Destination : ${data.destination}` : "",
-      data.dataAmount   ? `Data : ${data.dataAmount}`         : "",
-      data.validity     ? `Validité : ${data.validity}`       : "",
-    ].filter(Boolean).join("  ·  ");
-    doc.text(details, 100, y + 7);
-  } else {
-    // Routeur
-    doc.text(`${data.rentalStart} → ${data.rentalEnd}`, 100, y + 5);
-    doc.text(`${data.rentalDays} jours × ${data.pricePerDay?.toFixed(2)} ${currSymbol}/j`, 100, y + 10);
-  }
-
-  // Montant
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.setTextColor(...DARK);
-  doc.text(amtStr, W - 18, y + 7, { align: "right" });
-
-  y += 20;
-
-  // Note caution routeur
-  if (data.type === "router_rental" && data.depositAmount) {
-    doc.setFont("helvetica", "oblique");
-    doc.setFontSize(8);
-    doc.setTextColor(...GRAY);
-    doc.text(
-      `Caution versée : ${data.depositAmount.toFixed(2)} ${currSymbol} — Remboursable au retour en bon état. Non incluse dans cette facture.`,
-      14, y
-    );
-    y += 8;
-  }
-
-  // Mention TVA
-  doc.setFont("helvetica", "oblique");
-  doc.setFontSize(8);
-  doc.setTextColor(...GRAY);
-  doc.text(COMPANY.vat, 14, y);
-
-  y += 12;
-
-  // ── Total ──
-  doc.setFillColor(...VIOLET);
-  doc.rect(W - 14 - 80, y, 80, 14, "F");
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
-  doc.setTextColor(...WHITE);
-  doc.text(`TOTAL TTC : ${amtStr}`, W - 18, y + 9.5, { align: "right" });
-
-  // ── Pied de page ──
-  const footerY = 282;
-  doc.setDrawColor(230, 230, 230);
-  doc.line(14, footerY - 4, W - 14, footerY - 4);
-
+  // Pied de page
+  const footY = 287;
+  doc.setDrawColor(...LINE);
+  doc.setLineWidth(0.2);
+  doc.line(MAR, footY - 5, W - MAR, footY - 5);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(...GRAY);
   doc.text(
-    `${COMPANY.legal}  ·  ${COMPANY.address1}, ${COMPANY.address2}  ·  SIRET ${COMPANY.siret}  ·  ${COMPANY.email}`,
-    W / 2, footerY, { align: "center" }
+    `${CO.legal} ${CO.capital} - ${CO.siret} . Email : ${CO.email} Site : ${CO.site}`,
+    W / 2, footY - 1, { align: "center" }
   );
+  doc.text("Page 1 / 1", W - MAR, footY - 1, { align: "right" });
 
   return Buffer.from(doc.output("arraybuffer"));
 }
 
-// ── Handler principal ────────────────────────────────────────
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const { orderId, rentalId, type } = req.body as {
-    orderId?: string;
-    rentalId?: string;
-    type?: "esim" | "router_rental";
-  };
+  // Mode direct (depuis la page admin devis)
+  if (req.body.mode === "direct") {
+    try {
+      const data = req.body as PDFData & { mode: string };
+      // Valider les champs requis
+      if (!data.docType) data.docType = "devis";
+      if (!data.docNumber || data.docNumber === "") {
+        data.docNumber = await nextNumber(data.docType);
+      }
+      if (!data.lines || data.lines.length === 0) {
+        return res.status(400).json({ error: "Au moins une ligne est requise" });
+      }
+      const pdfBuf = buildPDF(data);
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${data.docNumber}.pdf"`);
+      return res.send(pdfBuf);
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
 
+  // Mode depuis commande existante
+  const { orderId, rentalId, type, docType } = req.body;
   if (!orderId && !rentalId) return res.status(400).json({ error: "orderId ou rentalId requis" });
 
   const invoiceType: "esim" | "router_rental" = type ?? (rentalId ? "router_rental" : "esim");
+  const docKind: "devis" | "facture"          = docType ?? "facture";
 
   try {
-    let pdfData: Parameters<typeof buildPDF>[0];
+    const docNumber = await nextNumber(docKind);
+    const echeance  = new Date(Date.now() + 30 * 86400000).toLocaleDateString("fr-FR");
+    let pdfData: PDFData;
 
     if (invoiceType === "esim" && orderId) {
-      // ── Récupérer la commande eSIM ──
       const { data: order, error } = await supabase
         .from("orders")
-        .select(`
-          id, email, prenom, nom, first_name, last_name,
-          package_name, price, currency, stripe_session_id, created_at,
-          partner_code, promo_code
-        `)
-        .eq("id", orderId)
-        .single();
-
+        .select("id, email, prenom, nom, first_name, last_name, package_name, price, currency, stripe_session_id, created_at")
+        .eq("id", orderId).single();
       if (error || !order) return res.status(404).json({ error: "Commande introuvable" });
 
-      // Récupérer les détails du package
-      const { data: pkg } = await supabase
-        .from("airalo_packages")
-        .select("data_amount, data_unit, validity_days, country, region_fr, region")
-        .eq("airalo_id", order.package_id ?? "")
-        .maybeSingle();
-
-      const invoiceNumber = await nextInvoiceNumber();
-      const dateStr = new Date(order.created_at).toLocaleDateString("fr-FR");
-      const customerName = [order.prenom || order.first_name, order.nom || order.last_name].filter(Boolean).join(" ");
-      const amount = order.price ?? 0;
+      const customerName = [order.prenom || order.first_name, order.nom || order.last_name].filter(Boolean).join(" ") || order.email;
+      const price   = Number(order.price ?? 0);
+      const cur     = ((order.currency || "EUR").toUpperCase() === "XPF" && price >= 200) ? "XPF" : "EUR";
+      const amount  = cur === "XPF" ? price : (price < 200 ? price : price / 119.33);
 
       pdfData = {
-        invoiceNumber,
-        date: dateStr,
-        customerEmail: order.email,
-        customerName,
-        productName: order.package_name ?? "eSIM",
-        destination: pkg ? (pkg.country || pkg.region_fr || pkg.region) : undefined,
-        dataAmount: pkg ? `${pkg.data_amount} ${pkg.data_unit}` : undefined,
-        validity: pkg ? `${pkg.validity_days} jours` : undefined,
-        amount,
-        currency: order.currency ?? "EUR",
-        stripePaymentId: order.stripe_session_id,
-        type: "esim",
+        docType: docKind, docNumber,
+        date: new Date(order.created_at).toLocaleDateString("fr-FR"),
+        echeance, vendeur: "Support FENUA SIM",
+        clientName: customerName, clientAddress: "", clientCity: "", clientCountry: "",
+        lines: [{ description: order.package_name ?? "eSIM", qty: 1, unite: "Unite(s)", prixUnitaire: amount, montant: amount, currency: cur }],
       };
-
-      const pdfBuffer = buildPDF(pdfData);
-
-      // Sauvegarder la facture en base
-      const { data: invoice, error: invErr } = await supabase
-        .from("invoices")
-        .insert({
-          invoice_number: invoiceNumber,
-          order_id: orderId,
-          invoice_type: "esim",
-          customer_email: order.email,
-          customer_name: customerName,
-          amount,
-          currency: order.currency ?? "EUR",
-          product_name: order.package_name,
-          pdf_generated_at: new Date().toISOString(),
-          email_sent: false,
-        })
-        .select("id")
-        .single();
-
-      if (!invErr && invoice) {
-        await supabase.from("orders").update({ invoice_id: invoice.id }).eq("id", orderId);
-      }
-
-      // Retourner le PDF
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename="${invoiceNumber}.pdf"`);
-      return res.send(pdfBuffer);
-    }
-
-    if (invoiceType === "router_rental" && rentalId) {
-      // ── Récupérer la location routeur ──
+    } else if (invoiceType === "router_rental" && rentalId) {
       const { data: rental, error } = await supabase
         .from("router_rentals")
-        .select(`
-          id, customer_email, customer_name,
-          rental_start, rental_end, rental_days,
-          price_per_day, rental_amount, deposit_amount,
-          currency, stripe_session_id, created_at,
-          router_id
-        `)
-        .eq("id", rentalId)
-        .single();
-
+        .select("id, customer_email, customer_name, rental_start, rental_end, rental_days, price_per_day, rental_amount, deposit_amount, currency, created_at, router_id")
+        .eq("id", rentalId).single();
       if (error || !rental) return res.status(404).json({ error: "Location introuvable" });
 
-      const { data: router } = await supabase
-        .from("routers")
-        .select("model, serial_number")
-        .eq("id", rental.router_id)
-        .maybeSingle();
-
-      const invoiceNumber = await nextInvoiceNumber();
-      const dateStr = new Date(rental.created_at).toLocaleDateString("fr-FR");
+      const { data: router } = await supabase.from("routers").select("model").eq("id", rental.router_id).maybeSingle();
+      const ppd  = Number(rental.price_per_day ?? 5);
+      const days = Number(rental.rental_days ?? 1);
+      const amt  = Number(rental.rental_amount ?? ppd * days);
+      const start = rental.rental_start ? new Date(rental.rental_start).toLocaleDateString("fr-FR") : "";
+      const end   = rental.rental_end   ? new Date(rental.rental_end).toLocaleDateString("fr-FR")   : "";
 
       pdfData = {
-        invoiceNumber,
-        date: dateStr,
-        customerEmail: rental.customer_email,
-        customerName: rental.customer_name,
-        productName: `Location routeur ${router?.model ?? ""}`,
-        amount: rental.rental_amount ?? 0,
-        currency: rental.currency ?? "EUR",
-        stripePaymentId: rental.stripe_session_id,
-        type: "router_rental",
-        routerModel: router?.model,
-        rentalStart: rental.rental_start
-          ? new Date(rental.rental_start).toLocaleDateString("fr-FR") : "",
-        rentalEnd: rental.rental_end
-          ? new Date(rental.rental_end).toLocaleDateString("fr-FR") : "",
-        rentalDays: rental.rental_days,
-        pricePerDay: rental.price_per_day,
-        depositAmount: rental.deposit_amount,
+        docType: docKind, docNumber,
+        date: new Date(rental.created_at).toLocaleDateString("fr-FR"),
+        echeance, vendeur: "Support FENUA SIM",
+        clientName: rental.customer_name || rental.customer_email, clientAddress: "", clientCity: "", clientCountry: "",
+        lines: [{ description: `Location routeur ${router?.model ?? ""} - ${start} au ${end} (${days} jours)`, qty: days, unite: "Jour(s)", prixUnitaire: ppd, montant: amt, currency: "EUR" }],
+        notes: rental.deposit_amount ? `Caution versee : ${Number(rental.deposit_amount).toFixed(2)} EUR - Remboursable au retour en bon etat.` : undefined,
       };
-
-      const pdfBuffer = buildPDF(pdfData);
-
-      // Sauvegarder la facture
-      const { data: invoice, error: invErr } = await supabase
-        .from("invoices")
-        .insert({
-          invoice_number: invoiceNumber,
-          rental_id: rentalId,
-          invoice_type: "router_rental",
-          customer_email: rental.customer_email,
-          customer_name: rental.customer_name,
-          amount: rental.rental_amount,
-          currency: rental.currency ?? "EUR",
-          product_name: `Location routeur ${router?.model ?? ""}`,
-          pdf_generated_at: new Date().toISOString(),
-          email_sent: false,
-        })
-        .select("id")
-        .single();
-
-      if (!invErr && invoice) {
-        await supabase.from("router_rentals").update({ invoice_id: invoice.id }).eq("id", rentalId);
-      }
-
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename="${invoiceNumber}.pdf"`);
-      return res.send(pdfBuffer);
+    } else {
+      return res.status(400).json({ error: "Type invalide" });
     }
 
-    return res.status(400).json({ error: "Type de facture invalide" });
+    const pdfBuffer = buildPDF(pdfData);
+    if (docKind === "facture") {
+      await supabase.from("invoices").insert({
+        invoice_number: docNumber, order_id: orderId ?? null, rental_id: rentalId ?? null,
+        invoice_type: invoiceType, customer_email: pdfData.clientName,
+        amount: pdfData.lines[0]?.montant ?? 0, currency: pdfData.lines[0]?.currency ?? "EUR",
+        product_name: pdfData.lines[0]?.description ?? "", pdf_generated_at: new Date().toISOString(), email_sent: false,
+      }).select("id").single();
+    }
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${docNumber}.pdf"`);
+    return res.send(pdfBuffer);
   } catch (err: any) {
-    console.error("generate-invoice error:", err);
     return res.status(500).json({ error: err.message ?? "Erreur serveur" });
   }
 }

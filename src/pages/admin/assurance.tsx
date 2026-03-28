@@ -711,3 +711,5 @@ export default function AdminAssurance() {
     </>
   );
 }
+
+AdminAssurance.getLayout = (page: ReactElement) => page;

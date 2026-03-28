@@ -10,7 +10,7 @@ import Head from "next/head";
 import Image from "next/image";
 import {
   TrendingUp, Shield, Users, Package, LogOut, ChevronRight, Wifi, PlusCircle,
-} from "lucide-react";
+, FileText } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
 const G = "linear-gradient(135deg, #A020F0 0%, #FF4D6D 50%, #FF7F11 100%)";
@@ -76,11 +76,22 @@ const MODULES = [
     bg: "linear-gradient(135deg, #0EA896 0%, #1D9E75 100%)",
     badge: null,
   },
+  {
+    key: "devis",
+    title: "Devis & Factures",
+    desc: "Generer des devis et factures PDF au format FENUA SIM",
+    href: "/admin/devis",
+    icon: FileText,
+    color: "#0EA5E9",
+    bg: "linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%)",
+    badge: null,
+  },
 ];
 
 export default function AdminHome() {
   const router = useRouter();
   const [authChecked, setAuthChecked] = useState(false);
+  const [userEmail, setUserEmail] = useState("");
   const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
@@ -95,6 +106,7 @@ export default function AdminHome() {
 
       if (session) {
         setAuthChecked(true);
+        setUserEmail(session.user?.email ?? "");
       } else {
         router.replace("/admin/login");
       }
@@ -189,6 +201,7 @@ export default function AdminHome() {
                 </span>
                 <span style={{ color: "#D1D5DB", margin: "0 4px" }}>·</span>
                 <span style={{ color: "#374151" }}>Admin</span>
+                <span style={{ color: "#9ca3af", fontSize: 11, marginLeft: 8 }}>{userEmail}</span>
               </div>
               <p
                 style={{

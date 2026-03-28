@@ -13,19 +13,16 @@ import {
   CheckCircle, Download, Wifi,
 } from "lucide-react";
 
-const ADMIN_EMAIL = "admin@fenuasim.com";
+const ADMIN_EMAILS = ["admin@fenuasim.com", "hello@fenuasim.com", "tomleb987@gmail.com"];
+const isAdmin = (email?: string | null) =>
+  !!email && (ADMIN_EMAILS.includes(email) || email.endsWith("@fenuasim.com"));
 const G = "linear-gradient(135deg, #A020F0 0%, #FF4D6D 50%, #FF7F11 100%)";
-// Tarifs de fallback (valeurs réelles lues depuis la table routers)
-const DAILY_RATE_EUR = 5;
-const WEEK_RATE_EUR = 30;
-const FIXED_DEPOSIT_EUR = 67;
-const DAILY_RATE_XPF = DAILY_RATE_EUR;
-const WEEK_RATE_XPF = WEEK_RATE_EUR;
-const FIXED_DEPOSIT_XPF = FIXED_DEPOSIT_EUR;
+const DAILY_RATE_XPF = 500;
+const WEEK_RATE_XPF = 3000;
+const FIXED_DEPOSIT_XPF = 8000;
 const COMMERCIAL_META_PREFIX = "[COMMERCIAL_META]";
 
 // ── Formatage ─────────────────────────────────────────────────
-const fmtEur = (n: number) => new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", minimumFractionDigits: 0 }).format(Math.round(n));
 const fmtXpf = (n: number) =>
   new Intl.NumberFormat("fr-FR", {
     style: "currency",
@@ -258,7 +255,7 @@ export default function AdminRouteurs() {
     if (!router.isReady) return;
 
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session || session.user?.email !== ADMIN_EMAIL) {
+      if (!session || !isAdmin(session.user?.email)) {
         router.push("/admin/login");
       } else {
         setAuthChecked(true);
@@ -602,7 +599,7 @@ export default function AdminRouteurs() {
 
                       <p className="text-xs text-gray-400">S/N : {r.serial_number}</p>
                       <p className="text-xs text-gray-400 mt-1">
-                        {fmtEur(r.rental_price_per_day)}/jour · Caution {fmtEur(r.deposit_amount || FIXED_DEPOSIT_EUR)}
+                        {fmtXpf(r.rental_price_per_day)}/jour · Caution {fmtXpf(r.deposit_amount || FIXED_DEPOSIT_XPF)}
                       </p>
 
                       {(computedRouterStatus === "active" || computedRouterStatus === "upcoming") && currentRental && rentalDisplay && (
@@ -620,8 +617,8 @@ export default function AdminRouteurs() {
                           <p className="text-xs text-gray-400 mt-0.5">
                             {currentRental.rental_days}j ·{" "}
                             {rentalDisplay.offered
-                              ? `Offerte (valeur ${fmtEur(rentalDisplay.reference)})`
-                              : fmtEur(rentalDisplay.charged)}
+                              ? `Offerte (valeur ${fmtXpf(rentalDisplay.reference)})`
+                              : fmtXpf(rentalDisplay.charged)}
                           </p>
 
                           <div className="flex gap-1.5 mt-2">
@@ -779,13 +776,13 @@ function RentalTable({
 
                 <td className="px-4 py-3 text-right">
                   <p className="font-semibold text-gray-800">
-                    {rentalDisplay.offered ? "Offerte" : fmtEur(rentalDisplay.charged)}
+                    {rentalDisplay.offered ? "Offerte" : fmtXpf(rentalDisplay.charged)}
                   </p>
                   <p className="text-xs text-gray-400">
                     {rentalDisplay.offered
-                      ? `Valeur ${fmtEur(rentalDisplay.reference)}`
+                      ? `Valeur ${fmtXpf(rentalDisplay.reference)}`
                       : rentalDisplay.discount > 0
-                        ? `Remise ${fmtEur(rentalDisplay.discount)}`
+                        ? `Remise ${fmtXpf(rentalDisplay.discount)}`
                         : r.payment_status === "paid"
                           ? "✓ Payé"
                           : "En attente"}
@@ -794,7 +791,7 @@ function RentalTable({
 
                 <td className="px-4 py-3 text-right">
                   <p className="text-gray-700">
-                    {depositDisplay.offered ? "Offerte" : fmtEur(depositDisplay.charged)}
+                    {depositDisplay.offered ? "Offerte" : fmtXpf(depositDisplay.charged)}
                   </p>
                   <Badge
                     label={
@@ -927,14 +924,11 @@ function NewRentalModal({
       : 0;
 
   const pricingMode = form.pricing_mode;
-  // Tarifs lus depuis la table routers (pas des constantes)
-  const dailyRate = selectedRouter?.rental_price_per_day ?? DAILY_RATE_EUR;
-  const weekRate  = dailyRate * 7;
-  const rentalBase = pricingMode === "7days" ? weekRate : days * dailyRate;
+  const rentalBase = pricingMode === "7days" ? WEEK_RATE_XPF : days * DAILY_RATE_XPF;
   const customDiscount = Math.max(0, parseFloat(form.discount_amount) || 0);
   const rentalDiscount = form.offer_rental ? rentalBase : Math.min(customDiscount, rentalBase);
   const rentalCharged = Math.max(0, rentalBase - rentalDiscount);
-  const depositReference = selectedRouter?.deposit_amount ?? FIXED_DEPOSIT_EUR;
+  const depositReference = FIXED_DEPOSIT_XPF;
   const depositCharged = form.offer_deposit ? 0 : depositReference;
   const totalCharged = rentalCharged + depositCharged;
 
@@ -1124,7 +1118,7 @@ function NewRentalModal({
             return (
               <option key={r.id} value={r.id} disabled={unavail}>
                 {unavail ? "⛔ " : form.rental_start && form.rental_end ? "✓ " : ""}
-                {r.model} — {r.serial_number} ({fmtEur(r.rental_price_per_day || DAILY_RATE_EUR)}/j)
+                {r.model} — {r.serial_number} ({fmtXpf(r.rental_price_per_day || DAILY_RATE_XPF)}/j)
                 {unavail && avail.next_available
                   ? " — libre le " + new Date(avail.next_available).toLocaleDateString("fr-FR")
                   : ""}
@@ -1192,8 +1186,8 @@ function NewRentalModal({
             onChange={(e) => set("pricing_mode", e.target.value)}
             className={inputCls}
           >
-            <option value="daily">Journalier — {fmtEur(selectedRouter?.rental_price_per_day ?? DAILY_RATE_EUR)}/jour</option>
-            <option value="7days">Forfait 7 jours — {fmtEur((selectedRouter?.rental_price_per_day ?? DAILY_RATE_EUR) * 7)}</option>
+            <option value="daily">Journalier — {fmtXpf(DAILY_RATE_XPF)}/jour</option>
+            <option value="7days">Forfait 7 jours — {fmtXpf(WEEK_RATE_XPF)}</option>
           </select>
         </Field>
 
@@ -1293,36 +1287,36 @@ function NewRentalModal({
             <span className="text-gray-500">
               {pricingMode === "7days"
                 ? `Forfait 7 jours`
-                : `Loyer théorique (${days}j × ${fmtEur(DAILY_RATE_EUR)})`}
+                : `Loyer théorique (${days}j × ${fmtXpf(DAILY_RATE_XPF)})`}
             </span>
-            <span className="font-medium">{fmtEur(rentalBase)}</span>
+            <span className="font-medium">{fmtXpf(rentalBase)}</span>
           </div>
 
           {rentalDiscount > 0 && (
             <div className="flex justify-between mb-1">
               <span className="text-green-600">Remise commerciale</span>
-              <span className="font-medium text-green-600">- {fmtEur(rentalDiscount)}</span>
+              <span className="font-medium text-green-600">- {fmtXpf(rentalDiscount)}</span>
             </div>
           )}
 
           <div className="flex justify-between mb-1">
             <span className="text-gray-500">Location facturée</span>
-            <span className="font-medium">{form.offer_rental ? "Offerte" : fmtEur(rentalCharged)}</span>
+            <span className="font-medium">{form.offer_rental ? "Offerte" : fmtXpf(rentalCharged)}</span>
           </div>
 
           <div className="flex justify-between mb-1">
             <span className="text-gray-500">Caution standard</span>
-            <span className="font-medium">{fmtEur(depositReference)}</span>
+            <span className="font-medium">{fmtXpf(depositReference)}</span>
           </div>
 
           <div className="flex justify-between mb-1">
             <span className="text-gray-500">Caution facturée</span>
-            <span className="font-medium">{form.offer_deposit ? "Offerte" : fmtEur(depositCharged)}</span>
+            <span className="font-medium">{form.offer_deposit ? "Offerte" : fmtXpf(depositCharged)}</span>
           </div>
 
           <div className="flex justify-between pt-2 border-t border-gray-200 font-semibold">
             <span>Total à encaisser</span>
-            <span style={{ color: "#A020F0" }}>{fmtEur(totalCharged)}</span>
+            <span style={{ color: "#A020F0" }}>{fmtXpf(totalCharged)}</span>
           </div>
         </div>
       )}
@@ -1448,7 +1442,7 @@ function ReturnModal({
         <p className="font-medium text-gray-700">
           {rental.customer_name} — {rental.routers?.model}
         </p>
-        <p className="text-xs text-gray-400 mt-1">Caution encaissée : {fmtEur(effectiveDeposit)}</p>
+        <p className="text-xs text-gray-400 mt-1">Caution encaissée : {fmtXpf(effectiveDeposit)}</p>
         {effectiveDeposit === 0 ? (
           <p className="text-xs text-blue-600 mt-1">✓ Aucune caution à restituer</p>
         ) : rental.stripe_payment_intent ? (
@@ -1465,13 +1459,13 @@ function ReturnModal({
               {[
                 {
                   key: "refund",
-                  label: `Restituer intégralement (${fmtEur(effectiveDeposit)})`,
+                  label: `Restituer intégralement (${fmtXpf(effectiveDeposit)})`,
                   color: "text-green-600",
                 },
                 { key: "retain_partial", label: "Retenue partielle", color: "text-amber-600" },
                 {
                   key: "retain_full",
-                  label: `Retenue totale (${fmtEur(effectiveDeposit)})`,
+                  label: `Retenue totale (${fmtXpf(effectiveDeposit)})`,
                   color: "text-red-600",
                 },
               ].map((opt) => (
@@ -1546,8 +1540,8 @@ function AddRouterModal({ onClose, onDone }: { onClose: () => void; onDone: () =
   const [form, setForm] = useState({
     model: "",
     serial_number: "",
-    rental_price_per_day: String(DAILY_RATE_EUR),
-    deposit_amount: String(FIXED_DEPOSIT_EUR),
+    rental_price_per_day: String(DAILY_RATE_XPF),
+    deposit_amount: String(FIXED_DEPOSIT_XPF),
     imei: "",
   });
   const [saving, setSaving] = useState(false);

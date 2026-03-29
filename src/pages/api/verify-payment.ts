@@ -15,15 +15,30 @@ export default async function handler(
 
   try {
     const { session_id } = req.body;
-    
-    const session = await stripe.checkout.sessions.retrieve(session_id);
-    
-    // Bloquer les sessions à 0€ (coupon 100% ou paiement non abouti)
-    const isPaid = session.payment_status === 'paid' && (session.amount_total ?? 0) > 0;
-    return res.status(200).json({ 
+
+    // Récupérer la session avec le payment_intent expandé
+    const session = await stripe.checkout.sessions.retrieve(session_id, {
+      expand: ["payment_intent"],
+    });
+
+    // Vérification stricte :
+    // 1. payment_status doit être 'paid'
+    // 2. amount_total doit être > 0
+    // 3. payment_intent.status doit être 'succeeded'
+    const paymentIntent = session.payment_intent as Stripe.PaymentIntent | null;
+    const intentSucceeded = !paymentIntent || paymentIntent.status === "succeeded";
+
+    const isPaid =
+      session.payment_status === "paid" &&
+      (session.amount_total ?? 0) > 0 &&
+      intentSucceeded;
+
+    return res.status(200).json({
       paid: isPaid,
       session_id: session.id,
-      amount: session.amount_total 
+      amount: session.amount_total,
+      payment_status: session.payment_status,
+      intent_status: paymentIntent?.status ?? null,
     });
   } catch (error: any) {
     return res.status(500).json({ error: error.message });

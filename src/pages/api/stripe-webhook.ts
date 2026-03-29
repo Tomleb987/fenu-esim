@@ -46,9 +46,13 @@ export default async function handler(
 
     if (session.payment_status !== "paid") {
       console.log(`Session ${session.id} not paid yet.`);
-      return res
-        .status(200)
-        .json({ received: true, status: "payment_not_paid" });
+      return res.status(200).json({ received: true, status: "payment_not_paid" });
+    }
+
+    // Bloquer les sessions à montant 0 (paiement non abouti ou coupon 100%)
+    if (!session.amount_total || session.amount_total === 0) {
+      console.warn(`Session ${session.id} has amount_total=0 — commande bloquée.`);
+      return res.status(200).json({ received: true, status: "zero_amount_blocked" });
     }
 
     try {
@@ -162,7 +166,12 @@ export default async function handler(
           data_amount: packageData.data_amount,
           data_unit: packageData.data_unit,
           validity: parseInt(packageData.validity.toString().charAt(0)),
-          price: (session.amount_total ?? 0) / 100,
+          price: (() => {
+            const cur = (session.currency || packageData.currency || "EUR").toUpperCase();
+            const raw = session.amount_total ?? 0;
+            // XPF n'a pas de décimales — Stripe envoie déjà en unités entières
+            return cur === "XPF" || cur === "CFP" ? raw : raw / 100;
+          })(),
           currency:
             session.currency?.toUpperCase() ||
             packageData.currency?.toUpperCase() ||
@@ -308,7 +317,12 @@ export default async function handler(
           data_amount: packageData.data_amount,
           data_unit: packageData.data_unit,
           validity: parseInt(packageData.validity.toString().charAt(0)),
-          price: (session.amount_total ?? 0) / 100,
+          price: (() => {
+            const cur = (session.currency || packageData.currency || "EUR").toUpperCase();
+            const raw = session.amount_total ?? 0;
+            // XPF n'a pas de décimales — Stripe envoie déjà en unités entières
+            return cur === "XPF" || cur === "CFP" ? raw : raw / 100;
+          })(),
           currency:
             session.currency?.toUpperCase() ||
             packageData.currency?.toUpperCase() ||

@@ -18,8 +18,10 @@ export default async function handler(
     
     const session = await stripe.checkout.sessions.retrieve(session_id);
     
+    // Bloquer les sessions à 0€ (coupon 100% ou paiement non abouti)
+    const isPaid = session.payment_status === 'paid' && (session.amount_total ?? 0) > 0;
     return res.status(200).json({ 
-      paid: session.payment_status === 'paid',
+      paid: isPaid,
       session_id: session.id,
       amount: session.amount_total 
     });

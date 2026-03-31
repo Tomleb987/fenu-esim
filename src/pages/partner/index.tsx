@@ -1259,17 +1259,20 @@ export default function PartnerDashboard() {
                         </div>
                         {/* Type */}
                         <div style={{ display: "flex", gap: 4, background: "#f3f4f6", borderRadius: 10, padding: 3 }}>
-                          {[["all","Tous"],["voice","Appels+SMS"],["data","Data only"]] .map(([v,l]) => (
-                            <button key={v} onClick={() => setFilterType(v as "all"|"voice"|"data")}
-                              style={{
-                                fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 7, border: "none",
-                                background: filterType === v ? "#A020F0" : "transparent",
-                                color: filterType === v ? "#fff" : "#6b7280",
-                                cursor: "pointer",
-                              }}>
-                              {l}
-                            </button>
-                          ))}
+                          {(["all","voice","data"] as const).map((v) => {
+                            const labels = { all: "Tous", voice: "Appels+SMS", data: "Data only" };
+                            return (
+                              <button key={v} onClick={() => setFilterType(v)}
+                                style={{
+                                  fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 7, border: "none",
+                                  background: filterType === v ? "#A020F0" : "transparent",
+                                  color: filterType === v ? "#fff" : "#6b7280",
+                                  cursor: "pointer",
+                                }}>
+                                {labels[v]}
+                              </button>
+                            );
+                          })}
                         </div>
                         <span style={{ fontSize: 11, color: "#9ca3af", marginLeft: "auto" }}>
                           {regionPackages.length} forfait{regionPackages.length > 1 ? "s" : ""}

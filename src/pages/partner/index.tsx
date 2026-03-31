@@ -192,6 +192,8 @@ export default function PartnerDashboard() {
   const [orders, setOrders] = useState<PartnerOrder[]>([]);
   const [activeTab, setActiveTab] = useState<"new" | "orders" | "challenge">("new");
   const [searchQuery, setSearchQuery] = useState("");
+  const [filterDuration, setFilterDuration] = useState<number | null>(null); // jours
+  const [filterType, setFilterType] = useState<"all" | "voice" | "data">("all");
   const [sendingEmail, setSendingEmail] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [resendingId, setResendingId] = useState<string | null>(null);
@@ -377,11 +379,24 @@ export default function PartnerDashboard() {
   );
 
   const regionPackages = selectedRegion
-    ? (packagesByRegion[selectedRegion] || []).sort((a, b) => {
-        const pa = a.price_xpf || a.final_price_xpf || a.price_eur || 0;
-        const pb = b.price_xpf || b.final_price_xpf || b.price_eur || 0;
-        return pa - pb;
-      })
+    ? (packagesByRegion[selectedRegion] || [])
+        .filter(pkg => {
+          // Filtre durée
+          if (filterDuration !== null) {
+            const days = getValidityDays(pkg);
+            if (filterDuration === 60) { if (days < 60) return false; }
+            else { if (days !== filterDuration) return false; }
+          }
+          // Filtre type
+          if (filterType === "voice" && !pkg.includes_voice) return false;
+          if (filterType === "data" && pkg.includes_voice) return false;
+          return true;
+        })
+        .sort((a, b) => {
+          const pa = a.price_xpf || a.final_price_xpf || a.price_eur || 0;
+          const pb = b.price_xpf || b.final_price_xpf || b.price_eur || 0;
+          return pa - pb;
+        })
     : [];
 
   const getValidity = (pkg: AiraloPackage) => {
@@ -608,11 +623,13 @@ export default function PartnerDashboard() {
   const currentStepIdx = stepKeys.indexOf(step);
 
   const statusConfig: { [key: string]: { label: string; bg: string; text: string } } = {
-    pending: { label: "En attente", bg: "#FFF7ED", text: "#C2410C" },
-    expired: { label: "Expiré", bg: "#FEF2F2", text: "#DC2626" },
-    paid: { label: "Paye", bg: "#EDE9FE", text: "#7C3AED" },
-    esim_sent: { label: "eSIM envoyee", bg: "#F0FDF4", text: "#15803D" },
-    error: { label: "Erreur", bg: "#FEF2F2", text: "#DC2626" },
+    pending:   { label: "En attente",   bg: "#FFF7ED", text: "#C2410C" },
+    expired:   { label: "Expiré",       bg: "#FEF2F2", text: "#DC2626" },
+    paid:      { label: "Payé",         bg: "#EDE9FE", text: "#7C3AED" },
+    esim_sent: { label: "eSIM envoyée", bg: "#F0FDF4", text: "#15803D" },
+    completed: { label: "Complété",     bg: "#F0FDF4", text: "#15803D" },
+    error:     { label: "Erreur",       bg: "#FEF2F2", text: "#DC2626" },
+    cancelled: { label: "Annulé",       bg: "#F3F4F6", text: "#6B7280" },
   };
 
   const G = "linear-gradient(135deg, #A020F0 0%, #FF4D6D 50%, #FF7F11 100%)";
@@ -1224,12 +1241,47 @@ export default function PartnerDashboard() {
                         </span>
                       </div>
 
+                      {/* Filtres durée + type */}
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12, alignItems: "center" }}>
+                        {/* Durée */}
+                        <div style={{ display: "flex", gap: 4, background: "#f3f4f6", borderRadius: 10, padding: 3 }}>
+                          {[null, 7, 15, 30, 60].map(d => (
+                            <button key={String(d)} onClick={() => setFilterDuration(d)}
+                              style={{
+                                fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 7, border: "none",
+                                background: filterDuration === d ? "#A020F0" : "transparent",
+                                color: filterDuration === d ? "#fff" : "#6b7280",
+                                cursor: "pointer", whiteSpace: "nowrap",
+                              }}>
+                              {d === null ? "Tous" : d === 60 ? "60j+" : `${d}j`}
+                            </button>
+                          ))}
+                        </div>
+                        {/* Type */}
+                        <div style={{ display: "flex", gap: 4, background: "#f3f4f6", borderRadius: 10, padding: 3 }}>
+                          {[["all","Tous"],["voice","Appels+SMS"],["data","Data only"]] .map(([v,l]) => (
+                            <button key={v} onClick={() => setFilterType(v as "all"|"voice"|"data")}
+                              style={{
+                                fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 7, border: "none",
+                                background: filterType === v ? "#A020F0" : "transparent",
+                                color: filterType === v ? "#fff" : "#6b7280",
+                                cursor: "pointer",
+                              }}>
+                              {l}
+                            </button>
+                          ))}
+                        </div>
+                        <span style={{ fontSize: 11, color: "#9ca3af", marginLeft: "auto" }}>
+                          {regionPackages.length} forfait{regionPackages.length > 1 ? "s" : ""}
+                        </span>
+                      </div>
+
                       <div
                         style={{
                           display: "grid",
                           gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
                           gap: 10,
-                          maxHeight: 420,
+                          maxHeight: 380,
                           overflowY: "auto",
                           paddingRight: 4,
                           marginBottom: 20,
@@ -1298,10 +1350,10 @@ export default function PartnerDashboard() {
                                 </p>
                                 <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 4 }}>
                                   <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: pkg.includes_voice ? "#dbeafe" : "#fce7f3", color: pkg.includes_voice ? "#1d4ed8" : "#be185d" }}>
-                                    {pkg.includes_voice ? "Appels inclus" : "Pas d'appels"}
+                                    {pkg.includes_voice ? (getMinsCount(pkg) || "Appels inclus") : "Pas d'appels"}
                                   </span>
                                   <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: pkg.includes_sms ? "#ffedd5" : "#fce7f3", color: pkg.includes_sms ? "#c2410c" : "#be185d" }}>
-                                    {pkg.includes_sms ? "SMS inclus" : "Pas de SMS"}
+                                    {pkg.includes_sms ? (getSmsCount(pkg) || "SMS inclus") : "Pas de SMS"}
                                   </span>
                                 </div>
                                 {pkg.operator_name && (
@@ -2142,12 +2194,12 @@ export default function PartnerDashboard() {
                                   if (cur === "XPF" || cur === "CFP") {
                                     // partner_orders : montants en XPF entiers (ex: 2501)
                                     // orders (promo) : montants en EUR décimaux stockés avec currency XPF (ex: 6.93)
-                                    if (raw >= 50) {
-                                      // Vrai XPF
+                                    if (raw >= 10) {
+                                      // Vrai XPF (même 95 XPF = vrai montant XPF)
                                       const eur = raw / 119.33;
                                       return `${Math.round(raw).toLocaleString("fr")} XPF ≈ ${eur.toFixed(2)} €`;
                                     } else {
-                                      // EUR mal étiqueté XPF
+                                      // EUR mal étiqueté XPF (ex: 6.93 stocké en XPF)
                                       return `${raw.toFixed(2)} €`;
                                     }
                                   }

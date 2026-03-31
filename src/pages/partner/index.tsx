@@ -171,6 +171,22 @@ function getFrenchName(pkg: AiraloPackage): string {
   return REGION_TRANSLATIONS[raw] || raw || "-";
 }
 
+// ── Helpers forfaits (hors composant) ────────────────────────
+function getValidityDays(pkg: { validity_days?: number; validity?: string; name: string }): number {
+  if (pkg.validity_days) return pkg.validity_days;
+  const v = pkg.validity?.toString() || pkg.name;
+  const m = v.match(/(\d+)\s*jours?/i) || v.match(/(\d+)\s*days?/i);
+  return m ? parseInt(m[1]) : 0;
+}
+function getSmsCount(pkg: { name: string }): string | null {
+  const m = pkg.name.match(/(\d+)\s*SMS/i);
+  return m ? m[1] + " SMS" : null;
+}
+function getMinsCount(pkg: { name: string }): string | null {
+  const m = pkg.name.match(/(\d+)\s*Mins?/i);
+  return m ? m[1] + " Min" : null;
+}
+
 export default function PartnerDashboard() {
   const router = useRouter();
   const [partnerProfile, setPartnerProfile] = useState<any>(null);

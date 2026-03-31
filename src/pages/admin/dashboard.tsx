@@ -95,19 +95,21 @@ function useDashboard(period: { start: string; end: string }) {
         await Promise.all([
           supabase.from("orders")
             .select("amount, price, currency, margin_net, cost_airalo, stripe_fee, commission_amount, source, partner_code, promo_code, created_at")
-            // Convertir dates locales (UTC-10) en UTC pour Supabase
+// Convertir dates locales Tahiti (UTC-10) en UTC
+            // Début : minuit Tahiti = 10:00 UTC même jour
+            // Fin   : 23:59 Tahiti = 09:59 UTC jour SUIVANT
             .gte("created_at", `${period.start}T10:00:00Z`)
-            .lte("created_at", `${period.end}T09:59:59Z`)
+            .lte("created_at", `${new Date(new Date(period.end + "T10:00:00Z").getTime() + 86400000 - 1000).toISOString()}`)
             .in("status", ["completed", "paid"]),
           supabase.from("insurances")
             .select("frais_distribution, premium_ava, amount_to_transfer, transfer_status, stripe_fee, created_at")
             .gte("created_at", `${period.start}T10:00:00Z`)
-            .lte("created_at", `${period.end}T09:59:59Z`)
+            .lte("created_at", `${new Date(new Date(period.end + "T10:00:00Z").getTime() + 86400000 - 1000).toISOString()}`)
             .in("status", ["paid", "validated"]),
           supabase.from("router_rentals")
             .select("rental_amount, deposit_amount, deposit_status, stripe_fee, created_at, rental_end, status")
             .gte("created_at", `${period.start}T10:00:00Z`)
-            .lte("created_at", `${period.end}T09:59:59Z`),
+            .lte("created_at", `${new Date(new Date(period.end + "T10:00:00Z").getTime() + 86400000 - 1000).toISOString()}`),
           supabase.from("v_router_stock").select("*"),
           supabase.from("insurances")
             .select("id, created_at, premium_ava, frais_distribution, amount_to_transfer, transfer_status")

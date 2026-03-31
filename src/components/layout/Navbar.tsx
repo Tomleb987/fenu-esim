@@ -73,7 +73,7 @@ export default function Navbar() {
           <li>
             <Link href="/fenuasimbox" className={`nav-link font-semibold ${pathname === '/fenuasimbox' ? 'text-purple-600' : ''}`}>
               <span style={{ background: 'linear-gradient(135deg, #A020F0, #FF7F11)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                FENUABOX
+                FENUASIMBOX
               </span>
             </Link>
           </li>

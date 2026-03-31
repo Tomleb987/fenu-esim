@@ -166,7 +166,7 @@ export default function Navbar() {
           <Link href="/assurance" onClick={() => setMenuOpen(false)}>Assurance</Link>
           <Link href="/fenuasimbox" onClick={() => setMenuOpen(false)}>
             <span style={{ background: 'linear-gradient(135deg, #A020F0, #FF7F11)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontWeight: '700' }}>
-              FENUABOX
+              FENUASIMBOX
             </span>
           </Link>
           <Link href="/blog" onClick={() => setMenuOpen(false)}>Blog</Link>

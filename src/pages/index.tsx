@@ -322,12 +322,12 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-white">
       <Head>
-        <title>FENUA SIM — eSIM de voyage pour les résidents de Polynésie française</title>
-        <meta name="description" content="Achetez votre eSIM de voyage depuis Tahiti. Connexion 4G/5G dans 180+ pays, activation immédiate, sans carte SIM physique. Le spécialiste eSIM des résidents de Polynésie française." />
-        <meta name="keywords" content="eSIM Polynésie française, eSIM Tahiti, carte SIM voyage, eSIM voyage, connexion étranger Polynésie" />
+        <title>FENUA SIM — eSIM pour les voyageurs depuis l'outre-mer et d'ailleurs</title>
+        <meta name="description" content="Achetez votre eSIM de voyage en quelques minutes. Connexion 4G/5G dans 180+ pays, activation immédiate. Le spécialiste eSIM pour les francophones de l'Outre-mer et du monde entier." />
+        <meta name="keywords" content="eSIM voyage, eSIM Outre-mer, eSIM Polynésie française, eSIM Nouvelle-Calédonie, eSIM Martinique, eSIM Guadeloupe, carte SIM voyage, connexion étranger" />
         <link rel="canonical" href="https://www.fenuasim.com/" />
-        <meta property="og:title" content="FENUA SIM — eSIM de voyage pour les résidents de Polynésie française" />
-        <meta property="og:description" content="Achetez votre eSIM de voyage depuis Tahiti. Connexion 4G/5G dans 180+ pays, activation immédiate." />
+        <meta property="og:title" content="FENUA SIM — eSIM pour les voyageurs depuis l'outre-mer et d'ailleurs" />
+        <meta property="og:description" content="Achetez votre eSIM de voyage en quelques minutes. Connexion 4G/5G dans 180+ pays, activation immédiate, depuis l'Outre-mer et partout dans le monde." />
         <meta property="og:url" content="https://www.fenuasim.com/" />
         <script
           type="application/ld+json"
@@ -337,7 +337,7 @@ export default function Home() {
               "@type": "WebSite",
               name: "FENUA SIM",
               url: "https://www.fenuasim.com",
-              description: "Vente d'eSIM de voyage pour les résidents de Polynésie française",
+              description: "Achetez votre eSIM de voyage en quelques minutes. Connexion 4G/5G dans 180+ pays, activation immédiate, depuis l'Outre-mer et partout dans le monde.",
               potentialAction: {
                 "@type": "SearchAction",
                 target: "https://www.fenuasim.com/shop?q={search_term_string}",

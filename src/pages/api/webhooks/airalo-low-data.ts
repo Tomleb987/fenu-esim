@@ -67,7 +67,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const { data: simData, error: simError } = await supabase
       .from("airalo_orders")
-      .select("email, nom, prenom, first_name, last_name")
+      .select("email, nom, prenom")
       .eq("sim_iccid", iccid)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -80,7 +80,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const customerEmail = simData.email;
     const customerName = (
-      simData.first_name ||
       simData.prenom ||
       simData.nom ||
       "Client"

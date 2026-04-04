@@ -49,7 +49,6 @@ export default async function handler(
       return res.status(200).json({ received: true, status: "payment_not_paid" });
     }
 
-    // Bloquer les sessions à montant 0 (paiement non abouti ou coupon 100%)
     if (!session.amount_total || session.amount_total === 0) {
       console.warn(`Session ${session.id} has amount_total=0 — commande bloquée.`);
       return res.status(200).json({ received: true, status: "zero_amount_blocked" });
@@ -66,15 +65,12 @@ export default async function handler(
         partner_code,
       } = session.metadata || {};
 
-      // For top-ups, also check metadata for firstName/lastName (from order form)
       const topUpFirstName = is_top_up === "true" ? (firstName || session.customer_details?.name?.split(" ")[0] || null) : null;
       const topUpLastName = is_top_up === "true" ? (lastName || session.customer_details?.name?.split(" ").slice(1).join(" ") || null) : null;
+
       console.log("Package ID:", packageId);
       if (!packageId) {
-        console.error(
-          "Package ID not found in session metadata for session:",
-          session.id,
-        );
+        console.error("Package ID not found in session metadata for session:", session.id);
         throw new Error("Package ID not found in session metadata");
       }
 
@@ -86,7 +82,9 @@ export default async function handler(
       const { data: packageData, error: packageError } = await supabase
         .from("airalo_packages")
         .select("*")
-        .eq("id", packageId.split("-topup")[0])
+        // FIX 3 : ne pas tronquer l'ID avec split("-topup")[0] pour chercher le package
+        // On cherche d'abord le package exact, puis en fallback sans le suffixe -topup
+        .or(`id.eq.${packageId},id.eq.${packageId.replace(/-topup$/, "")}`)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -110,16 +108,13 @@ export default async function handler(
 
         const topUpResponse = await fetch(topUpApiRoute, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             sim_iccid: sim_iccid,
             airalo_package_id: packageId,
           }),
         });
 
-        // Use safe JSON parsing to handle non-JSON responses (e.g., 502 HTML pages)
         const parseResult = await safeJsonParse<{
           success: boolean;
           message?: string;
@@ -148,28 +143,25 @@ export default async function handler(
           );
         }
 
-        console.log(
-          "Local Airalo top-up API processed successfully:",
-          topUpApiResult,
-        );
+        console.log("Local Airalo top-up API processed successfully:", topUpApiResult);
 
         const orderToInsert = {
           stripe_session_id: session.id,
           airalo_order_id: packageId,
           email: customerEmail,
-          // Use the Airalo top-up ID from the API response as airalo_order_id for consistency in 'orders'
-          package_id: packageId.split("-topup")[0],
+          // FIX A : on utilise l'ID du package tel quel, sans tronquer
+          package_id: packageId.replace(/-topup$/, ""),
           status: "completed",
           amount: session.amount_total,
           created_at: new Date().toISOString(),
           package_name: packageData.name,
           data_amount: packageData.data_amount,
           data_unit: packageData.data_unit,
-          validity: parseInt(packageData.validity.toString().charAt(0)),
+          // FIX 1 : parseInt avec radix 10 — évite charAt(0) qui tronque "30" en "3"
+          validity: parseInt(packageData.validity.toString(), 10),
           price: (() => {
             const cur = (session.currency || packageData.currency || "EUR").toUpperCase();
             const raw = session.amount_total ?? 0;
-            // XPF n'a pas de décimales — Stripe envoie déjà en unités entières
             return cur === "XPF" || cur === "CFP" ? raw : raw / 100;
           })(),
           currency:
@@ -177,9 +169,9 @@ export default async function handler(
             packageData.currency?.toUpperCase() ||
             "EUR",
           transaction_type: "topup",
-          first_name: topUpFirstName, // Use order form names (preferred)
+          first_name: topUpFirstName,
           last_name: topUpLastName,
-          nom: session.customer_details?.name || null, // Keep for backward compatibility
+          nom: session.customer_details?.name || null,
           prenom: session.customer_details?.name?.split(" ")[0] || null,
           promo_code: promo_code || null,
           partner_code: partner_code || null,
@@ -210,7 +202,7 @@ export default async function handler(
           sim_iccid: sim_iccid,
           order_id: newOrderData.id,
           email: customerEmail,
-          package_id: packageId.split("-topup")[0],
+          package_id: packageId.replace(/-topup$/, ""),
           amount: (session.amount_total ?? 0) / 100,
           currency:
             session.currency?.toUpperCase() ||
@@ -231,9 +223,38 @@ export default async function handler(
             `Failed to save top-up details to airalo_topups: ${airaloTopupError.message}`,
           );
         }
-        console.log(
-          "Top-up details saved to 'airalo_topups' database successfully.",
-        );
+        console.log("Top-up details saved to 'airalo_topups' database successfully.");
+
+        // FIX B : alimenter user_sims pour que DataUsage trouve l'eSIM rechargée
+        // Non bloquant — le topup est déjà traité, on ne throw pas si ça échoue
+        const { data: existingSim } = await supabase
+          .from("user_sims")
+          .select("id")
+          .eq("user_email", customerEmail)
+          .eq("iccid", sim_iccid)
+          .maybeSingle();
+
+        if (!existingSim) {
+          const { error: simInsertError } = await supabase
+            .from("user_sims")
+            .insert({
+              user_email: customerEmail,
+              iccid: sim_iccid,
+              name: packageData.name,
+              status: "active",
+            });
+
+          if (simInsertError) {
+            console.error(
+              `[webhook] user_sims insert failed (non-blocking): ${simInsertError.message}`
+            );
+          } else {
+            console.log(`[webhook] user_sims updated for ${customerEmail} / ${sim_iccid}`);
+          }
+        } else {
+          console.log(`[webhook] user_sims already has entry for ${sim_iccid} — skipping`);
+        }
+
       } else {
         console.log(
           `Processing new order for package ID: ${packageId}, session: ${session.id}`,
@@ -242,9 +263,7 @@ export default async function handler(
           `${process.env.NEXT_PUBLIC_BASE_URL}/api/create-airalo-order`,
           {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               packageId,
               airalo_id: packageData.id,
@@ -258,13 +277,8 @@ export default async function handler(
           },
         );
 
-        // Use safe JSON parsing to handle non-JSON responses (e.g., 502 HTML pages)
         const orderParseResult = await safeJsonParse<{
-          order?: {
-            order_id?: string;
-            sim_iccid?: string;
-            qr_code_url?: string;
-          };
+          order?: { order_id?: string; sim_iccid?: string; qr_code_url?: string };
           order_reference?: string;
           id?: string;
           sim_iccid?: string;
@@ -283,21 +297,14 @@ export default async function handler(
         }
 
         if (orderParseResult.data.error) {
-          console.error(
-            `Airalo order API returned error: ${orderParseResult.data.error}`,
-          );
-          throw new Error(
-            `Failed to create Airalo order: ${orderParseResult.data.error}`,
-          );
+          console.error(`Airalo order API returned error: ${orderParseResult.data.error}`);
+          throw new Error(`Failed to create Airalo order: ${orderParseResult.data.error}`);
         }
 
         const airaloOrderData = orderParseResult.data;
-        console.log(
-          "Airalo order created successfully via Edge Function:",
-          airaloOrderData,
-        );
-
+        console.log("Airalo order created successfully via Edge Function:", airaloOrderData);
         console.log("First name: ", firstName, "Last name: ", lastName);
+
         const orderToInsert = {
           stripe_session_id: session.id,
           first_name: firstName,
@@ -316,11 +323,11 @@ export default async function handler(
           package_name: packageData.name,
           data_amount: packageData.data_amount,
           data_unit: packageData.data_unit,
-          validity: parseInt(packageData.validity.toString().charAt(0)),
+          // FIX 1 : même correction sur le bloc new_order
+          validity: parseInt(packageData.validity.toString(), 10),
           price: (() => {
             const cur = (session.currency || packageData.currency || "EUR").toUpperCase();
             const raw = session.amount_total ?? 0;
-            // XPF n'a pas de décimales — Stripe envoie déjà en unités entières
             return cur === "XPF" || cur === "CFP" ? raw : raw / 100;
           })(),
           currency:
@@ -337,16 +344,12 @@ export default async function handler(
           .insert(orderToInsert);
 
         if (orderError) {
-          console.error(
-            `Failed to save new order to database: ${orderError.message}`,
-          );
-          throw new Error(
-            `Failed to save new order to database: ${orderError.message}`,
-          );
+          console.error(`Failed to save new order to database: ${orderError.message}`);
+          throw new Error(`Failed to save new order to database: ${orderError.message}`);
         }
         console.log("New order saved to database successfully.");
 
-        // ── FENUASIMBOX : notifier hello@fenuasim.com avec l'eSIM
+        // ── FENUASIMBOX notification
         if (session.metadata?.origin === "fenuasimbox") {
           try {
             const nodemailer = require("nodemailer");
@@ -404,12 +407,8 @@ export default async function handler(
           .select();
 
         if (userEsimsError) {
-          console.error(
-            `Failed to save user esim to database: ${userEsimsError.message}`,
-          );
-          throw new Error(
-            `Failed to save user esim to database: ${userEsimsError.message}`,
-          );
+          console.error(`Failed to save user esim to database: ${userEsimsError.message}`);
+          throw new Error(`Failed to save user esim to database: ${userEsimsError.message}`);
         }
         console.log("User Esims: ", userEsims);
       }

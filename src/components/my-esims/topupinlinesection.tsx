@@ -385,7 +385,7 @@ const TopUpInlineSection: React.FC<TopUpInlineSectionProps> = ({ order }) => {
       <button
         onClick={() => selectedTopUpPackage && handleAcheter(selectedTopUpPackage)}
         disabled={!selectedTopUpPackage || submitting}
-        className="w-full flex items-center justify-center gap-2 py-3 bg-[#D251D8] text-white font-semibold rounded-xl hover:bg-[#b83fbe] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-orange-500 to-purple-600 text-white font-semibold rounded-xl hover:from-orange-600 hover:to-purple-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {submitting ? (
           <>

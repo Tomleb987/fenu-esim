@@ -12,68 +12,45 @@ export const useDataUsage = () => {
   const [usage, setUsage] = useState<DataUsage | null>(null);
 
   const fetchUsage = useCallback(async (simIccid: string) => {
-    console.log('[useDataUsage] Fetching usage for ICCID:', simIccid);
-    
     const response = await fetchAPI<DataUsage>(`/sims/${simIccid}/usage`);
-    
-    console.log('[useDataUsage] API Response:', response);
-    console.log('[useDataUsage] Response data:', response.data);
-    console.log('[useDataUsage] Response error:', response.error);
-    
+
     if (response.data) {
-      console.log('[useDataUsage] Setting usage data:', {
-        total: response.data.total,
-        remaining: response.data.remaining,
-        status: response.data.status,
-        calculatedUsed: response.data.total - response.data.remaining
-      });
       setUsage(response.data);
     } else if (response.error) {
       console.error('[useDataUsage] Error fetching usage:', response.error);
-    } else {
-      console.warn('[useDataUsage] No data and no error - response might be empty');
     }
-    
+
     return response;
   }, [fetchAPI]);
 
-  const formatDataUsage = useCallback((usage: DataUsage | null) => {
-    if (!usage) {
-      console.log('[formatDataUsage] No usage data available');
-      return 'N/A';
-    }
-    
-    // Ensure total and remaining are numbers
+  // FIX 2 : l'API Airalo retourne les données en Mo (ex: 10240 = 10 Go)
+  // L'ancien code affichait "10240 Mbs" — on convertit proprement
+  const formatMo = (mo: number): string => {
+    if (mo <= 0) return '0 Mo';
+    if (mo >= 1024) return `${(mo / 1024).toFixed(1).replace('.0', '')} Go`;
+    return `${mo} Mo`;
+  };
+
+  const formatDataUsage = useCallback((usage: DataUsage | null): string => {
+    if (!usage) return 'N/A';
     const total = typeof usage.total === 'number' ? usage.total : 0;
     const remaining = typeof usage.remaining === 'number' ? usage.remaining : 0;
     const used = total - remaining;
-    
-    console.log('[formatDataUsage] Calculation:', {
-      total,
-      remaining,
-      used,
-      totalType: typeof usage.total,
-      remainingType: typeof usage.remaining
-    });
-    
-    // If used is 0 or negative, it might be because:
-    // 1. No data has been used (total === remaining)
-    // 2. API returned wrong values
-    // 3. Data hasn't been synced yet
-    if (used < 0) {
-      console.warn('[formatDataUsage] Negative usage detected - possible data issue');
-      return '0 Mbs';
-    }
-    
-    const unit = 'Mbs';
-    return `${used} ${unit}`;
+    if (used <= 0) return '0 Mo';
+    return formatMo(used);
   }, []);
 
-  const formatRemainingData = useCallback((usage: DataUsage | null) => {
+  const formatRemainingData = useCallback((usage: DataUsage | null): string => {
     if (!usage) return 'N/A';
-    const remaining = usage.remaining;
-    const unit = 'Mbs';
-    return `${remaining} ${unit}`;
+    const remaining = typeof usage.remaining === 'number' ? usage.remaining : 0;
+    return formatMo(remaining);
+  }, []);
+
+  // Utilitaire exposé pour les barres de progression
+  const getUsagePercent = useCallback((usage: DataUsage | null): number => {
+    if (!usage || !usage.total || usage.total === 0) return 0;
+    const used = usage.total - usage.remaining;
+    return Math.min(100, Math.round((used / usage.total) * 100));
   }, []);
 
   return {
@@ -83,5 +60,6 @@ export const useDataUsage = () => {
     fetchUsage,
     formatDataUsage,
     formatRemainingData,
+    getUsagePercent,
   };
-}; 
+};

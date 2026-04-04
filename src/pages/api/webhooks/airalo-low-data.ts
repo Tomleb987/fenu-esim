@@ -1,17 +1,6 @@
-// pages/api/webhooks/airalo-low-data.ts
-//
-// Reçoit les notifications Airalo "low data" :
-//   - 75% consommé
-//   - 90% consommé
-//   - 3 jours restants
-//   - 1 jour restant
-//
-// Airalo valide l'URL via HEAD avant opt-in — les deux méthodes sont gérées.
-// Signature HMAC-SHA512 vérifiée via le header "airalo-signature".
-
 import type { NextApiRequest, NextApiResponse } from "next";
 import crypto from "crypto";
-import { supabaseAdmin as supabase } from "@/lib/supabaseAdmin";
+import { createClient } from "@supabase/supabase-js";
 
 export const config = { api: { bodyParser: false } };
 
@@ -27,7 +16,7 @@ function verifyAiraloSignature(rawBody: Buffer, signature: string): boolean {
   const secret = process.env.AIRALO_WEBHOOK_SECRET;
   if (!secret) {
     console.warn("[airalo-low-data] AIRALO_WEBHOOK_SECRET non défini — signature non vérifiée");
-    return true; // non bloquant en dev, à sécuriser en prod
+    return true;
   }
   const expected = crypto
     .createHmac("sha512", secret)
@@ -37,7 +26,6 @@ function verifyAiraloSignature(rawBody: Buffer, signature: string): boolean {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // HEAD : requis par Airalo pour valider l'URL lors de l'opt-in
   if (req.method === "HEAD") {
     return res.status(200).end();
   }
@@ -70,8 +58,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const { level, iccid, package_name, remaining_percentage } = payload;
   console.log(`[airalo-low-data] ${level} pour ICCID ${iccid} (${remaining_percentage}% restant)`);
 
+  // Init Supabase à l'intérieur du handler pour garantir les variables d'env
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
   try {
-    // 1. Retrouver l'eSIM et l'email du client
     const { data: simData, error: simError } = await supabase
       .from("airalo_orders")
       .select("email, nom, prenom, first_name, last_name")
@@ -81,8 +74,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .maybeSingle();
 
     if (simError || !simData) {
-      console.error(`[airalo-low-data] ICCID ${iccid} introuvable dans airalo_orders`);
-      // On répond 200 quand même pour éviter les retries Airalo
+      console.error(`[airalo-low-data] ICCID ${iccid} introuvable dans airalo_orders`, simError);
       return res.status(200).json({ received: true });
     }
 
@@ -94,7 +86,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       "Client"
     ).trim();
 
-    // 2. Mettre à jour user_sims si statut à surveiller
     if (level === "1days") {
       await supabase
         .from("user_sims")
@@ -109,7 +100,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.log(`[airalo-low-data] Statut mis à jour → expiring_soon pour ${iccid}`);
     }
 
-    // 3. Envoyer un email de notification au client
     await sendLowDataEmail({
       email: customerEmail,
       name: customerName,
@@ -123,12 +113,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   } catch (err) {
     console.error("[airalo-low-data] Erreur traitement:", err);
-    // Toujours 200 pour éviter les retries inutiles d'Airalo
     return res.status(200).json({ received: true, error: "processing_error" });
   }
 }
-
-// ─── Email de notification ───────────────────────────────────
 
 interface LowDataEmailParams {
   email: string;
@@ -210,7 +197,6 @@ async function sendLowDataEmail(params: LowDataEmailParams) {
             <h2 style="color: ${accentColor}; margin-top: 0;">${headline}</h2>
             <p style="color: #444;">Bonjour ${name},</p>
             <p style="color: #444;">${body}</p>
-
             <div style="background: white; border: 1px solid #eee; border-radius: 8px; padding: 16px; margin: 20px 0;">
               <p style="margin: 0; font-size: 13px; color: #888;">eSIM concernée</p>
               <p style="margin: 4px 0 0; font-family: monospace; color: #333; font-size: 14px;">
@@ -221,14 +207,12 @@ async function sendLowDataEmail(params: LowDataEmailParams) {
                 Données restantes : <strong style="color: ${accentColor}">${remainingPercentage}%</strong>
               </p>` : ""}
             </div>
-
             <a
               href="${dashboardUrl}"
               style="display: inline-block; background: linear-gradient(135deg, #A020F0, #FF7F11); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 15px; margin-top: 8px;"
             >
               Recharger mon eSIM →
             </a>
-
             <p style="color: #999; font-size: 12px; margin-top: 24px;">
               Besoin d'aide ? Contactez-nous à
               <a href="mailto:sav@fenuasim.com" style="color: #A020F0;">sav@fenuasim.com</a>
@@ -242,6 +226,5 @@ async function sendLowDataEmail(params: LowDataEmailParams) {
     console.log(`[airalo-low-data] Email envoyé à ${email} pour level=${level}`);
   } catch (err) {
     console.error(`[airalo-low-data] Échec envoi email à ${email}:`, err);
-    // Non bloquant — le webhook a quand même été traité
   }
 }

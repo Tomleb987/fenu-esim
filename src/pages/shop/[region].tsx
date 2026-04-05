@@ -584,6 +584,11 @@ export default function RegionPage() {
               Forfaits disponibles
             </h2>
 
+            {/* Nombre de forfaits */}
+            <p className="text-sm text-gray-500 mb-3">
+              <span className="font-semibold text-purple-700">{packages.length}</span> forfait{packages.length > 1 ? "s" : ""} disponible{packages.length > 1 ? "s" : ""} pour cette destination
+            </p>
+
             {/* Mobile : scroll horizontal natif */}
             <div className="flex sm:hidden gap-3 overflow-x-auto pb-3 snap-x snap-mandatory -mx-1 px-1" id="pkg-scroll">
               {packages.map((pkg) => {

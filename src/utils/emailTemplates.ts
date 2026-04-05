@@ -19,6 +19,10 @@ export function createEsimEmailHTML({
   sharingLink: string;
   sharingLinkCode: string;
 }) {
+  const dashboardUrl = process.env.NEXT_PUBLIC_BASE_URL
+    ? `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/my-esims`
+    : "https://www.fenuasim.com/dashboard/my-esims";
+
   return `
     <!DOCTYPE html>
     <html>
@@ -67,7 +71,7 @@ export function createEsimEmailHTML({
           </h2>
           <table style="width: 100%; font-size: 14px; border-collapse: collapse;">
             <tr>
-              <td style="padding: 8px 0; font-weight: bold; color: #4b5563;">🎯 lien d’activation:</td>
+              <td style="padding: 8px 0; font-weight: bold; color: #4b5563;">🎯 Lien d'activation:</td>
               <td style="padding: 8px 0; color: #111827;">${sharingLink}</td>
             </tr>
             <tr>
@@ -113,9 +117,28 @@ export function createEsimEmailHTML({
         </div>
 
         <!-- Important Notice -->
-        <div style="background-color: #fef3c7; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #f59e0b;">
+        <div style="background-color: #fef3c7; padding: 15px; border-radius: 8px; margin-bottom: 30px; border-left: 4px solid #f59e0b;">
           <p style="margin: 0; font-size: 14px; color: #92400e;">
             <strong>⚠️ Important:</strong> Gardez ce code QR en sécurité. Vous en aurez besoin pour installer votre eSIM.
+          </p>
+        </div>
+
+        <!-- Espace client CTA -->
+        <div style="background: linear-gradient(135deg, #A020F0 0%, #FF7F11 100%); padding: 24px; border-radius: 12px; margin-bottom: 30px; text-align: center;">
+          <h2 style="color: white; font-size: 18px; margin: 0 0 8px 0;">
+            🗂️ Votre espace client est prêt
+          </h2>
+          <p style="color: rgba(255,255,255,0.9); font-size: 14px; margin: 0 0 16px 0;">
+            Retrouvez votre QR code à tout moment, suivez votre consommation et rechargez en un clic.
+          </p>
+          <a 
+            href="${dashboardUrl}"
+            style="display: inline-block; background-color: white; color: #A020F0; font-weight: bold; font-size: 15px; padding: 12px 28px; border-radius: 8px; text-decoration: none;"
+          >
+            Accéder à mon espace →
+          </a>
+          <p style="color: rgba(255,255,255,0.7); font-size: 12px; margin: 12px 0 0 0;">
+            Connectez-vous avec votre adresse email : ${customerName !== "Client" ? "" : "celle utilisée pour cet achat"}
           </p>
         </div>
 
@@ -124,8 +147,11 @@ export function createEsimEmailHTML({
           <p style="margin: 0 0 10px 0;">
             Cet email contient votre eSIM personnalisée. Ne le partagez avec personne.
           </p>
+          <p style="margin: 0 0 6px 0;">
+            Pour toute question : <strong>sav@fenuasim.com</strong> · WhatsApp +33 7 56 86 08 01
+          </p>
           <p style="margin: 0;">
-            Pour toute question, contactez notre support à <strong>sav@fenuasim.com</strong>
+            FENUA SIM — 58 rue Monceau, 75008 Paris
           </p>
         </div>
       </div>

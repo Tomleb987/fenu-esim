@@ -627,19 +627,18 @@ export default function RegionPage() {
               })}
             </div>
 
-            {/* Dots + hint mobile */}
-            <div className="flex sm:hidden flex-col items-center mt-3 gap-2">
-              <div className="flex gap-1.5">
-                {packages.map((_, idx) => (
-                  <div key={idx} className="w-2 h-2 rounded-full bg-purple-300" />
-                ))}
-              </div>
-              <p className="text-xs text-gray-400 flex items-center gap-1">
-                <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                Glissez pour voir plus
-              </p>
+            {/* Dots mobile — actif au scroll */}
+            <div className="flex sm:hidden flex-wrap justify-center mt-3 gap-1.5 max-w-[240px] mx-auto">
+              {packages.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    const el = document.getElementById("pkg-scroll");
+                    if (el) el.scrollTo({ left: idx * el.offsetWidth * 0.72, behavior: "smooth" });
+                  }}
+                  className="w-2.5 h-2.5 rounded-full bg-gray-300 hover:bg-purple-400 focus:bg-purple-600 transition-colors"
+                />
+              ))}
             </div>
 
             {/* Desktop : carousel avec flèches */}

@@ -215,7 +215,7 @@ async function sendLowDataEmail(params: LowDataEmailParams) {
             <p style="color: #999; font-size: 12px; margin-top: 24px;">
               Besoin d'aide ? Contactez-nous à
               <a href="mailto:sav@fenuasim.com" style="color: #A020F0;">sav@fenuasim.com</a>
-              ou sur WhatsApp au +33 7 56 86 08 01.
+              ou sur WhatsApp au +33 7 49 78 21 01.
             </p>
           </div>
         </div>

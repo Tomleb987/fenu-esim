@@ -148,7 +148,7 @@ export function createEsimEmailHTML({
             Cet email contient votre eSIM personnalisée. Ne le partagez avec personne.
           </p>
           <p style="margin: 0 0 6px 0;">
-            Pour toute question : <strong>sav@fenuasim.com</strong> · WhatsApp +33 7 56 86 08 01
+            Pour toute question : <strong>sav@fenuasim.com</strong> · WhatsApp +33 7 49 78 21 01
           </p>
           <p style="margin: 0;">
             FENUA SIM — 58 rue Monceau, 75008 Paris

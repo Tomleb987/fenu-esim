@@ -578,63 +578,89 @@ export default function RegionPage() {
               <option value="USD">$ USD</option>
             </select>
           </div>
-
-          {/* ── Carousel ── */}
+          {/* ── Forfaits ── */}
           <div className="mt-8 rounded-xl shadow bg-gray-100 p-4 sm:p-6">
             <h2 className="text-xl sm:text-2xl text-purple-800 font-bold mb-4 sm:mb-6">
               Forfaits disponibles
             </h2>
 
-            <div className="relative flex items-center justify-center px-8 sm:px-10">
-              {/* Left Arrow */}
-              <button
-                onClick={handlePrev}
-                className="absolute left-0 z-10 bg-white border border-gray-200 rounded-full p-1.5 sm:p-2 shadow hover:bg-purple-50 transition disabled:opacity-50"
-                style={{ top: "50%", transform: "translateY(-50%)" }}
-                aria-label="Précédent"
-                disabled={packages.length <= (isMobile ? 1 : 2)}
-              >
-                <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M13 16l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
+            {/* Mobile : scroll horizontal natif */}
+            <div className="flex sm:hidden gap-3 overflow-x-auto pb-3 snap-x snap-mandatory -mx-1 px-1">
+              {packages.map((pkg) => {
+                let price = pkg.final_price_eur;
+                let symbol = "€";
+                if (currency === "USD") { price = pkg.final_price_usd; symbol = "$"; }
+                else if (currency === "XPF") { price = pkg.final_price_xpf; symbol = "₣"; }
+                const priceWithMargin = price! * (1 + margin);
+                return (
+                  <div
+                    key={pkg.id}
+                    className={`flex-shrink-0 w-[80vw] max-w-xs bg-white rounded-xl border-2 p-4 flex flex-col items-center shadow snap-center cursor-pointer transition-all ${
+                      selectedPackage?.id === pkg.id ? "border-purple-500 shadow-lg" : "border-gray-100"
+                    }`}
+                    onClick={() => setSelectedPackage(pkg)}
+                  >
+                    <div className="flex items-center gap-2 mb-3">
+                      <img src={pkg.image_url} alt="" width={36} height={26} className="rounded object-cover border" />
+                      <h3 className="text-base font-bold text-purple-800 text-center">{pkg.name}</h3>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 mb-3 justify-center">
+                      <span className="text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full font-bold">
+                        {pkg.includes_voice ? "Appels inclus" : "Pas d'appels"}
+                      </span>
+                      <span className="text-xs bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full font-bold">
+                        {pkg.includes_sms ? "SMS inclus" : "Pas de SMS"}
+                      </span>
+                    </div>
+                    <div className="text-gray-700 text-xs mb-3 text-center min-h-[36px]">{pkg.description}</div>
+                    <div className="text-lg font-bold text-purple-700 mb-4">
+                      {priceWithMargin && priceWithMargin > 0 ? `${priceWithMargin.toFixed(2)} ${symbol}` : <span className="text-gray-400">Prix indisponible</span>}
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleAcheter(pkg); }}
+                      className="w-full py-3 bg-gradient-to-r from-purple-600 to-orange-500 text-white font-semibold rounded-xl hover:from-purple-700 hover:to-orange-600 transition-all text-sm"
+                    >
+                      Acheter - Paiement Sécurisé
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
 
-              {/* Cards */}
-              {packages.length > 0 && (
-                <div className="w-full flex justify-center gap-3 sm:gap-4">
-                  {packages
-                    .slice(currentIndex, currentIndex + (isMobile ? 1 : 2))
-                    .map((pkg) => {
+            {/* Desktop : carousel avec flèches */}
+            <div className="hidden sm:block">
+              <div className="relative flex items-center justify-center px-10">
+                <button
+                  onClick={handlePrev}
+                  className="absolute left-0 z-10 bg-white border border-gray-200 rounded-full p-2 shadow hover:bg-purple-50 transition disabled:opacity-50"
+                  style={{ top: "50%", transform: "translateY(-50%)" }}
+                  aria-label="Précédent"
+                  disabled={packages.length <= 2}
+                >
+                  <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M13 16l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                {packages.length > 0 && (
+                  <div className="w-full flex justify-center gap-4">
+                    {packages.slice(currentIndex, currentIndex + 2).map((pkg) => {
                       let price = pkg.final_price_eur;
                       let symbol = "€";
                       if (currency === "USD") { price = pkg.final_price_usd; symbol = "$"; }
                       else if (currency === "XPF") { price = pkg.final_price_xpf; symbol = "₣"; }
                       const priceWithMargin = price! * (1 + margin);
-
                       return (
                         <div
                           key={pkg.id}
-                          className={`flex-1 min-w-0 bg-white rounded-xl border-2 p-4 sm:p-6 flex flex-col items-center shadow transition-all duration-200 cursor-pointer ${
-                            selectedPackage?.id === pkg.id
-                              ? "border-purple-500 shadow-lg"
-                              : "border-gray-100 hover:border-purple-300"
+                          className={`flex-1 min-w-0 bg-white rounded-xl border-2 p-6 flex flex-col items-center shadow transition-all duration-200 cursor-pointer ${
+                            selectedPackage?.id === pkg.id ? "border-purple-500 shadow-lg" : "border-gray-100 hover:border-purple-300"
                           }`}
                           onClick={() => setSelectedPackage(pkg)}
                         >
-                          {/* Flag & Name */}
-                          <div className="flex items-center gap-2 sm:gap-3 mb-3">
-                            <img
-                              src={pkg.image_url}
-                              alt={""}
-                              width={36}
-                              height={26}
-                              className="rounded object-cover border"
-                            />
-                            <h3 className="text-base sm:text-lg font-bold text-purple-800 text-center">
-                              {pkg.name}
-                            </h3>
+                          <div className="flex items-center gap-3 mb-3">
+                            <img src={pkg.image_url} alt="" width={36} height={26} className="rounded object-cover border" />
+                            <h3 className="text-lg font-bold text-purple-800 text-center">{pkg.name}</h3>
                           </div>
-                          {/* Badges */}
                           <div className="flex flex-wrap gap-1.5 mb-3 justify-center">
                             <span className="text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full font-bold">
                               {pkg.includes_voice ? "Appels inclus" : "Pas d'appels"}
@@ -643,55 +669,42 @@ export default function RegionPage() {
                               {pkg.includes_sms ? "SMS inclus" : "Pas de SMS"}
                             </span>
                           </div>
-                          {/* Description */}
-                          <div className="text-gray-700 text-xs sm:text-sm mb-3 text-center min-h-[36px]">
-                            {pkg.description}
+                          <div className="text-gray-700 text-sm mb-3 text-center min-h-[36px]">{pkg.description}</div>
+                          <div className="text-xl font-bold text-purple-700 mb-4">
+                            {priceWithMargin && priceWithMargin > 0 ? `${priceWithMargin.toFixed(2)} ${symbol}` : <span className="text-gray-400">Prix indisponible</span>}
                           </div>
-                          {/* Price */}
-                          <div className="text-lg sm:text-xl font-bold text-purple-700 mb-4">
-                            {priceWithMargin && priceWithMargin > 0 ? (
-                              `${priceWithMargin.toFixed(2)} ${symbol}`
-                            ) : (
-                              <span className="text-gray-400">Prix indisponible</span>
-                            )}
-                          </div>
-                          {/* Buy Button */}
                           <button
                             onClick={(e) => { e.stopPropagation(); handleAcheter(pkg); }}
-                            className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-orange-500 text-white font-semibold rounded-xl hover:from-purple-700 hover:to-orange-600 transition-all duration-300 text-sm sm:text-base"
+                            className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-orange-500 text-white font-semibold rounded-xl hover:from-purple-700 hover:to-orange-600 transition-all"
                           >
                             Acheter - Paiement Sécurisé
                           </button>
                         </div>
                       );
                     })}
-                </div>
-              )}
-
-              {/* Right Arrow */}
-              <button
-                onClick={handleNext}
-                className="absolute right-0 z-10 bg-white border border-gray-200 rounded-full p-1.5 sm:p-2 shadow hover:bg-purple-50 transition disabled:opacity-50"
-                style={{ top: "50%", transform: "translateY(-50%)" }}
-                aria-label="Suivant"
-                disabled={packages.length <= (isMobile ? 1 : 2)}
-              >
-                <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M7 4l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Dot indicators */}
-            <div className="flex justify-center mt-4 gap-2 flex-wrap">
-              {packages.map((_, idx) => (
+                  </div>
+                )}
                 <button
-                  key={idx}
-                  className={`w-2.5 h-2.5 rounded-full transition-colors ${idx === currentIndex ? "bg-purple-600" : "bg-gray-300"}`}
-                  onClick={() => setCurrentIndex(idx)}
-                  aria-label={`Aller au forfait ${idx + 1}`}
-                />
-              ))}
+                  onClick={handleNext}
+                  className="absolute right-0 z-10 bg-white border border-gray-200 rounded-full p-2 shadow hover:bg-purple-50 transition disabled:opacity-50"
+                  style={{ top: "50%", transform: "translateY(-50%)" }}
+                  aria-label="Suivant"
+                  disabled={packages.length <= 2}
+                >
+                  <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M7 4l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </div>
+              <div className="flex justify-center mt-4 gap-2">
+                {packages.map((_, idx) => (
+                  <button
+                    key={idx}
+                    className={`w-2.5 h-2.5 rounded-full transition-colors ${idx === currentIndex ? "bg-purple-600" : "bg-gray-300"}`}
+                    onClick={() => setCurrentIndex(idx)}
+                  />
+                ))}
+              </div>
             </div>
           </div>
 

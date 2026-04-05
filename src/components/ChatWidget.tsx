@@ -50,7 +50,7 @@ export default function ChatWidget() {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end font-sans gap-4">
+    <div className="fixed bottom-24 right-4 z-50 md:bottom-6 md:right-6 flex flex-col items-end font-sans gap-4">
       
       {/* --- BULLE D'ACCROCHE (PROMPT) --- */}
       {showPrompt && !isOpen && (

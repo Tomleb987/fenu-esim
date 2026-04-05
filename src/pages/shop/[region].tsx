@@ -585,7 +585,7 @@ export default function RegionPage() {
             </h2>
 
             {/* Mobile : scroll horizontal natif */}
-            <div className="flex sm:hidden gap-3 overflow-x-auto pb-3 snap-x snap-mandatory -mx-1 px-1">
+            <div className="flex sm:hidden gap-3 overflow-x-auto pb-3 snap-x snap-mandatory -mx-1 px-1" id="pkg-scroll">
               {packages.map((pkg) => {
                 let price = pkg.final_price_eur;
                 let symbol = "€";
@@ -625,6 +625,21 @@ export default function RegionPage() {
                   </div>
                 );
               })}
+            </div>
+
+            {/* Dots + hint mobile */}
+            <div className="flex sm:hidden flex-col items-center mt-3 gap-2">
+              <div className="flex gap-1.5">
+                {packages.map((_, idx) => (
+                  <div key={idx} className="w-2 h-2 rounded-full bg-purple-300" />
+                ))}
+              </div>
+              <p className="text-xs text-gray-400 flex items-center gap-1">
+                <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                Glissez pour voir plus
+              </p>
             </div>
 
             {/* Desktop : carousel avec flèches */}

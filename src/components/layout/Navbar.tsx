@@ -2,9 +2,8 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { ShoppingCart, User, Menu, X, LogOut, ChevronDown } from 'lucide-react'
+import { User, Menu, X, LogOut, ChevronDown } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
-import LanguageSelector from '@/components/LanguageSelector'
 import { useRouter } from 'next/router'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
@@ -32,6 +31,16 @@ export default function Navbar() {
     return () => subscription.unsubscribe()
   }, [])
 
+  // Bloquer le scroll du body quand le menu mobile est ouvert
+  useEffect(() => {
+    if (menuOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [menuOpen])
+
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut()
@@ -51,7 +60,6 @@ export default function Navbar() {
   return (
     <header className="w-full bg-white/80 backdrop-blur border-b border-gray-100 shadow-sm sticky top-0 z-50">
       <nav className="container mx-auto flex items-center justify-between px-4" style={{ height: '88px' }}>
-        {/* Logo */}
         <Link href="/" className="flex items-center" style={{ height: '80px' }}>
           <div style={{ height: '80px', width: '80px', overflow: 'visible', display: 'flex', alignItems: 'center' }}>
             <Image
@@ -65,7 +73,6 @@ export default function Navbar() {
           </div>
         </Link>
 
-        {/* Liens Desktop */}
         <ul className="hidden md:flex items-center gap-6 font-medium text-gray-700">
           <li><Link href="/" className="nav-link">Accueil</Link></li>
           <li><Link href="/shop" className="nav-link">Nos eSIM</Link></li>
@@ -86,8 +93,6 @@ export default function Navbar() {
               Espace partenaire
             </Link>
           </li>
-
-          {/* User Menu */}
           {user ? (
             <li className="relative">
               <button
@@ -98,7 +103,6 @@ export default function Navbar() {
                 <span className="max-w-[120px] truncate">{userName}</span>
                 <ChevronDown size={16} className={`transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
               </button>
-
               {userMenuOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)} />
@@ -135,7 +139,6 @@ export default function Navbar() {
           )}
         </ul>
 
-        {/* Bouton Menu Mobile */}
         <div className="md:hidden">
           <button onClick={() => setMenuOpen(true)} className="p-2">
             <Menu size={26} />
@@ -143,52 +146,89 @@ export default function Navbar() {
         </div>
       </nav>
 
-      {/* Menu Mobile */}
+      {/* Menu Mobile — z-[9999] pour passer au dessus de tout (dashboard bar + agent IA) */}
       {menuOpen && (
-        <div className="fixed inset-0 bg-white z-50 h-screen p-6 pt-24 flex flex-col gap-6 text-gray-800 font-medium text-lg">
-          <button onClick={() => setMenuOpen(false)} className="absolute top-6 right-6">
-            <X size={28} />
-          </button>
-          <Link href="/" onClick={() => setMenuOpen(false)}>Accueil</Link>
-          <Link href="/shop" onClick={() => setMenuOpen(false)}>Nos eSIM</Link>
-          <Link href="/assurance" onClick={() => setMenuOpen(false)}>Assurance</Link>
-          <Link href="/fenuasimbox" onClick={() => setMenuOpen(false)}>
-            <span style={{ background: 'linear-gradient(135deg, #A020F0, #FF7F11)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontWeight: '700' }}>
-              FENUASIMBOX
-            </span>
-          </Link>
-          <Link href="/blog" onClick={() => setMenuOpen(false)}>Blog</Link>
-          <Link href="/compatibilite" onClick={() => setMenuOpen(false)}>Compatibilité</Link>
-          <Link href="/faq" onClick={() => setMenuOpen(false)}>FAQ</Link>
-          <Link href="/contact" onClick={() => setMenuOpen(false)}>Contact</Link>
-          <Link href="/partner/login" onClick={() => setMenuOpen(false)} className="text-sm font-semibold text-purple-600">
-            Espace partenaire →
-          </Link>
+        <div className="fixed inset-0 bg-white z-[9999] flex flex-col overflow-y-auto">
+          {/* Header du menu */}
+          <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 flex-shrink-0">
+            <Image src="/logo.png" alt="FENUA SIM" width={60} height={60} style={{ objectFit: 'contain' }} />
+            <button onClick={() => setMenuOpen(false)} className="p-2">
+              <X size={28} />
+            </button>
+          </div>
 
-          {user ? (
-            <>
-              <hr className="my-2 border-gray-200" />
-              <div className="text-sm text-gray-500 mb-2">
-                Connecté : <span className="text-gray-800 font-semibold">{user.email}</span>
-              </div>
-              <Link href="/dashboard" onClick={() => setMenuOpen(false)} className="flex items-center gap-2">
-                <User size={20} />
-                Mon dashboard
-              </Link>
-              <button
-                onClick={() => { handleLogout(); setMenuOpen(false); }}
-                className="flex items-center gap-2 text-red-600 mt-2"
+          {/* Liens */}
+          <div className="flex flex-col px-6 py-4 gap-1 flex-1">
+            {[
+              { href: '/', label: 'Accueil' },
+              { href: '/shop', label: 'Nos eSIM' },
+              { href: '/assurance', label: 'Assurance' },
+              { href: '/blog', label: 'Blog' },
+              { href: '/compatibilite', label: 'Compatibilité' },
+              { href: '/faq', label: 'FAQ' },
+              { href: '/contact', label: 'Contact' },
+            ].map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setMenuOpen(false)}
+                className="py-3 text-lg font-medium text-gray-800 border-b border-gray-100 hover:text-purple-600 transition-colors"
               >
-                <LogOut size={20} />
-                Déconnexion
-              </button>
-            </>
-          ) : (
-            <Link href="/login" onClick={() => setMenuOpen(false)} className="flex items-center gap-2">
-              <User size={20} />
-              Connexion
+                {item.label}
+              </Link>
+            ))}
+
+            <Link
+              href="/fenuasimbox"
+              onClick={() => setMenuOpen(false)}
+              className="py-3 text-lg font-bold border-b border-gray-100"
+            >
+              <span style={{ background: 'linear-gradient(135deg, #A020F0, #FF7F11)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                FENUASIMBOX
+              </span>
             </Link>
-          )}
+
+            <Link
+              href="/partner/login"
+              onClick={() => setMenuOpen(false)}
+              className="py-3 text-sm font-semibold text-purple-600 border-b border-gray-100"
+            >
+              Espace partenaire →
+            </Link>
+
+            {user ? (
+              <>
+                <div className="py-3 border-b border-gray-100">
+                  <p className="text-xs text-gray-400 mb-1">Connecté</p>
+                  <p className="text-sm font-semibold text-gray-800">{user.email}</p>
+                </div>
+                <Link
+                  href="/dashboard"
+                  onClick={() => setMenuOpen(false)}
+                  className="py-3 text-lg font-medium text-gray-800 border-b border-gray-100 flex items-center gap-2 hover:text-purple-600"
+                >
+                  <User size={20} />
+                  Mon dashboard
+                </Link>
+                <button
+                  onClick={() => { handleLogout(); setMenuOpen(false); }}
+                  className="py-3 text-lg font-medium text-red-500 flex items-center gap-2 text-left"
+                >
+                  <LogOut size={20} />
+                  Déconnexion
+                </button>
+              </>
+            ) : (
+              <Link
+                href="/login"
+                onClick={() => setMenuOpen(false)}
+                className="py-3 text-lg font-medium text-gray-800 flex items-center gap-2 hover:text-purple-600"
+              >
+                <User size={20} />
+                Connexion
+              </Link>
+            )}
+          </div>
         </div>
       )}
     </header>

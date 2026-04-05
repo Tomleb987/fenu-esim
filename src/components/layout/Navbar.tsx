@@ -148,7 +148,7 @@ export default function Navbar() {
 
       {/* Menu Mobile — z-[9999] pour passer au dessus de tout (dashboard bar + agent IA) */}
       {menuOpen && (
-        <div className="fixed inset-0 bg-white z-[9999] flex flex-col overflow-y-auto">
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,backgroundColor:"white",zIndex:99999,overflowY:"auto",WebkitOverflowScrolling:"touch",display:"flex",flexDirection:"column"}}>
           {/* Header du menu */}
           <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 flex-shrink-0">
             <Image src="/logo.png" alt="FENUA SIM" width={60} height={60} style={{ objectFit: 'contain' }} />

@@ -17,7 +17,6 @@ export default async function handler(
     }
 
     const code = (req.query.code as string).toUpperCase();
-
     if (!code || typeof code !== "string") {
       return res.status(400).json({ error: "Missing partner code" });
     }
@@ -30,6 +29,22 @@ export default async function handler(
       .single();
 
     if (partnerError || !partner) {
+      // Fallback : vérifier si c'est un code de parrainage client
+      const { data: referral } = await supabase
+        .from("referrals")
+        .select("referral_code, referrer_email")
+        .eq("referral_code", code.toUpperCase())
+        .maybeSingle();
+
+      if (referral) {
+        return res.status(200).json({
+          partner_code: referral.referral_code,
+          advisor_name: "FENUA SIM",
+          promo_code: null,
+          is_referral: true,
+        });
+      }
+
       console.error("Partner not found:", code, partnerError?.message);
       return res.status(404).json({ error: "Partenaire introuvable" });
     }
@@ -55,12 +70,10 @@ export default async function handler(
         code: partner.promo_code || null,
         ip_address: ip,
         user_agent: userAgent,
-        // clicked_at defaults to now() in the DB
       },
     ]);
 
     if (clickError) {
-      // Log but don't fail the redirect - click tracking is secondary
       console.error("Failed to record click:", clickError.message);
     }
 
@@ -70,6 +83,7 @@ export default async function handler(
       advisor_name: partner.advisor_name,
       promo_code: partner.promo_code,
     });
+
   } catch (err) {
     console.error("Error in track-partner:", err);
     return res.status(500).json({ error: "Internal server error" });

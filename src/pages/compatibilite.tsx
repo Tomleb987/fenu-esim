@@ -7,7 +7,7 @@ import {
   LifeBuoy, Mail, ArrowRight, Lock, ShoppingBag, ChevronDown
 } from "lucide-react";
 
-const ODOO_EMAIL = "sav@fenua-sim.odoo.com";
+const ODOO_EMAIL = "sav@fenuasim.com";
 const EMAIL_SUBJECT = "Assistance : Vérification compatibilité eSIM";
 const EMAIL_BODY = `Bonjour l'équipe Fenuasim,
 

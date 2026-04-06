@@ -117,6 +117,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (error) throw error;
 
+    // Alimenter expires_at immédiatement après la création (non bloquant)
+    if (sim?.iccid) {
+      try {
+        const { getAiraloToken } = require("@/lib/airalo");
+        const { resilientFetch } = require("@/lib/apiResilience");
+        const expiryToken = await getAiraloToken();
+        const pkgRes = await resilientFetch(
+          `${process.env.AIRALO_API_URL}/sims/${sim.iccid}/packages`,
+          { headers: { Authorization: `Bearer ${expiryToken}`, Accept: "application/json" } },
+          { maxRetries: 2, initialDelayMs: 500, retryOn5xx: true, retryOnNetworkError: true }
+        );
+        if (pkgRes.success && pkgRes.data?.data) {
+          const active = pkgRes.data.data.filter((p: any) => p.status === "ACTIVE" && p.expired_at);
+          if (active.length > 0) {
+            const latest = active.reduce((a: any, b: any) => new Date(a.expired_at) > new Date(b.expired_at) ? a : b);
+            await supabase.from("airalo_orders").update({ expires_at: latest.expired_at, activated_at: latest.activated_at }).eq("id", order.id);
+            console.log(`[create-airalo-order] expires_at: ${latest.expired_at}`);
+          }
+        }
+      } catch (e) { console.error("[create-airalo-order] expires_at non bloquant:", e); }
+    }
+
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Content-Type', 'application/json');
     return res.status(200).json({ order });

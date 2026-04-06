@@ -121,7 +121,7 @@ export default function GuideCompatibilite() {
           <div className="flex-1 text-center mb-8 md:mb-0">
             <div className="inline-block bg-gray-950 rounded-2xl px-10 py-8 shadow-xl">
               <p className="text-gray-400 text-xs font-semibold uppercase tracking-widest mb-3">Composez</p>
-              <p className="text-5xl font-black text-white tracking-[0.2em] font-mono">*#06#</p>
+              <a href="tel:*%2306%23" className="text-5xl font-black text-white tracking-[0.2em] font-mono hover:text-purple-300 transition-colors">*#06#</a>
               <p className="text-gray-500 text-xs mt-3">Gratuit · Instantané · Pas d'appel</p>
             </div>
           </div>

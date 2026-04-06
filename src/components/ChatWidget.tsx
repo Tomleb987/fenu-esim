@@ -31,7 +31,7 @@ export default function ChatWidget() {
       if (!isOpen) {
         setShowPrompt(true);
       }
-    }, 3000);
+    }, 8000);
     return () => clearTimeout(timer);
   }, [isOpen]);
 

@@ -23,6 +23,9 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const REVIEWS = [
+  { id: 12, author: "Papeete", country: "🇫🇷 France", rating: 5, date: "Août 2025", title: "Le top !!", text: "Le top!!! trop facile et fiable. Je recommande fortement. Merci", destination: "Monde" },
+  { id: 13, author: "Jean-François YUE", country: "🇵🇫 Polynésie", rating: 5, date: "Juillet 2025", title: "Rapide et efficace", text: "Rapide et efficace trop bien merci FENUA SIM", destination: "Monde" },
+  { id: 14, author: "Ym H", country: "🇳🇿 Nouvelle-Zélande", rating: 5, date: "Juillet 2025", title: "Super service", text: "Super service !", destination: "Monde" },
   { id: 9, author: "Pacific Kite", country: "🇵🇫 Polynésie", rating: 5, date: "Mars 2026", title: "J'ai utilisé ma eSIM au Japon", text: "Tout a bien fonctionné. Mon ami n'est pas arrivé à se connecter avec la sienne, surtout par manque d'habitude. Le service client a été extraordinaire pour nous dépanner. Un grand merci. Je recommande fortement Fenuasim.", destination: "Japon" },
   { id: 10, author: "Nero Almeida", country: "🇳🇨 Nouvelle-Calédonie", rating: 5, date: "Mars 2026", title: "10/10", text: "Rapide, efficace et fiable !", destination: "Monde" },
   { id: 11, author: "Low de Bora", country: "🇵🇫 Polynésie", rating: 5, date: "Mars 2026", title: "Je recommande à 1000% Fenua SIM", text: "Support technique au TOP et surtout aucun bug durant tout mon séjour aux USA. SATISFAITE à 2000%. Mauruuru Fenua SIM.", destination: "États-Unis" },

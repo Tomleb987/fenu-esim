@@ -93,7 +93,7 @@ export default function AboutPage() {
   <img
     src="/thomas-fondateur.png"
     alt="Thomas, fondateur de FENUA SIM"
-    className="w-full h-full object-cover object-top"
+    className="w-full h-full object-cover object-[center_20%]"
   />
 </div>
 {/* Badge flottant */}
@@ -113,8 +113,7 @@ export default function AboutPage() {
             <div className="space-y-4 text-gray-600 leading-relaxed">
               <p>
                 Je suis <strong className="text-gray-900">Thomas</strong>, fondateur de FENUA SIM. 
-                Je vis à Tahiti et je vois chaque semaine des proches, des amis, des voyageurs 
-                partir en métropole ou à l'étranger — parfois dans des situations difficiles.
+                Je vois chaque semaine des proches, des amis, des voyageurs partir en métropole ou à l'étranger — parfois dans des situations difficiles.
               </p>
               <p>
                 À chaque départ, la même galère : trouver un forfait data qui marche vraiment, 

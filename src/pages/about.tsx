@@ -89,21 +89,18 @@ export default function AboutPage() {
 
           {/* Photo placeholder + déco */}
           <div className="relative">
-            <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-purple-100 to-orange-50 aspect-[4/3] flex items-center justify-center border border-gray-100 shadow-lg">
-              <div className="text-center px-8">
-                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-purple-200 to-orange-100 flex items-center justify-center text-4xl mx-auto mb-4 shadow-inner">
-                  🌺
-                </div>
-                <p className="text-gray-400 text-sm font-medium">Thomas, fondateur</p>
-                <p className="text-gray-400 text-xs mt-1">Tahiti, Polynésie française</p>
-              </div>
-            </div>
-            {/* Badge flottant */}
-            <div className="absolute -bottom-4 -right-4 bg-white rounded-2xl shadow-lg border border-gray-100 px-4 py-3 flex items-center gap-2.5">
-              <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-sm font-bold text-gray-700">Support actif</span>
-            </div>
-          </div>
+            <div className="relative rounded-3xl overflow-hidden aspect-[4/3] border border-gray-100 shadow-lg">
+  <img
+    src="/thomas-fondateur.png"
+    alt="Thomas, fondateur de FENUA SIM"
+    className="w-full h-full object-cover object-top"
+  />
+</div>
+{/* Badge flottant */}
+<div className="absolute -bottom-4 -right-4 bg-white rounded-2xl shadow-lg border border-gray-100 px-4 py-3 flex items-center gap-2.5">
+  <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+  <span className="text-sm font-bold text-gray-700">Support actif</span>
+</div>
 
           {/* Texte */}
           <div>

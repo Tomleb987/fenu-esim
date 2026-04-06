@@ -437,6 +437,97 @@ export default async function handler(
         }
       }
 
+      // Logique parrainage — créer code promo 5€ pour le parrain si filleul achète ≥ 20€
+      if (partner_code && !is_top_up) {
+        try {
+          const orderAmount = (() => {
+            const cur = (session.currency || "EUR").toUpperCase();
+            const raw = session.amount_total ?? 0;
+            return cur === "XPF" || cur === "CFP" ? raw : raw / 100;
+          })();
+
+          if (orderAmount >= 20) {
+            // Vérifier que le partner_code correspond à un code de parrainage
+            const { data: referral } = await supabase
+              .from("referrals")
+              .select("referrer_email")
+              .eq("referral_code", partner_code)
+              .maybeSingle();
+
+            if (referral) {
+              // Générer un code promo unique pour le parrain
+              const referrerPromoCode = `REF5-${partner_code}-${Date.now().toString(36).toUpperCase()}`;
+              const validUntil = new Date();
+              validUntil.setMonth(validUntil.getMonth() + 6);
+
+              await supabase.from("promo_codes").insert({
+                code: referrerPromoCode,
+                discount_amount: 5,
+                discount_percentage: 0,
+                is_active: true,
+                valid_from: new Date().toISOString(),
+                valid_until: validUntil.toISOString(),
+                usage_limit: 1,
+                times_used: 0,
+                min_order_amount: 20,
+                referrer_email: referral.referrer_email,
+                referral_type: "referrer",
+              });
+
+              console.log(`[webhook] Code parrainage créé pour ${referral.referrer_email} : ${referrerPromoCode}`);
+
+              // Envoyer un email au parrain
+              try {
+                const nodemailer = require("nodemailer");
+                const transporter = nodemailer.createTransport({
+                  host: "smtp-relay.brevo.com", port: 587, secure: false,
+                  auth: { user: process.env.BREVO_SMTP_USER, pass: process.env.BREVO_SMTP_PASS },
+                });
+                await transporter.sendMail({
+                  from: `"FENUA SIM" <hello@fenuasim.com>`,
+                  to: referral.referrer_email,
+                  subject: "🎉 Votre ami a utilisé votre lien — 5€ offerts !",
+                  html: `
+                    <div style="font-family:Arial;max-width:600px;margin:0 auto;padding:20px;">
+                      <div style="background:linear-gradient(135deg,#A020F0,#FF7F11);padding:28px;border-radius:16px 16px 0 0;text-align:center;">
+                        <div style="font-size:20px;font-weight:800;color:white;">FENUA•SIM</div>
+                        <div style="font-size:40px;margin-top:10px;">🎉</div>
+                        <h1 style="color:white;font-size:20px;margin:10px 0 0;">Votre ami a acheté une eSIM !</h1>
+                      </div>
+                      <div style="background:white;padding:28px;border-radius:0 0 16px 16px;border:1px solid #eee;">
+                        <p style="font-size:15px;color:#1a0533;font-weight:600;">Bonne nouvelle 🌺</p>
+                        <p style="font-size:14px;color:#4a5568;line-height:1.7;">
+                          Un de vos filleuls vient d'effectuer son premier achat chez FENUA SIM. 
+                          Comme promis, voici votre bon de réduction de <strong>5€</strong> sur votre prochain forfait eSIM !
+                        </p>
+                        <div style="background:#f8f0ff;border:2px dashed #A020F0;border-radius:12px;padding:20px;text-align:center;margin:20px 0;">
+                          <p style="margin:0 0 6px;font-size:12px;color:#666;text-transform:uppercase;letter-spacing:1px;">Votre code promo</p>
+                          <p style="margin:0;font-size:24px;font-weight:800;color:#A020F0;font-family:monospace;">${referrerPromoCode}</p>
+                          <p style="margin:6px 0 0;font-size:12px;color:#888;">Valable 6 mois · Achat minimum 20€</p>
+                        </div>
+                        <div style="text-align:center;">
+                          <a href="https://www.fenuasim.com/shop" style="display:inline-block;background:linear-gradient(135deg,#A020F0,#FF7F11);color:white;font-weight:bold;padding:12px 28px;border-radius:10px;text-decoration:none;font-size:14px;">
+                            Utiliser mon code →
+                          </a>
+                        </div>
+                      </div>
+                      <p style="text-align:center;font-size:11px;color:#9ca3af;margin-top:16px;">
+                        FENUA SIM — 58 rue Monceau, 75008 Paris · sav@fenuasim.com
+                      </p>
+                    </div>
+                  `,
+                });
+                console.log(`[webhook] Email parrainage envoyé à ${referral.referrer_email}`);
+              } catch (emailErr) {
+                console.error("[webhook] Email parrainage non envoyé (non bloquant):", emailErr);
+              }
+            }
+          }
+        } catch (referralErr) {
+          console.error("[webhook] Erreur parrainage (non bloquant):", referralErr);
+        }
+      }
+
       return res.status(200).json({ received: true, processed: true });
     } catch (error) {
       console.error("Webhook processing error:", error);

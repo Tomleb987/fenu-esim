@@ -101,6 +101,7 @@ export default function AboutPage() {
   <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
   <span className="text-sm font-bold text-gray-700">Support actif</span>
 </div>
+          </div>
 
           {/* Texte */}
           <div>

@@ -190,7 +190,7 @@ export default function AboutPage() {
             <div>
               <h3 className="font-extrabold text-gray-900 mb-1">Conformité & protection des données</h3>
               <p className="text-gray-500 text-sm leading-relaxed max-w-2xl">
-                <strong className="text-gray-700">FENUA SIM SASU</strong> est domiciliée en France et respecte strictement le <strong className="text-gray-700">RGPD</strong>. 
+                <strong className="text-gray-700">FENUA SIM SASU</strong> est domiciliée au 58 rue Monceau, 75008 Paris et respecte strictement le <strong className="text-gray-700">RGPD</strong>. 
                 Toutes les données collectées sont utilisées uniquement dans le cadre du service et traitées de manière confidentielle. 
                 Aucune donnée n'est revendue à des tiers.
               </p>

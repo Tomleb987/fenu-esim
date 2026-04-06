@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Session } from "@supabase/supabase-js";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import OrdersList from "@/components/dashboard/OrdersList";
+import ReferralBlock from "@/components/dashboard/ReferralBlock";
 
 export default function Dashboard() {
   const router = useRouter();
@@ -12,49 +13,31 @@ export default function Dashboard() {
 
   useEffect(() => {
     const getSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
       setIsLoading(false);
     };
-
     getSession();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
-
-    return () => {
-      subscription.unsubscribe();
-    };
+    return () => { subscription.unsubscribe(); };
   }, []);
 
-  if (isLoading) {
-    return <div>Loading...</div>; // Or your loading component
-  }
-
-  if (!session) {
-    router.push("/login");
-    // The middleware will handle the redirect
-  }
+  if (isLoading) return <div>Loading...</div>;
+  if (!session) { router.push("/login"); }
 
   return (
     <>
       {session ? (
         <DashboardLayout>
           <div className="space-y-6">
-            <h1 className="text-3xl font-bold text-gray-900">
-              Tableau de bord
-            </h1>
+            <h1 className="text-3xl font-bold text-gray-900">Tableau de bord</h1>
             <OrdersList />
+            <ReferralBlock />
           </div>
         </DashboardLayout>
-      ) : (
-        <></>
-      )}
+      ) : <></>}
     </>
   );
 }

@@ -716,13 +716,11 @@ function VueBordereaux({ anset, loading, onGeneratePdf, onMarkPaid }: {
       )}
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        {/* Header avec filtre */}
         <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: C.insurance }}><Shield size={13} className="text-white" /></div>
             <p className="text-sm font-bold text-gray-700">Reversements ANSET</p>
           </div>
-          {/* Filtre Tous / En attente / Reversés */}
           <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
             {([
               ["all",     "Tous",        anset.length],
@@ -899,8 +897,6 @@ export default function AdminDashboard() {
   const [customEnd,   setCustomEnd]   = useState("");
   const [showCustom,  setShowCustom]  = useState(false);
   const [activeTab,   setActiveTab]   = useState<"global" | "partenaires" | "bordereaux" | "stock">("global");
-  const [markingCommission, setMarkingCommission] = useState<string | null>(null);
-  const [commissionRef,     setCommissionRef]     = useState("");
 
   const period = showCustom && customStart && customEnd ? { start: customStart, end: customEnd } : getPeriod(periodKey);
   const { kpis, monthly, partners, anset, stock, expiringEsims, loading, error, reload } = useDashboard(period);
@@ -927,11 +923,29 @@ export default function AdminDashboard() {
     if (data.success) { alert(`✅ Reversement ${p} marqué payé`); reload(); } else alert(`Erreur : ${data.error}`);
   };
 
+  // ── CORRIGÉ : envoie la plage complète au lieu du mois seul ──
   const handleGenerateCommissionPdf = async (partnerCode: string) => {
-    const res = await fetch("/api/admin/commission-pdf", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ partner_code: partnerCode, period: period.start.slice(0, 7) }) });
-    if (!res.ok) { alert("Erreur PDF commission"); return; }
-    const blob = await res.blob(); const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `commission-${partnerCode}-${period.start.slice(0, 7)}.pdf`; a.click(); URL.revokeObjectURL(url);
+    const res = await fetch("/api/admin/commission-pdf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        partner_code: partnerCode,
+        date_start: period.start,
+        date_end: period.end,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      alert(`Erreur PDF commission : ${err.error}`);
+      return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `commission-${partnerCode}-${period.start.slice(0, 7)}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleMarkCommissionPaid = async (partnerCode: string) => {

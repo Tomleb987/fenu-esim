@@ -29,7 +29,8 @@ type DataTip = {
 };
 
 function getDataTip(amount: number, unit: string): DataTip {
-  let go = unit.toLowerCase() === "mo" ? amount / 1024 : amount;
+  // FIX: "mb" (not "mo") is the correct unit to convert from MB to GB
+  let go = unit.toLowerCase() === "mb" ? amount / 1024 : amount;
   return {
     photo: Math.floor(go * 500).toLocaleString(),
     web: Math.floor(go / 0.06) + "h",
@@ -281,6 +282,13 @@ export default function RegionPage() {
 
   useEffect(() => { console.log(destinationInfo); }, [destinationInfo]);
 
+  // FIX: keep selectedPackage in sync with currentIndex on mobile
+  useEffect(() => {
+    if (packages.length > 0) {
+      setSelectedPackage(packages[currentIndex]);
+    }
+  }, [currentIndex, packages]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
@@ -386,7 +394,7 @@ export default function RegionPage() {
               price: finalPrice,
               currency: currency,
               final_price_eur: selectedPackage.final_price_eur! * (1 + margin),
-              final_price_usd: selectedPackage.final_price_usd! * (1 + margin),
+              final_price_usd: selectedPackic.final_price_usd! * (1 + margin),
               final_price_xpf: selectedPackage.final_price_xpf! * (1 + margin),
               promo_code: promoCodeToSave || undefined,
               partner_code: form.codePartenaire || undefined,
@@ -578,6 +586,7 @@ export default function RegionPage() {
               <option value="USD">$ USD</option>
             </select>
           </div>
+
           {/* ── Forfaits ── */}
           <div className="mt-8 rounded-xl shadow bg-gray-100 p-4 sm:p-6">
             <h2 className="text-xl sm:text-2xl text-purple-800 font-bold mb-4 sm:mb-6">
@@ -589,64 +598,97 @@ export default function RegionPage() {
               <span className="font-semibold text-purple-700">{packages.length}</span> forfait{packages.length > 1 ? "s" : ""} disponible{packages.length > 1 ? "s" : ""} pour cette destination
             </p>
 
-            {/* Mobile : scroll horizontal natif */}
-            <div className="flex sm:hidden gap-3 overflow-x-auto pb-3 snap-x snap-mandatory -mx-1 px-1" id="pkg-scroll">
-              {packages.map((pkg) => {
-                let price = pkg.final_price_eur;
-                let symbol = "€";
-                if (currency === "USD") { price = pkg.final_price_usd; symbol = "$"; }
-                else if (currency === "XPF") { price = pkg.final_price_xpf; symbol = "₣"; }
-                const priceWithMargin = price! * (1 + margin);
-                return (
-                  <div
-                    key={pkg.id}
-                    className={`flex-shrink-0 w-[80vw] max-w-xs bg-white rounded-xl border-2 p-4 flex flex-col items-center shadow snap-center cursor-pointer transition-all ${
-                      selectedPackage?.id === pkg.id ? "border-purple-500 shadow-lg" : "border-gray-100"
-                    }`}
-                    onClick={() => setSelectedPackage(pkg)}
-                  >
-                    <div className="flex items-center gap-2 mb-3">
-                      <img src={pkg.image_url} alt="" width={36} height={26} className="rounded object-cover border" />
-                      <h3 className="text-base font-bold text-purple-800 text-center">{pkg.name}</h3>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5 mb-3 justify-center">
-                      <span className="text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full font-bold">
-                        {pkg.includes_voice ? "Appels inclus" : "Pas d'appels"}
-                      </span>
-                      <span className="text-xs bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full font-bold">
-                        {pkg.includes_sms ? "SMS inclus" : "Pas de SMS"}
-                      </span>
-                    </div>
-                    <div className="text-gray-700 text-xs mb-3 text-center min-h-[36px]">{pkg.description}</div>
-                    <div className="text-lg font-bold text-purple-700 mb-4">
-                      {priceWithMargin && priceWithMargin > 0 ? `${priceWithMargin.toFixed(2)} ${symbol}` : <span className="text-gray-400">Prix indisponible</span>}
-                    </div>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleAcheter(pkg); }}
-                      className="w-full py-3 bg-gradient-to-r from-purple-600 to-orange-500 text-white font-semibold rounded-xl hover:from-purple-700 hover:to-orange-600 transition-all text-sm"
-                    >
-                      Acheter - Paiement Sécurisé
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Dots mobile — actif au scroll */}
-            <div className="flex sm:hidden flex-wrap justify-center mt-3 gap-1.5 max-w-[240px] mx-auto">
-              {packages.map((_, idx) => (
+            {/* ── Mobile : carousel avec flèches ── */}
+            <div className="flex sm:hidden flex-col gap-3">
+              <div className="relative flex items-center gap-2">
+                {/* Flèche gauche */}
                 <button
-                  key={idx}
-                  onClick={() => {
-                    const el = document.getElementById("pkg-scroll");
-                    if (el) el.scrollTo({ left: idx * el.offsetWidth * 0.72, behavior: "smooth" });
-                  }}
-                  className="w-2.5 h-2.5 rounded-full bg-gray-300 hover:bg-purple-400 focus:bg-purple-600 transition-colors"
-                />
-              ))}
+                  onClick={handlePrev}
+                  className="flex-shrink-0 bg-white border border-gray-200 rounded-full p-2 shadow hover:bg-purple-50 transition disabled:opacity-30"
+                  aria-label="Précédent"
+                  disabled={packages.length <= 1}
+                >
+                  <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M11 14l-5-5 5-5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+
+                {/* Carte du forfait courant */}
+                {packages[currentIndex] && (() => {
+                  const pkg = packages[currentIndex];
+                  let price = pkg.final_price_eur;
+                  let symbol = "€";
+                  if (currency === "USD") { price = pkg.final_price_usd; symbol = "$"; }
+                  else if (currency === "XPF") { price = pkg.final_price_xpf; symbol = "₣"; }
+                  const priceWithMargin = price! * (1 + margin);
+                  return (
+                    <div
+                      className={`flex-1 bg-white rounded-xl border-2 p-4 flex flex-col items-center shadow transition-all cursor-pointer ${
+                        selectedPackage?.id === pkg.id ? "border-purple-500 shadow-lg" : "border-gray-100"
+                      }`}
+                      onClick={() => setSelectedPackage(pkg)}
+                    >
+                      <div className="flex items-center gap-2 mb-3">
+                        <img src={pkg.image_url} alt="" width={36} height={26} className="rounded object-cover border" />
+                        <h3 className="text-base font-bold text-purple-800 text-center">{pkg.name}</h3>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 mb-3 justify-center">
+                        <span className="text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full font-bold">
+                          {pkg.includes_voice ? "Appels inclus" : "Pas d'appels"}
+                        </span>
+                        <span className="text-xs bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full font-bold">
+                          {pkg.includes_sms ? "SMS inclus" : "Pas de SMS"}
+                        </span>
+                      </div>
+                      <div className="text-gray-700 text-xs mb-3 text-center min-h-[36px]">{pkg.description}</div>
+                      <div className="text-lg font-bold text-purple-700 mb-4">
+                        {priceWithMargin && priceWithMargin > 0
+                          ? `${priceWithMargin.toFixed(2)} ${symbol}`
+                          : <span className="text-gray-400">Prix indisponible</span>}
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleAcheter(pkg); }}
+                        className="w-full py-3 bg-gradient-to-r from-purple-600 to-orange-500 text-white font-semibold rounded-xl hover:from-purple-700 hover:to-orange-600 transition-all text-sm"
+                      >
+                        Acheter - Paiement Sécurisé
+                      </button>
+                    </div>
+                  );
+                })()}
+
+                {/* Flèche droite */}
+                <button
+                  onClick={handleNext}
+                  className="flex-shrink-0 bg-white border border-gray-200 rounded-full p-2 shadow hover:bg-purple-50 transition disabled:opacity-30"
+                  aria-label="Suivant"
+                  disabled={packages.length <= 1}
+                >
+                  <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M7 4l5 5-5 5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Compteur + dots mobile */}
+              <div className="flex flex-col items-center gap-1.5">
+                <span className="text-xs text-gray-400 font-medium">
+                  {currentIndex + 1} / {packages.length}
+                </span>
+                <div className="flex justify-center gap-1.5 flex-wrap max-w-[240px]">
+                  {packages.map((_, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setCurrentIndex(idx)}
+                      className={`w-2.5 h-2.5 rounded-full transition-colors ${
+                        idx === currentIndex ? "bg-purple-600" : "bg-gray-300 hover:bg-purple-400"
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
 
-            {/* Desktop : carousel avec flèches */}
+            {/* ── Desktop : carousel avec flèches ── */}
             <div className="hidden sm:block">
               <div className="relative flex items-center justify-center px-10">
                 <button
@@ -737,11 +779,15 @@ export default function RegionPage() {
       {/* ── Bloc 2 : Que faire avec XX Go ? ── */}
       {selectedPackage &&
       typeof selectedPackage.data_amount === "number" &&
-      selectedPackage.data_unit ? (
+      selectedPackage.data_amount > 0 &&
+      selectedPackage.data_unit &&
+      selectedPackage.data_unit.trim() !== "" ? (
         <section className="bg-white rounded-xl sm:rounded-2xl shadow-sm p-4 sm:p-6 lg:p-8 text-gray-700">
           <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 text-center sm:text-left">
             Que faire avec {selectedPackage.data_amount}{" "}
-            {selectedPackage.data_unit?.toLowerCase() === "gb" ? "Go" : selectedPackage.data_unit || "Go"} ?
+            {["gb", "go"].includes(selectedPackage.data_unit?.toLowerCase() ?? "") ? "Go" :
+             ["mb", "mo"].includes(selectedPackage.data_unit?.toLowerCase() ?? "") ? "Mo" :
+             selectedPackage.data_unit || "Go"} ?
           </h2>
           {(() => {
             const tips = getDataTip(selectedPackage.data_amount, selectedPackage.data_unit);

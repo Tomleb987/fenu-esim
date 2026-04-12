@@ -447,7 +447,7 @@ export default function RegionPage() {
 
   // ── SEO dynamique ──────────────────────────────────────────────────────
   const seoTitle = regionName
-    ? `eSIM ${regionName} — Forfaits depuis Polynésie française | FENUA SIM`
+    ? `eSIM ${regionName} — Connexion instantanée à l'étranger | FENUA SIM`
     : "Forfait eSIM — FENUA SIM";
 
   const minPrice = packages.length > 0
@@ -457,8 +457,8 @@ export default function RegionPage() {
   const packageCount = packages.length;
 
   const seoDescription = regionName && minPrice
-    ? `Achetez votre eSIM ${regionName} depuis Tahiti. ${packageCount} forfait${packageCount > 1 ? "s" : ""} disponible${packageCount > 1 ? "s" : ""} à partir de ${minPrice} €. Activation instantanée, couverture 4G/5G, support 7j/7.`
-    : `Forfait eSIM de voyage — Activation instantanée depuis la Polynésie française.`;
+    ? `Achetez votre eSIM ${regionName} depuis N'importe où . ${packageCount} forfait${packageCount > 1 ? "s" : ""} disponible${packageCount > 1 ? "s" : ""} à partir de ${minPrice} €. Activation instantanée, couverture 4G/5G, support 7j/7.`
+    : `Forfait eSIM de voyage — Activation instantanée.`;
 
   const canonicalSlug = Array.isArray(params?.region) ? params.region[0] : params?.region || "";
   const canonicalUrl = `https://www.fenuasim.com/shop/${canonicalSlug}`;

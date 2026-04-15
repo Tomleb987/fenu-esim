@@ -241,7 +241,9 @@ export default function RegionPage() {
         const { data: pkgs, error: pkgError } = await supabase
           .from("airalo_packages")
           .select("*")
-          .eq("slug", dbSlug);
+          .eq("slug", dbSlug)
+          .gt("final_price_eur", 0)
+          .order("final_price_eur", { ascending: true });
         const { data: dest, error: destError } = await supabase
           .from("destination_info")
           .select("*")

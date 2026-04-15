@@ -394,7 +394,7 @@ export default function RegionPage() {
               price: finalPrice,
               currency: currency,
               final_price_eur: selectedPackage.final_price_eur! * (1 + margin),
-              final_price_usd: selectedPackic.final_price_usd! * (1 + margin),
+              final_price_usd: selectedPackage.final_price_usd! * (1 + margin),
               final_price_xpf: selectedPackage.final_price_xpf! * (1 + margin),
               promo_code: promoCodeToSave || undefined,
               partner_code: form.codePartenaire || undefined,

@@ -1,9 +1,15 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import Stripe from "stripe";
+import { createClient } from "@supabase/supabase-js";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-04-30.basil",
 });
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export default async function handler(
   req: NextApiRequest,
@@ -20,57 +26,71 @@ export default async function handler(
       return res.status(400).json({ message: "Invalid cart items" });
     }
 
-
-    // This prevents creating Stripe sessions with undefined packageId which causes webhook failures
     const packageId = cartItems[0].id;
     if (!packageId) {
-      console.error("Missing packageId in cartItems[0].id - this would cause webhook failure", {
-        cartItems: JSON.stringify(cartItems),
-        timestamp: new Date().toISOString(),
-      });
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: "Package ID is required. Please refresh the page and try again.",
         error: "MISSING_PACKAGE_ID"
       });
     }
 
-    // Valid currency codes for Stripe
+    const { data: pkg, error: pkgError } = await supabase
+      .from("airalo_packages")
+      .select("airalo_id, name, final_price_eur, final_price_usd, final_price_xpf")
+      .eq("airalo_id", packageId)
+      .single();
+
+    if (pkgError || !pkg) {
+      console.error("Package not found in DB:", packageId);
+      return res.status(400).json({
+        message: "Forfait introuvable. Veuillez rafraichir la page.",
+        error: "PACKAGE_NOT_FOUND"
+      });
+    }
+
     const validCurrencies = ['eur', 'usd', 'xpf'];
-    
-    // Create checkout session with all necessary metadata
+    const item = cartItems[0];
+    let normalizedCurrency = (item.currency || 'eur').toLowerCase();
+    if (!validCurrencies.includes(normalizedCurrency)) {
+      normalizedCurrency = 'eur';
+    }
+
+    let serverPrice: number;
+    if (normalizedCurrency === 'xpf') {
+      serverPrice = Math.round(Number(pkg.final_price_xpf));
+    } else if (normalizedCurrency === 'usd') {
+      serverPrice = Math.round(Number(pkg.final_price_usd) * 100);
+    } else {
+      serverPrice = Math.round(Number(pkg.final_price_eur) * 100);
+    }
+
+    const clientPrice = item.price || item.final_price_eur;
+    const clientPriceInCents = normalizedCurrency === 'xpf'
+      ? Math.round(clientPrice)
+      : Math.round(clientPrice * 100);
+
+    if (Math.abs(clientPriceInCents - serverPrice) > 10) {
+      console.warn("PRIX SUSPECT", {
+        packageId, clientPriceInCents, serverPrice,
+        currency: normalizedCurrency, email: customer_email,
+        ip: req.headers["x-forwarded-for"] || req.socket.remoteAddress,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
-      line_items: cartItems.map((item: any) => {
-        // Normalize currency to lowercase for Stripe (required format)
-        // Ensure currency is valid, default to 'eur' if invalid
-        let normalizedCurrency = (item.currency || 'eur').toLowerCase();
-        if (!validCurrencies.includes(normalizedCurrency)) {
-          console.warn(`Invalid currency "${item.currency}", defaulting to "eur"`);
-          normalizedCurrency = 'eur';
-        }
-        
-        // Use the price in the selected currency, or fallback to EUR
-        let unitAmount = item.price || item.final_price_eur;
-        if (normalizedCurrency === 'xpf') {
-          // XPF doesn't need multiplication (already in smallest unit)
-          unitAmount = Math.round(unitAmount);
-        } else {
-          // EUR and USD need to be multiplied by 100 (cents)
-          unitAmount = Math.round(unitAmount * 100);
-        }
-        
-        return {
-          price_data: {
-            currency: normalizedCurrency,
-            product_data: {
-              name: item.name,
-              description: item.description || "No description provided",
-            },
-            unit_amount: unitAmount,
+      line_items: [{
+        price_data: {
+          currency: normalizedCurrency,
+          product_data: {
+            name: item.name || pkg.name,
+            description: item.description || "eSIM FENUA SIM",
           },
-          quantity: 1,
-        };
-      }),
+          unit_amount: serverPrice,
+        },
+        quantity: 1,
+      }],
       mode: "payment",
       success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/checkout/cancel`,
@@ -80,15 +100,11 @@ export default async function handler(
         firstName: first_name,
         lastName: last_name,
         email: customer_email,
-        // Store cart items as JSON string to access in webhook
         cartItems: JSON.stringify(cartItems),
         promo_code: cartItems[0].promo_code || "",
         partner_code: cartItems[0].partner_code || "",
       },
     });
-
-    // DO NOT create the order here - wait for payment confirmation in webhook
-    // The webhook will handle order creation after successful payment
 
     res.status(200).json({ sessionId: session.id });
   } catch (error: any) {

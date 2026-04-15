@@ -11,6 +11,11 @@ const ADMIN_EMAILS = [
 ];
 
 export function middleware(req: NextRequest) {
+  // Laisser passer la page de login
+  if (req.nextUrl.pathname === "/admin/login") {
+    return NextResponse.next();
+  }
+
   const token = req.cookies.get("sb-access-token")?.value
     || req.cookies.get("supabase-auth-token")?.value;
 
@@ -26,16 +31,14 @@ export function middleware(req: NextRequest) {
     const exp = payload.exp as number;
 
     if (Date.now() / 1000 > exp) {
-      const loginUrl = new URL("/admin/login", req.url);
-      return NextResponse.redirect(loginUrl);
+      return NextResponse.redirect(new URL("/admin/login", req.url));
     }
 
     if (!ADMIN_EMAILS.includes(email) && !email.endsWith("@fenuasim.com")) {
       return NextResponse.redirect(new URL("/", req.url));
     }
   } catch {
-    const loginUrl = new URL("/admin/login", req.url);
-    return NextResponse.redirect(loginUrl);
+    return NextResponse.redirect(new URL("/admin/login", req.url));
   }
 
   return NextResponse.next();

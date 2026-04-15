@@ -883,7 +883,7 @@ export default function RegionPage() {
       {/* ── Modal récapitulatif + formulaire ── */}
       {showRecapModal && selectedPackage && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4">
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-lg p-4 sm:p-6 w-full max-w-md relative animate-fade-in max-h-[95dvh] overflow-y-auto">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-lg p-4 sm:p-6 w-full max-w-md relative animate-fade-in max-h-[85dvh] overflow-y-auto">
             <button
               className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-2xl font-bold leading-none"
               onClick={() => setShowRecapModal(false)}

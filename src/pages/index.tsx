@@ -317,7 +317,7 @@ export default function Home() {
       maxDays: Math.max(...pkgs.map((p) => parseInt(p.validity?.toString().split(" ")[0] || "0"))),
       minPrice: minPriceRaw * (1 + margin),
       maxPrice: maxPriceRaw * (1 + margin),
-      packageCount: pkgs.length,
+      packageCount: pkgs.filter((p) => getPrice(p, currency) > 0).length,
       originalRegion: pkgs[0]?.region || pkgs[0]?.region_fr || region,
     };
     return acc;

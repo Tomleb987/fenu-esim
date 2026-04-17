@@ -33,7 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // 1. Récupérer les eSIMs actives sans expires_at
     const { data: orders, error } = await supabase
       .from("airalo_orders")
-      .select("id, sim_iccid")
+      .select("id, sim_iccid, order_id")
       .not("sim_iccid", "is", null)
       .is("expires_at", null)
       .not("status", "in", '("expired","cancelled")')
@@ -81,6 +81,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 
         if (activePackages.length === 0) {
+          if ((order as any).order_id) {
+            try {
+              const orderResult = await resilientFetch<{ data: { sims: Array<{ iccid: string; expired_at: string | null; activated_at: string | null }> } }>(
+                `${AIRALO_API_URL}/orders/${(order as any).order_id}`,
+                { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" } },
+                { maxRetries: 2, initialDelayMs: 500, retryOn5xx: true, retryOnNetworkError: true }
+              );
+              const sim = orderResult.data?.data?.sims?.find((s: any) => s.iccid === order.sim_iccid);
+              if (sim?.expired_at) {
+                await supabase.from("airalo_orders").update({ expires_at: sim.expired_at, activated_at: sim.activated_at }).eq("id", order.id);
+                console.log(`[sync-esim-expiry] fallback OK ${order.sim_iccid} expires ${sim.expired_at}`);
+                results.updated++;
+                continue;
+              }
+            } catch(e) {}
+          }
           console.log(`[sync-esim-expiry] Aucun package actif pour ${order.sim_iccid}`);
           results.skipped++;
           continue;

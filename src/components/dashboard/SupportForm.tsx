@@ -43,6 +43,17 @@ export default function SupportForm() {
 
       if (insertError) throw insertError;
 
+      await fetch("/api/support/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_email: session.user.email,
+          subject: formData.subject,
+          message: formData.message,
+          priority: formData.priority,
+        }),
+      });
+
       setSuccess(true);
       setFormData({ subject: '', message: '', priority: 'medium' });
     } catch (err) {

@@ -76,9 +76,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const packages = result.data.data;
 
         // Trouver le package ACTIVE avec expires_at le plus lointain
-        const activePackages = packages.filter(
-          (p) => p.status === "ACTIVE" && p.expired_at
-        );
+        const activePackages = packages.filter((p) => p.expired_at);
+
+
 
         if (activePackages.length === 0) {
           console.log(`[sync-esim-expiry] Aucun package actif pour ${order.sim_iccid}`);

@@ -1,5 +1,5 @@
 import { streamText } from 'ai';
-import { openai } from '@ai-sdk/openai';
+import { anthropic } from '@ai-sdk/anthropic';
 import { systemPrompt } from './systemPrompt';
 import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
@@ -10,12 +10,12 @@ const supabase = createClient(
 );
 
 const transporter = nodemailer.createTransport({
-  host: 'smtp.office365.com',
+  host: 'smtp-relay.brevo.com',
   port: 587,
   secure: false,
   auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASSWORD,
+    user: process.env.BREVO_SMTP_USER,
+    pass: process.env.BREVO_SMTP_PASS,
   },
 });
 
@@ -60,8 +60,8 @@ Horodatage : ${new Date().toISOString()}
 
   if (dbResult.status === 'rejected') {
     console.error('❌ Erreur Supabase :', dbResult.reason);
-  } else if (dbResult.value.error) {
-    console.error('❌ Erreur Supabase :', dbResult.value.error);
+  } else if ((dbResult.value as { error: unknown }).error) {
+    console.error('❌ Erreur Supabase :', (dbResult.value as { error: unknown }).error);
   } else {
     console.log('✅ Lead sauvegardé dans Supabase');
   }
@@ -80,17 +80,14 @@ export async function POST(req: Request) {
     if (!Array.isArray(messages) || messages.length === 0) {
       return new Response(
         JSON.stringify({ error: 'Messages invalides' }),
-        {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' },
-        }
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
     const safeMessages = messages.slice(-20);
 
     const result = await streamText({
-      model: openai('gpt-4o-mini'),
+      model: anthropic('claude-haiku-4-5-20251001'),
       system: systemPrompt.content,
       messages: safeMessages,
       onFinish: async ({ text }) => {
@@ -101,13 +98,9 @@ export async function POST(req: Request) {
     return result.toDataStreamResponse();
   } catch (error) {
     console.error('Erreur API :', error);
-
     return new Response(
       JSON.stringify({ error: 'Erreur serveur' }),
-      {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      }
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
 }

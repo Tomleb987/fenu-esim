@@ -10,6 +10,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.71",
     "@ai-sdk/openai": "^1.0.0",
     "@radix-ui/react-slot": "^1.2.2",
     "@stripe/react-stripe-js": "^3.7.0",

@@ -147,7 +147,11 @@ export default function ChatWidget() {
                   }`}
                 >
                   {/* Affichage du HTML (gras, liens...) */}
-                  <div dangerouslySetInnerHTML={{ __html: m.content }} />
+                  <div dangerouslySetInnerHTML={{ 
+                    __html: m.content
+                      .replace(/\|\|LEAD\|.*?\|\|/gs, '')
+                      .trim() 
+                  }} />
                 </div>
               </div>
             ))}

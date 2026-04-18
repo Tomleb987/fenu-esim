@@ -1,8 +1,9 @@
-import { streamText } from 'ai';
+import { streamText, tool } from 'ai';
 import { anthropic } from '@ai-sdk/anthropic';
 import { systemPrompt } from './systemPrompt';
 import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
+import { z } from 'zod';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -42,35 +43,13 @@ async function handleLeadDetection(completion: string) {
       to: 'sav@fenua-sim.odoo.com',
       replyTo: email,
       subject: `Nouveau Lead Chatbot : ${prenom}`,
-      text: `
-Nouveau prospect détecté par le chatbot IA :
-
-👤 Prénom  : ${prenom}
-📞 Tél.    : ${telephone}
-📧 Email   : ${email}
-
-📝 Demande :
-${demande}
-
----
-Horodatage : ${new Date().toISOString()}
-      `.trim(),
+      text: `Nouveau prospect :\n\nPrénom : ${prenom}\nTél : ${telephone}\nEmail : ${email}\nDemande : ${demande}\n\nHorodatage : ${new Date().toISOString()}`,
     }),
   ]);
 
-  if (dbResult.status === 'rejected') {
-    console.error('❌ Erreur Supabase :', dbResult.reason);
-  } else if ((dbResult.value as { error: unknown }).error) {
-    console.error('❌ Erreur Supabase :', (dbResult.value as { error: unknown }).error);
-  } else {
-    console.log('✅ Lead sauvegardé dans Supabase');
-  }
-
-  if (mailResult.status === 'rejected') {
-    console.error('❌ Erreur email :', mailResult.reason);
-  } else {
-    console.log('✅ Email envoyé à Odoo');
-  }
+  if (dbResult.status === 'rejected') console.error('❌ Supabase :', dbResult.reason);
+  if (mailResult.status === 'rejected') console.error('❌ Email :', mailResult.reason);
+  else console.log('✅ Lead sauvegardé et email envoyé');
 }
 
 export async function POST(req: Request) {
@@ -90,6 +69,79 @@ export async function POST(req: Request) {
       model: anthropic('claude-haiku-4-5-20251001'),
       system: systemPrompt.content,
       messages: safeMessages,
+      maxSteps: 3,
+      tools: {
+        getPackages: tool({
+          description: 'Récupère les forfaits eSIM depuis Supabase pour une destination. Appelle OBLIGATOIREMENT cet outil avant de donner tout prix ou recommandation de forfait.',
+          parameters: z.object({
+            destination: z.string().describe('Slug de la destination en anglais (ex: japan, france, united-states, europe, discover-global)'),
+            duration_days: z.number().optional().describe('Durée du voyage en jours (optionnel)'),
+            prefers_unlimited: z.boolean().optional().describe('true si le client préfère illimité (défaut: true)'),
+          }),
+          execute: async ({ destination, duration_days, prefers_unlimited = true }) => {
+            // Uniquement final_price_xpf et final_price_eur — jamais price_xpf ou price_eur
+            const { data, error } = await supabase
+              .from('airalo_packages')
+              .select('name, slug, data_amount, data_unit, is_unlimited, final_price_xpf, final_price_eur, validity')
+              .eq('status', 'active')
+              .ilike('slug', `%${destination}%`)
+              .order('is_unlimited', { ascending: false })
+              .order('final_price_xpf', { ascending: true })
+              .limit(10);
+
+            if (error || !data || data.length === 0) {
+              return { found: false, message: `Aucun forfait trouvé pour "${destination}". Essaie avec le nom en anglais.` };
+            }
+
+            // Filtrer par durée si fournie
+            let filtered = data;
+            if (duration_days) {
+              const withDays = data.filter(p => {
+                const match = p.validity?.match(/(\d+)/);
+                if (!match) return true;
+                return parseInt(match[1]) >= duration_days;
+              });
+              if (withDays.length > 0) filtered = withDays;
+            }
+
+            // Séparer illimité et data
+            const unlimited = filtered.filter(p => p.is_unlimited);
+            const dataPlans = filtered.filter(p => !p.is_unlimited);
+
+            // 1 recommandation principale + 1 alternative max
+            const results = [];
+
+            if (prefers_unlimited && unlimited.length > 0) {
+              results.push({
+                ...unlimited[0],
+                recommended: true,
+                type: 'illimité',
+              });
+            }
+
+            if (dataPlans.length > 0) {
+              const bestData = duration_days
+                ? dataPlans.find(p => {
+                    const m = p.validity?.match(/(\d+)/);
+                    return m && parseInt(m[1]) >= duration_days;
+                  }) || dataPlans[0]
+                : dataPlans[Math.floor(dataPlans.length / 2)];
+              results.push({
+                ...bestData,
+                recommended: !prefers_unlimited,
+                type: 'data',
+              });
+            }
+
+            return {
+              found: true,
+              destination,
+              packages: results.slice(0, 2),
+              shop_url: `/shop/${destination}`,
+            };
+          },
+        }),
+      },
       onFinish: async ({ text }) => {
         await handleLeadDetection(text);
       },
@@ -97,7 +149,7 @@ export async function POST(req: Request) {
 
     return result.toDataStreamResponse();
   } catch (error) {
-    console.error('Erreur API :', error);
+    console.error('❌ Erreur API :', error);
     return new Response(
       JSON.stringify({ error: 'Erreur serveur' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }

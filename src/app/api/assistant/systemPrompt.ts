@@ -75,11 +75,7 @@ SCÉNARIO LEAD — déclencher si le client dit :
 
 Puis sur la dernière ligne (invisible) :
 ||LEAD|[Prénom]|[Téléphone]|[Email]|[Résumé_demande_en_1_phrase]||
+RÈGLE PRIX OBLIGATOIRE : Toujours afficher XPF ET EUR ensemble. Format : "3 921₣ / 33€".
+RÈGLE ALTERNATIVE : Pour l'alternative data, choisir un forfait dont la durée >= durée du voyage.
 `,
 };
-
-RÈGLE PRIX OBLIGATOIRE : Toujours afficher XPF ET EUR ensemble.
-Format exact : "3 921₣ / 33€" — jamais l'un sans l'autre.
-
-RÈGLE ALTERNATIVE : Pour l'alternative data, choisir un forfait dont la durée correspond au voyage.
-Exemple : pour 10 jours → proposer 10Go/30j et non 2Go/15j.

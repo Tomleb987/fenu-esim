@@ -174,6 +174,7 @@ export async function POST(req: Request) {
             phone_model: z.string().describe('Modèle exact du téléphone (ex: iPhone 13 Pro, Samsung Galaxy S23)'),
           }),
           execute: async ({ phone_model }) => {
+            // Réponse prudente — toujours recommander le test *#06#
             const model = phone_model.toLowerCase();
 
             // iPhones compatibles

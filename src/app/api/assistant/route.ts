@@ -40,7 +40,7 @@ async function handleLeadDetection(completion: string) {
     supabase.from('assistance').insert({ prenom, telephone, email, demande }),
     transporter.sendMail({
       from: '"Chatbot FenuaSIM" <contact@fenuasim.com>',
-      to: 'sav@fenua-sim.odoo.com',
+      to: 'contact@fenuasim.com',
       replyTo: email,
       subject: `Nouveau Lead Chatbot : ${prenom}`,
       text: `Nouveau prospect :\n\nPrénom : ${prenom}\nTél : ${telephone}\nEmail : ${email}\nDemande : ${demande}\n\nHorodatage : ${new Date().toISOString()}`,

@@ -7,6 +7,8 @@ import { MessageCircle, X, Send, Bot } from "lucide-react";
 export default function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
+  const [zone, setZone] = useState<string | null>(null);
+  const [showZoneButtons, setShowZoneButtons] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // --- CONFIGURATION DU CHAT ---
@@ -32,7 +34,20 @@ export default function ChatWidget() {
         setShowPrompt(true);
       }
     }, 8000);
-    return () => clearTimeout(timer);
+    const handleZoneSelect = (label: string, value: string) => {
+    setZone(value);
+    setShowZoneButtons(false);
+    // Envoyer le choix comme message utilisateur
+    const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
+    handleInputChange({ target: { value: label } } as React.ChangeEvent<HTMLInputElement>);
+    setTimeout(() => {
+      const submitEvent = new Event('submit', { bubbles: true });
+      const form = document.querySelector('#chat-form') as HTMLFormElement;
+      if (form) form.dispatchEvent(submitEvent);
+    }, 100);
+  };
+
+  return () => clearTimeout(timer);
   }, [isOpen]);
 
   // 2. Auto-scroll vers le bas à chaque nouveau message
@@ -47,6 +62,19 @@ export default function ChatWidget() {
     setIsOpen(!isOpen);
     // Si on ouvre le chat, on cache définitivement la bulle d'accroche
     if (!isOpen) setShowPrompt(false);
+  };
+
+  const handleZoneSelect = (label: string, value: string) => {
+    setZone(value);
+    setShowZoneButtons(false);
+    // Envoyer le choix comme message utilisateur
+    const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
+    handleInputChange({ target: { value: label } } as React.ChangeEvent<HTMLInputElement>);
+    setTimeout(() => {
+      const submitEvent = new Event('submit', { bubbles: true });
+      const form = document.querySelector('#chat-form') as HTMLFormElement;
+      if (form) form.dispatchEvent(submitEvent);
+    }, 100);
   };
 
   return (
@@ -124,6 +152,26 @@ export default function ChatWidget() {
               </div>
             ))}
             
+            {/* Boutons de sélection de zone — affichés après le message d'accueil */}
+            {showZoneButtons && messages.length === 1 && (
+              <div className="flex flex-col gap-2 mt-2">
+                {[
+                  { label: '🌺 Polynésie française', value: 'polynesie' },
+                  { label: '🌿 Nouvelle-Calédonie', value: 'nc' },
+                  { label: '🇫🇷 France / DROM', value: 'france' },
+                  { label: '🌍 Autre pays', value: 'autre' },
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => handleZoneSelect(option.label, option.value)}
+                    className="text-left bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 text-sm font-medium px-4 py-2 rounded-xl transition-colors"
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* Indicateur de chargement (...) */}
             {isLoading && (
               <div className="flex justify-start">
@@ -139,7 +187,7 @@ export default function ChatWidget() {
           </div>
 
           {/* Zone de saisie */}
-          <form onSubmit={handleSubmit} className="p-3 bg-white border-t border-gray-100 flex gap-2">
+          <form id="chat-form" onSubmit={handleSubmit} className="p-3 bg-white border-t border-gray-100 flex gap-2">
             <input
               className="flex-1 bg-gray-100 text-gray-900 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
               value={input}

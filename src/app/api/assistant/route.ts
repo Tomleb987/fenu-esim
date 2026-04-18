@@ -20,6 +20,17 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+
+// Traduit la durée anglaise en français
+function translateValidity(validity: string | null): string {
+  if (!validity) return '';
+  return validity
+    .replace(/(\d+)\s*days?/i, '$1 jours')
+    .replace(/(\d+)\s*months?/i, '$1 mois')
+    .replace(/(\d+)\s*weeks?/i, '$1 semaines')
+    .replace(/(\d+)\s*hours?/i, '$1 heures');
+}
+
 export const runtime = 'nodejs';
 
 async function handleLeadDetection(completion: string) {
@@ -98,13 +109,13 @@ export async function POST(req: Request) {
             const results = [];
 
             if (prefers_unlimited && unlimited.length > 0) {
-              results.push({ ...unlimited[0], type: 'illimité', recommended: true });
+              results.push({ ...unlimited[0], validity: translateValidity(unlimited[0].validity), type: 'illimité', recommended: true });
             }
             if (dataPlans.length > 0) {
               const best = duration_days
                 ? dataPlans.find(p => { const m = p.validity?.match(/(\d+)/); return m && parseInt(m[1]) >= duration_days; }) || dataPlans[0]
                 : dataPlans[Math.floor(dataPlans.length / 2)];
-              results.push({ ...best, type: 'data', recommended: !prefers_unlimited });
+              results.push({ ...best, validity: translateValidity(best.validity), type: 'data', recommended: !prefers_unlimited });
             }
 
             return { found: true, destination, packages: results.slice(0, 2), shop_url: `/shop/${destination}` };

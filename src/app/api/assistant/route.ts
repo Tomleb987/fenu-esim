@@ -20,7 +20,6 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-
 // Traduit la durée anglaise en français
 function translateValidity(validity: string | null): string {
   if (!validity) return '';
@@ -89,36 +88,57 @@ export async function POST(req: Request) {
               .ilike('slug', `%${destination}%`)
               .order('is_unlimited', { ascending: false })
               .order('final_price_xpf', { ascending: true })
-              .limit(10);
+              .limit(15);
 
             if (error || !data || data.length === 0) {
               return { found: false, message: `Aucun forfait trouvé pour "${destination}".` };
             }
 
-            let filtered = data;
-            if (duration_days) {
-              const withDays = data.filter(p => {
-                const m = p.validity?.match(/(\d+)/);
-                return m ? parseInt(m[1]) >= duration_days : true;
-              });
-              if (withDays.length > 0) filtered = withDays;
-            }
-
-            const unlimited = filtered.filter(p => p.is_unlimited);
-            const dataPlans = filtered.filter(p => !p.is_unlimited);
+            const unlimited = data.filter(p => p.is_unlimited);
+            const dataPlans = data.filter(p => !p.is_unlimited);
             const results = [];
 
             if (prefers_unlimited && unlimited.length > 0) {
-              results.push({ ...unlimited[0], validity: translateValidity(unlimited[0].validity), type: 'illimité', recommended: true });
-            }
-            if (dataPlans.length > 0) {
-              const best = duration_days
-                ? dataPlans.find(p => { const m = p.validity?.match(/(\d+)/); return m && parseInt(m[1]) >= duration_days; }) || dataPlans[0]
-                : dataPlans[Math.floor(dataPlans.length / 2)];
-              results.push({ ...best, validity: translateValidity(best.validity), type: 'data', recommended: !prefers_unlimited });
+              // Trouver l'illimité dont la durée correspond exactement ou >= durée demandée
+              const bestUnlimited = duration_days
+                ? unlimited.find(p => {
+                    const m = p.validity?.match(/(\d+)/);
+                    return m && parseInt(m[1]) >= duration_days;
+                  }) || unlimited[unlimited.length - 1]
+                : unlimited[0];
+              results.push({
+                ...bestUnlimited,
+                validity: translateValidity(bestUnlimited.validity),
+                type: 'illimité',
+                recommended: true,
+              });
             }
 
-            return { found: true, destination, packages: results.slice(0, 2), shop_url: `/shop/${destination}` };
+            if (dataPlans.length > 0) {
+              // Trouver le forfait data adapté à la durée
+              const suitablePlans = duration_days
+                ? dataPlans.filter(p => {
+                    const m = p.validity?.match(/(\d+)/);
+                    return m && parseInt(m[1]) >= duration_days;
+                  })
+                : dataPlans;
+              const pool = suitablePlans.length > 0 ? suitablePlans : dataPlans;
+              // Prendre un forfait milieu-haut de gamme (pas le plus petit ni le plus cher)
+              const bestData = pool[Math.floor(pool.length * 0.6)] || pool[pool.length - 1];
+              results.push({
+                ...bestData,
+                validity: translateValidity(bestData.validity),
+                type: 'data',
+                recommended: !prefers_unlimited || unlimited.length === 0,
+              });
+            }
+
+            return {
+              found: true,
+              destination,
+              packages: results.slice(0, 2),
+              shop_url: `/shop/${destination}`,
+            };
           },
         }),
 
@@ -146,7 +166,6 @@ export async function POST(req: Request) {
               return { found: false, message: 'Aucune commande trouvée avec ces informations.' };
             }
 
-            // Vérifier si QR code disponible dans airalo_orders
             const enriched = await Promise.all(data.map(async (order) => {
               if (!order.airalo_order_id) return { ...order, has_qr_code: false };
               const { data: airalo } = await supabase
@@ -174,49 +193,17 @@ export async function POST(req: Request) {
             phone_model: z.string().describe('Modèle exact du téléphone (ex: iPhone 13 Pro, Samsung Galaxy S23)'),
           }),
           execute: async ({ phone_model }) => {
-            // Réponse prudente — toujours recommander le test *#06#
-            const model = phone_model.toLowerCase();
-
-            // iPhones compatibles
-            const iphoneMatch = model.match(/iphone\s*(\d+)/);
-            if (iphoneMatch) {
-              const num = parseInt(iphoneMatch[1]);
-              if (num >= 11) return { compatible: true, phone_model, message: `L'${phone_model} est compatible eSIM ✅` };
-              if (num === 10) {
-                if (model.includes('xs') || model.includes('xr')) return { compatible: true, phone_model, message: `L'${phone_model} est compatible eSIM ✅` };
-                return { compatible: false, phone_model, message: `L'iPhone X n'est pas compatible eSIM.` };
-              }
-              return { compatible: false, phone_model, message: `L'${phone_model} n'est pas compatible eSIM.` };
-            }
-
-            // Samsung compatibles
-            const samsungPatterns = ['s21', 's22', 's23', 's24', 's25', 'z fold', 'z flip', 'fold 3', 'fold 4', 'fold 5', 'fold 6', 'flip 3', 'flip 4', 'flip 5', 'flip 6'];
-            if (model.includes('samsung') || model.includes('galaxy')) {
-              const isCompatible = samsungPatterns.some(p => model.includes(p));
-              if (isCompatible) return { compatible: true, phone_model, message: `Le ${phone_model} est compatible eSIM ✅` };
-              return { compatible: null, phone_model, message: `Je ne suis pas certain pour ce modèle Samsung. Vérifie dans Réglages > Connexions > Gestionnaire de carte SIM.` };
-            }
-
-            // Google Pixel compatibles
-            const pixelMatch = model.match(/pixel\s*(\d+)/);
-            if (pixelMatch) {
-              const num = parseInt(pixelMatch[1]);
-              if (num >= 6) return { compatible: true, phone_model, message: `Le ${phone_model} est compatible eSIM ✅` };
-              return { compatible: null, phone_model, message: `Le ${phone_model} pourrait ne pas être compatible. Teste avec *#06# — si EID apparaît = compatible.` };
-            }
-
-            // Cas inconnu
+            // Toujours prudent — certaines versions vendues localement peuvent ne pas supporter l'eSIM
             return {
-              compatible: null,
               phone_model,
-              message: `Je n'ai pas d'info certaine pour ce modèle. Teste avec *#06# — si "EID" apparaît dans les infos = compatible eSIM ✅`,
+              message: `Je pense que le ${phone_model} est compatible eSIM, mais pour en être sûr à 100% (certaines versions vendues localement peuvent différer), fais ce test rapide : compose *#06# sur ton téléphone → si tu vois "EID" dans les infos = compatible ✅`,
             };
           },
         }),
 
         // ─── OUTIL 4 : Ticket d'escalade niveau 2 ────────────────────────
         createSupportTicket: tool({
-          description: 'Crée un ticket d\'escalade niveau 2. Utiliser si : remboursement demandé, client frustré, problème non résolu après 2 échanges, client veut parler à un humain.',
+          description: 'Crée un ticket d\'escalade niveau 2. Utiliser si : remboursement demandé, client frustré, problème non résolu après 2 échanges, client veut parler à un humain, QR code non reçu.',
           parameters: z.object({
             customer_email: z.string().optional().describe('Email du client si connu'),
             summary: z.string().describe('Résumé court du problème'),
@@ -245,12 +232,11 @@ export async function POST(req: Request) {
               return { success: false };
             }
 
-            // Notifier l'équipe par email
             await transporter.sendMail({
               from: '"Chatbot FenuaSIM" <contact@fenuasim.com>',
               to: 'contact@fenuasim.com',
-              subject: `[${priority.toUpperCase()}] Nouveau ticket support : ${summary}`,
-              text: `Nouveau ticket d'escalade N2 :\n\nType : ${ticket_type}\nPriorité : ${priority}\nClient : ${customer_email || 'inconnu'}\n\nRésumé : ${summary}\n\nDernier message : ${last_customer_message}\n\nID ticket : ${data.id}`,
+              subject: `[${priority.toUpperCase()}] Ticket support : ${summary}`,
+              text: `Nouveau ticket N2 :\n\nType : ${ticket_type}\nPriorité : ${priority}\nClient : ${customer_email || 'inconnu'}\n\nRésumé : ${summary}\n\nDernier message : ${last_customer_message}\n\nID ticket : ${data.id}`,
             }).catch(e => console.error('❌ Email ticket :', e));
 
             return { success: true, ticket_id: data.id };

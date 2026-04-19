@@ -565,6 +565,7 @@ export default function AdminRouteurs() {
                     onInvoice={handleGenerateInvoice}
                     onContract={handleGenerateContract}
                     onYouSign={handleSendContractLink}
+                    onEdit={setShowEditRental}
                     onLinkEsim={setShowLinkEsim}
                     sendingContract={sendingContract}
                   />
@@ -582,6 +583,7 @@ export default function AdminRouteurs() {
                     onInvoice={handleGenerateInvoice}
                     onContract={handleGenerateContract}
                     onYouSign={handleSendContractLink}
+                    onEdit={setShowEditRental}
                     onLinkEsim={setShowLinkEsim}
                     sendingContract={sendingContract}
                   />
@@ -599,6 +601,7 @@ export default function AdminRouteurs() {
                     onInvoice={handleGenerateInvoice}
                     onContract={handleGenerateContract}
                     onYouSign={handleSendContractLink}
+                    onEdit={setShowEditRental}
                     onLinkEsim={setShowLinkEsim}
                     sendingContract={sendingContract}
                   />
@@ -805,6 +808,7 @@ function RentalTable({
   onContract,
   onYouSign,
   onLinkEsim,
+  onEdit,
   sendingContract,
 }: {
   rentals: Rental[];
@@ -813,6 +817,7 @@ function RentalTable({
   onContract: (r: Rental) => void;
   onYouSign: (r: Rental) => void;
   onLinkEsim: (r: Rental) => void;
+  onEdit: (r: Rental) => void;
   sendingContract: string | null;
 }) {
   return (
@@ -944,7 +949,7 @@ function RentalTable({
                     </button>
 
                     <button
-                      onClick={() => setShowEditRental(r)}
+                      onClick={() => onEdit(r)}
                       className="text-xs px-2 py-1 rounded-lg border border-amber-200 text-amber-700 hover:bg-amber-50"
                       title="Modifier le dossier"
                     >

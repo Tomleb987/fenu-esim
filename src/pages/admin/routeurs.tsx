@@ -391,7 +391,7 @@ export default function AdminRouteurs() {
     const MONTHS_FR = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
     const today = new Date().toISOString().slice(0, 10);
 
-    const getRentalStatus = (routerId: string, dayStr: string) => {
+    const getCalDayStatus = (routerId: string, dayStr: string) => {
       const rental = rentals.find(r => {
         if ((r as any).router_id !== routerId) return false;
         const s = getRentalStatus(r);
@@ -419,7 +419,7 @@ export default function AdminRouteurs() {
                 {Array.from({ length: daysInMonth }, (_, i) => {
                   const day = i + 1;
                   const dayStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-                  const info = getRentalStatus(r.id, dayStr);
+                  const info = getCalDayStatus(r.id, dayStr);
                   const isToday = dayStr === today;
                   let bg = "bg-green-100";
                   let label = "Disponible";

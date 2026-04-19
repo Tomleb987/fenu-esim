@@ -31,7 +31,7 @@ const fmtXpf = (n: number) =>
     maximumFractionDigits: 0,
   }).format(n || 0);
 
-const fmtDate = (s: string) => (s ? new Date(s).toLocaleDateString("fr-FR") : "-");
+const fmtDate = (s: string) => { if (!s) return "-"; const [y,m,d] = s.split("-"); return new Date(parseInt(y), parseInt(m)-1, parseInt(d)).toLocaleDateString("fr-FR"); };
 
 const today = () => {
   const now = new Date();

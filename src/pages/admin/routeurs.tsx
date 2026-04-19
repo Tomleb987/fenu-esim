@@ -170,6 +170,9 @@ interface Rental {
   order_id: string;
   stripe_payment_intent?: string | null;
   actual_return?: string | null;
+  signature_status?: string;
+  signed_name?: string;
+  signed_at?: string;
   esim_package_name?: string;
   routers?: { model: string; serial_number: string };
   orders?: { package_name: string; airalo_order_id: string };
@@ -272,7 +275,7 @@ export default function AdminRouteurs() {
       supabase.from("routers").select("*").order("model"),
       supabase
         .from("router_rentals")
-        .select("*, routers(model, serial_number)")
+        .select("*, routers(model, serial_number), signature_status, signed_name, signed_at")
         .order("created_at", { ascending: false })
         .limit(50),
     ]);
@@ -934,10 +937,10 @@ function RentalTable({
                     <button
                       onClick={() => onYouSign(r)}
                       disabled={sendingContract === r.id}
-                      className="text-xs px-2 py-1 rounded-lg border border-blue-200 text-blue-700 hover:bg-blue-50 disabled:opacity-50"
-                      title="Envoyer le lien de signature"
+                      className={`text-xs px-2 py-1 rounded-lg border disabled:opacity-50 ${r.signature_status === "signed" ? "border-green-200 text-green-700 hover:bg-green-50" : "border-blue-200 text-blue-700 hover:bg-blue-50"}`}
+                      title={r.signature_status === "signed" ? `Signé par ${r.signed_name}` : "Envoyer le lien de signature"}
                     >
-                      {sendingContract === r.id ? "Envoi…" : "Signature"}
+                      {sendingContract === r.id ? "Envoi…" : r.signature_status === "signed" ? "✓ Signé" : "Signature"}
                     </button>
 
                     <button

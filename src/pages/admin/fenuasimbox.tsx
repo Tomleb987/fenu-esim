@@ -15,8 +15,8 @@ import {
 
 const ADMIN_EMAIL = "admin@fenuasim.com";
 const G = "linear-gradient(135deg, #A020F0 0%, #FF4D6D 50%, #FF7F11 100%)";
-const DEPOSIT_XPF = 12000;
-const DEPOSIT_EUR = 100;
+const DEPOSIT_XPF = 8000;
+const DEPOSIT_EUR = 67;
 
 const fmtEur = (n: number) => new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", minimumFractionDigits: 0 }).format(n);
 const fmtXpf = (n: number) => `${new Intl.NumberFormat("fr-FR").format(Math.round(n))} XPF`;
@@ -163,7 +163,7 @@ export default function AdminFenuasimBox() {
 
   const rentalAmount = selectedRouter && rentalDays > 0
     ? currency === "xpf"
-      ? Math.round(selectedRouter.rental_price_per_day * 119.33 * rentalDays)
+      ? Math.round(selectedRouter.rental_price_per_day * rentalDays)
       : selectedRouter.rental_price_per_day * rentalDays
     : 0;
 
@@ -592,7 +592,7 @@ export default function AdminFenuasimBox() {
                   {rentalDays > 0 && selectedRouter && (
                     <div className="bg-orange-50 rounded-xl px-4 py-3 space-y-1">
                       <div className="flex justify-between text-xs text-gray-500">
-                        <span>Location ({rentalDays}j × {currency === "xpf" ? fmtXpf(selectedRouter.rental_price_per_day * 119.33) : fmtEur(selectedRouter.rental_price_per_day)})</span>
+                        <span>Location ({rentalDays}j × {currency === "xpf" ? fmtXpf(selectedRouter.rental_price_per_day) : fmtEur(selectedRouter.rental_price_per_day)})</span>
                         <span className="font-medium text-gray-700">{currency === "xpf" ? fmtXpf(rentalAmount) : fmtEur(rentalAmount)}</span>
                       </div>
                       <div className="flex justify-between text-xs text-gray-500">

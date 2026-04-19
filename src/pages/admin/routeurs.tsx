@@ -394,12 +394,12 @@ export default function AdminRouteurs() {
     const getRentalStatus = (routerId: string, dayStr: string) => {
       const rental = rentals.find(r => {
         if ((r as any).router_id !== routerId) return false;
-        const s = computeStatus(r);
+        const s = getRentalStatus(r);
         if (s === "cancelled") return false;
         return dayStr >= r.rental_start && dayStr <= r.rental_end;
       });
       if (!rental) return null;
-      return { status: computeStatus(rental), rental };
+      return { status: getRentalStatus(rental), rental };
     };
 
     return (

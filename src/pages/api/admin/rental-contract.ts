@@ -34,13 +34,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const fmtNum = (n: number): string => {
     const s = Math.round((n || 0) * 100) / 100;
-    return s.toLocaleString("fr-FR", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
+    const parts = s.toFixed(2).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    return parts.join(",");
   };
-
-  const fmtEur = (n: number) => fmtNum(n) + " XPF";
+  const EUR_TO_XPF = 119.33;
+  const fmtEur = (xpf: number) => {
+    const eur = Math.round((xpf / EUR_TO_XPF) * 100) / 100;
+    return fmtNum(xpf) + " XPF (" + fmtNum(eur) + " EUR)";
+  };
 
   const today = new Date().toLocaleDateString("fr-FR", {
     day: "2-digit",

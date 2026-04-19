@@ -17,6 +17,7 @@ const ADMIN_EMAIL = "admin@fenuasim.com";
 const G = "linear-gradient(135deg, #A020F0 0%, #FF4D6D 50%, #FF7F11 100%)";
 const DEPOSIT_XPF = 8000;
 const DEPOSIT_EUR = 67;
+const EUR_TO_XPF = 119.33;
 
 const fmtEur = (n: number) => new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", minimumFractionDigits: 0 }).format(n);
 const fmtXpf = (n: number) => `${new Intl.NumberFormat("fr-FR").format(Math.round(n))} XPF`;

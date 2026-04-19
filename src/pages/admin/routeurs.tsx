@@ -250,6 +250,7 @@ export default function AdminRouteurs() {
   const [showNewRental, setShowNewRental] = useState(false);
   const [showReturn, setShowReturn] = useState<Rental | null>(null);
   const [showLinkEsim, setShowLinkEsim] = useState<Rental | null>(null);
+  const [showEditRental, setShowEditRental] = useState<Rental | null>(null);
   const [sendingContract, setSendingContract] = useState<string | null>(null);
 
   useEffect(() => {
@@ -759,6 +760,15 @@ export default function AdminRouteurs() {
         />
       )}
 
+      {showEditRental && (
+        <Modal title="Modifier le dossier" onClose={() => setShowEditRental(null)}>
+          <EditRentalForm
+            rental={showEditRental}
+            onClose={() => setShowEditRental(null)}
+            onSaved={() => { setShowEditRental(null); load(); }}
+          />
+        </Modal>
+      )}
       {showReturn && (
         <ReturnModal
           rental={showReturn}
@@ -930,6 +940,13 @@ function RentalTable({
                       {sendingContract === r.id ? "Envoi…" : "Signature"}
                     </button>
 
+                    <button
+                      onClick={() => setShowEditRental(r)}
+                      className="text-xs px-2 py-1 rounded-lg border border-amber-200 text-amber-700 hover:bg-amber-50"
+                      title="Modifier le dossier"
+                    >
+                      ✏️
+                    </button>
                     {(getRentalStatus(r) === "active" || getRentalStatus(r) === "upcoming") && (
                       <button
                         onClick={() => onReturn(r)}
@@ -1411,6 +1428,82 @@ function NewRentalModal({
         </button>
       </div>
     </Modal>
+  );
+}
+
+
+// ── Modal : Modifier un dossier ───────────────────────────
+function EditRentalForm({ rental, onClose, onSaved }: { rental: Rental; onClose: () => void; onSaved: () => void }) {
+  const [form, setForm] = useState({
+    customer_name: rental.customer_name || "",
+    customer_email: rental.customer_email || "",
+    customer_phone: rental.customer_phone || "",
+    rental_start: rental.rental_start || "",
+    rental_end: rental.rental_end || "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSave = async () => {
+    setSaving(true); setError("");
+    try {
+      const days = Math.round((new Date(form.rental_end).getTime() - new Date(form.rental_start).getTime()) / 86400000);
+      const { error: err } = await supabase
+        .from("router_rentals")
+        .update({
+          customer_name: form.customer_name,
+          customer_email: form.customer_email,
+          customer_phone: form.customer_phone,
+          rental_start: form.rental_start,
+          rental_end: form.rental_end,
+          rental_days: days,
+        })
+        .eq("id", rental.id);
+      if (err) throw err;
+      onSaved();
+    } catch (e: any) {
+      setError(e.message ?? "Erreur");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <Field label="Nom client">
+        <input type="text" value={form.customer_name} onChange={e => setForm(p => ({ ...p, customer_name: e.target.value }))}
+          className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl text-gray-700" />
+      </Field>
+      <Field label="Email client">
+        <input type="email" value={form.customer_email} onChange={e => setForm(p => ({ ...p, customer_email: e.target.value }))}
+          className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl text-gray-700" />
+      </Field>
+      <Field label="Téléphone">
+        <input type="text" value={form.customer_phone} onChange={e => setForm(p => ({ ...p, customer_phone: e.target.value }))}
+          className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl text-gray-700" />
+      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Date début">
+          <input type="date" value={form.rental_start} onChange={e => setForm(p => ({ ...p, rental_start: e.target.value }))}
+            className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl text-gray-700" />
+        </Field>
+        <Field label="Date fin">
+          <input type="date" value={form.rental_end} onChange={e => setForm(p => ({ ...p, rental_end: e.target.value }))}
+            className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl text-gray-700" />
+        </Field>
+      </div>
+      {error && <p className="text-xs text-red-500">{error}</p>}
+      <div className="flex gap-2 pt-2">
+        <button onClick={handleSave} disabled={saving}
+          className="flex-1 py-2.5 rounded-xl text-white text-sm font-medium disabled:opacity-50"
+          style={{ background: "linear-gradient(135deg, #A020F0, #FF7F11)" }}>
+          {saving ? "Enregistrement…" : "Enregistrer"}
+        </button>
+        <button onClick={onClose} className="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-500 text-sm">
+          Annuler
+        </button>
+      </div>
+    </div>
   );
 }
 

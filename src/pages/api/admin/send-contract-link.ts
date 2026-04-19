@@ -43,7 +43,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })
     : "-";
   const fmtNum = (n: number) => Math.round(n * 100) / 100;
-  const fmtEur = (n: number) => fmtNum(n).toLocaleString("fr-FR", { minimumFractionDigits: 2 }) + " EUR";
+  const fmtEur = (n: number) => { const parts = Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " "); return parts + " XPF"; };
 
   // Envoyer l'email au client
   try {

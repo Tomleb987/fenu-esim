@@ -294,7 +294,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     drawSectionTitle("ARTICLE 5 - RESPONSABILITES ET DOMMAGES");
 
     drawParagraph(
-      "En cas de perte, vol ou destruction totale du routeur, le Locataire sera redevable d'une indemnite de 12 000 XPF (100 EUR) correspondant a la valeur de remplacement du materiel. En cas de deterioration partielle, le montant retenu sur la caution sera evalue au cout reel de reparation, dans la limite de 12 000 XPF (100 EUR). Le Bailleur ne pourra etre tenu responsable des pertes de donnees ou interruptions de service liees a l'utilisation du routeur."
+      "En cas de perte, vol ou destruction totale du routeur, le Locataire sera redevable d'une indemnite egale a la caution versee soit 8 000 XPF (67 EUR) correspondant a la valeur de remplacement du materiel. En cas de deterioration partielle, le montant retenu sur la caution sera evalue au cout reel de reparation, dans la limite de la caution versee soit 8 000 XPF (67 EUR). Le Bailleur ne pourra etre tenu responsable des pertes de donnees ou interruptions de service liees a l'utilisation du routeur."
     );
 
     // ── Restitution ────────────────────────────────────────

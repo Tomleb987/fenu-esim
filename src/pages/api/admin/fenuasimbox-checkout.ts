@@ -85,7 +85,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         currency: useCurrency,
         product_data: {
           name: `eSIM — ${pkg.name}`,
-          description: `${pkg.data_amount}${pkg.data_unit} · ${pkg.validity_days || pkg.validity} jours`,
+          description: `${pkg.data_amount || ""}${pkg.data_unit || "Go"} · ${pkg.validity_days || parseInt(pkg.validity) || ""} jours`,
         },
         unit_amount: esimAmountCents,
       },

@@ -592,7 +592,7 @@ export default function AdminFenuasimBox() {
                   {rentalDays > 0 && selectedRouter && (
                     <div className="bg-orange-50 rounded-xl px-4 py-3 space-y-1">
                       <div className="flex justify-between text-xs text-gray-500">
-                        <span>Location ({rentalDays}j × {currency === "xpf" ? fmtXpf(selectedRouter.rental_price_per_day) : fmtEur(selectedRouter.rental_price_per_day)})</span>
+                        <span>Location ({rentalDays}j × {currency === "xpf" ? fmtXpf(selectedRouter.rental_price_per_day) : fmtEur(Math.round((selectedRouter.rental_price_per_day / EUR_TO_XPF) * 100) / 100)})</span>
                         <span className="font-medium text-gray-700">{currency === "xpf" ? fmtXpf(rentalAmount) : fmtEur(rentalAmount)}</span>
                       </div>
                       <div className="flex justify-between text-xs text-gray-500">

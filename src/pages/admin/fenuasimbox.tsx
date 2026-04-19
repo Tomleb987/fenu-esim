@@ -165,7 +165,7 @@ export default function AdminFenuasimBox() {
   const rentalAmount = selectedRouter && rentalDays > 0
     ? currency === "xpf"
       ? Math.round(selectedRouter.rental_price_per_day * rentalDays)
-      : selectedRouter.rental_price_per_day * rentalDays
+      : Math.round((selectedRouter.rental_price_per_day / EUR_TO_XPF) * rentalDays)
     : 0;
 
   const esimPrice = selectedPkg

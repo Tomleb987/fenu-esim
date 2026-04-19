@@ -243,7 +243,8 @@ export default function AdminRouteurs() {
   const [routers, setRouters] = useState<RouterItem[]>([]);
   const [rentals, setRentals] = useState<Rental[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"rentals" | "stock">("rentals");
+  const [tab, setTab] = useState<"rentals" | "stock" | "calendrier">("rentals");
+  const [calMonth, setCalMonth] = useState(() => { const d = new Date(); return { year: d.getFullYear(), month: d.getMonth() }; });
 
   const [showAddRouter, setShowAddRouter] = useState(false);
   const [showNewRental, setShowNewRental] = useState(false);
@@ -465,7 +466,7 @@ export default function AdminRouteurs() {
           </div>
 
           <div className="flex gap-1 bg-white border border-gray-200 rounded-xl p-1 shadow-sm w-fit mb-6">
-            {[{ key: "rentals", label: "Locations" }, { key: "stock", label: "Stock routeurs" }].map((t) => (
+            {[{ key: "rentals", label: "Locations" }, { key: "stock", label: "Stock routeurs" }, { key: "calendrier", label: "📅 Calendrier" }].map((t) => (
               <button
                 key={t.key}
                 onClick={() => setTab(t.key as "rentals" | "stock")}
@@ -543,6 +544,7 @@ export default function AdminRouteurs() {
             </div>
           )}
 
+          {tab === "calendrier" && renderCalendrier()}
           {tab === "stock" && (
             <div>
               <div className="flex justify-end mb-4">

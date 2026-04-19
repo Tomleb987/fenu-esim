@@ -40,7 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   };
 
-  const fmtEur = (n: number) => fmtNum(n) + " EUR";
+  const fmtEur = (n: number) => fmtNum(n) + " XPF";
 
   const today = new Date().toLocaleDateString("fr-FR", {
     day: "2-digit",

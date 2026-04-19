@@ -29,7 +29,7 @@ const fmtDate = (d: string) => d
 
 const fmtNum = (n: number) => (Math.round(n * 100) / 100)
   .toLocaleString("fr-FR", { minimumFractionDigits: 2 });
-const fmtEur = (n: number) => fmtNum(n) + " EUR";
+const fmtEur = (n: number) => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " XPF";
 
 export default function SignerContrat() {
   const router = useRouter();
@@ -51,8 +51,8 @@ export default function SignerContrat() {
       .then(data => {
         if (data.error) setError(data.error);
         else {
-          setRental(data);
-          if (data.signature_status === "signed") setSigned(true);
+          setRental(data.rental);
+          if (data.rental.signature_status === "signed") setSigned(true);
         }
       })
       .catch(() => setError("Impossible de charger le contrat"))
@@ -216,7 +216,7 @@ export default function SignerContrat() {
                   <div className="border-l-2 border-orange-200 pl-4">
                     <p className="font-semibold text-gray-700 text-xs uppercase tracking-wide mb-1">Art. 5 — Responsabilités</p>
                     <p>
-                      En cas de <strong>perte, vol ou destruction totale</strong>, le Locataire sera redevable de <strong>100 EUR</strong> (valeur de remplacement). En cas de dégradation partielle, le montant retenu sera le coût réel de réparation, dans la limite de 100 EUR.
+                      En cas de <strong>perte, vol ou destruction totale</strong>, le Locataire sera redevable de <strong>8 000 XPF (67 EUR)</strong> correspondant à la caution versée. En cas de dégradation partielle, le montant retenu sera le coût réel de réparation, dans la limite de la caution versée.
                     </p>
                   </div>
 

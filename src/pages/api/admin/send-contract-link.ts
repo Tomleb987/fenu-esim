@@ -40,7 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const router = (rental as any).routers;
   const fmtDate = (d: string) => d
-    ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })
+    ? (() => { const [y,m,day] = d.split("-"); return new Date(parseInt(y), parseInt(m)-1, parseInt(day)).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" }); })()
     : "-";
   const fmtNum = (n: number) => Math.round(n * 100) / 100;
   const fmtEur = (n: number) => { const parts = Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " "); return parts + " XPF"; };

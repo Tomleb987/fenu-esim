@@ -24,7 +24,7 @@ interface RentalInfo {
 }
 
 const fmtDate = (d: string) => d
-  ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })
+  ? (() => { const [y,m,day] = d.split("-"); return new Date(parseInt(y), parseInt(m)-1, parseInt(day)).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" }); })()
   : "-";
 
 const fmtNum = (n: number) => (Math.round(n * 100) / 100)

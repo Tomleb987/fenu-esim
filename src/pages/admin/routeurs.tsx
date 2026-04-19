@@ -801,7 +801,9 @@ function RentalTable({
                           ? "Détenue"
                           : r.deposit_status === "refunded"
                             ? "Restituée"
-                            : "Retenue"
+                            : r.deposit_status === "waived"
+                              ? "Offerte"
+                              : "Retenue"
                     }
                     color={
                       r.deposit_status === "pending"
@@ -1013,7 +1015,7 @@ function NewRentalModal({
           rental_amount: rentalCharged,
           rental_offered: form.offer_rental,
           deposit_amount: depositCharged,
-          deposit_status: depositCharged > 0 ? "pending" : "refunded",
+          deposit_status: depositCharged > 0 ? "pending" : "waived",
           payment_status: totalCharged > 0 ? "pending" : "paid",
           status: computedStatus,
           notes: buildNotesWithMeta(form.notes, commercialMeta),

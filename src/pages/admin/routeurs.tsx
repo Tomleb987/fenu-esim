@@ -384,6 +384,74 @@ export default function AdminRouteurs() {
     return !hasBlockingRental;
   }).length;
 
+  const renderCalendrier = () => {
+    const { year, month } = calMonth;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const MONTHS_FR = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
+    const today = new Date().toISOString().slice(0, 10);
+
+    const getRentalStatus = (routerId: string, dayStr: string) => {
+      const rental = rentals.find(r => {
+        if ((r as any).router_id !== routerId) return false;
+        const s = computeStatus(r);
+        if (s === "cancelled") return false;
+        return dayStr >= r.rental_start && dayStr <= r.rental_end;
+      });
+      if (!rental) return null;
+      return { status: computeStatus(rental), rental };
+    };
+
+    return (
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
+          <button onClick={() => setCalMonth(p => { const d = new Date(p.year, p.month - 1); return { year: d.getFullYear(), month: d.getMonth() }; })}
+            className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 text-lg">‹</button>
+          <p className="text-sm font-bold text-gray-800">{MONTHS_FR[month]} {year}</p>
+          <button onClick={() => setCalMonth(p => { const d = new Date(p.year, p.month + 1); return { year: d.getFullYear(), month: d.getMonth() }; })}
+            className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 text-lg">›</button>
+        </div>
+        <div className="p-5 space-y-6">
+          {routers.map(r => (
+            <div key={r.id}>
+              <p className="text-xs font-bold text-gray-600 mb-2">{r.model} <span className="text-gray-400 font-normal">— {r.serial_number}</span></p>
+              <div className="flex gap-0.5">
+                {Array.from({ length: daysInMonth }, (_, i) => {
+                  const day = i + 1;
+                  const dayStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+                  const info = getRentalStatus(r.id, dayStr);
+                  const isToday = dayStr === today;
+                  let bg = "bg-green-100";
+                  let label = "Disponible";
+                  if (info) {
+                    if (info.status === "active") { bg = "bg-purple-500"; label = info.rental.customer_name || "En location"; }
+                    else if (info.status === "upcoming") { bg = "bg-blue-300"; label = info.rental.customer_name || "Réservé"; }
+                    else { bg = "bg-gray-200"; label = "Terminé"; }
+                  }
+                  return (
+                    <div key={day} title={`${dayStr} — ${label}`}
+                      className={`flex-1 h-8 rounded-sm ${bg} ${isToday ? "ring-2 ring-orange-400" : ""} hover:opacity-70 cursor-default transition-opacity`} />
+                  );
+                })}
+              </div>
+              <div className="flex gap-0.5 mt-0.5">
+                {Array.from({ length: daysInMonth }, (_, i) => (
+                  <div key={i} className="flex-1 text-center text-gray-300" style={{ fontSize: "9px" }}>{i + 1}</div>
+                ))}
+              </div>
+            </div>
+          ))}
+          <div className="flex items-center gap-4 pt-3 border-t border-gray-50">
+            <span className="flex items-center gap-1.5 text-xs text-gray-500"><span className="w-3 h-3 rounded-sm bg-green-100 inline-block" />Disponible</span>
+            <span className="flex items-center gap-1.5 text-xs text-gray-500"><span className="w-3 h-3 rounded-sm bg-blue-300 inline-block" />Réservé</span>
+            <span className="flex items-center gap-1.5 text-xs text-gray-500"><span className="w-3 h-3 rounded-sm bg-purple-500 inline-block" />En location</span>
+            <span className="flex items-center gap-1.5 text-xs text-gray-500"><span className="w-3 h-3 rounded-sm bg-orange-400 inline-block ring-1 ring-orange-400" />Aujourd&apos;hui</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+
   return (
     <>
       <Head>

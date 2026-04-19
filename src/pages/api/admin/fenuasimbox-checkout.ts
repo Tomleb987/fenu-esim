@@ -25,8 +25,8 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-04-30.basil",
 });
 
-const DEPOSIT_XPF = 12000;
-const DEPOSIT_EUR = 100;
+const DEPOSIT_XPF = 8000;
+const DEPOSIT_EUR = 67;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });

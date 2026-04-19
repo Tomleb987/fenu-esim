@@ -17,7 +17,7 @@ const ADMIN_EMAILS = ["admin@fenuasim.com", "hello@fenuasim.com", "tomleb987@gma
 const isAdmin = (email?: string | null) =>
   !!email && (ADMIN_EMAILS.includes(email) || email.endsWith("@fenuasim.com"));
 const G = "linear-gradient(135deg, #A020F0 0%, #FF4D6D 50%, #FF7F11 100%)";
-const DAILY_RATE_XPF = 500;
+const DAILY_RATE_XPF = 596;
 const WEEK_RATE_XPF = 3000;
 const FIXED_DEPOSIT_XPF = 8000;
 const COMMERCIAL_META_PREFIX = "[COMMERCIAL_META]";

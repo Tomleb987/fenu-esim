@@ -37,10 +37,14 @@ export default async function handler(
     }
 
     // Prix toujours lu depuis la base
+    // Airalo suffixe les IDs topup avec "-topup" (ex: change-plus-7days-10gb-topup)
+    // On normalise pour matcher l'airalo_id stocké en base
+    const normalizedPackageId = packageId.replace(/-topup$/, '');
+
     const { data: pkg, error: pkgError } = await supabase
       .from('airalo_packages')
       .select('airalo_id, name, final_price_eur, final_price_usd, final_price_xpf')
-      .eq('airalo_id', packageId)
+      .eq('airalo_id', normalizedPackageId)
       .single();
 
     if (pkgError || !pkg) {

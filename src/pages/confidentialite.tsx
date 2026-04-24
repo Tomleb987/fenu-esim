@@ -1,148 +1,233 @@
 export default function Confidentialite() {
   return (
     <div className="max-w-4xl mx-auto py-16 px-4">
-      <h1 className="text-3xl font-bold mb-8 text-center">Politique de Confidentialité</h1>
-      
+      <h1 className="text-3xl font-bold mb-8 text-center">
+        Politique de Confidentialité
+      </h1>
+
       <div className="bg-white rounded-xl shadow p-8 space-y-8 border border-purple-100">
         <section>
           <h2 className="text-xl font-semibold text-purple-700 mb-4">1. Introduction</h2>
           <p className="text-gray-700">
-            Cette politique de confidentialité (ci-après, "Politique") est destinée à vous informer sur la façon dont vos données personnelles sont traitées par FENUA SIM (ci-après, "FENUA SIM", "Nous", ou "Notre") et précise les informations (y compris les informations personnelles spécifiées ci-dessous) qui vous concernent ou que vous nous fournissez (ci-après, "Données Personnelles") qui seront collectées et traitées par FENUA SIM et/ou un prestataire de services tiers lorsque vous nous contactez par le biais de n'importe quel canal, tel que notre site web, ou lorsque vous vous abonnez à nos services. Nous sommes légalement tenus de vous fournir ces informations, y compris des informations sur vos droits, conformément au Règlement général sur la protection des données (UE) 2016/679 (ci-après, "RGPD").
-          </p>
-        </section>
-
-        <section>
-          <h2 className="text-xl font-semibold text-purple-700 mb-4">2. FENUA SIM en tant que responsable du traitement des données</h2>
-          <p className="text-gray-700">
-            En vertu de la présente politique, le responsable du traitement de vos données à caractère personnel est FENUA SIM, situé en Polynésie française. FENUA SIM est responsable de vos données à caractère personnel.
+            La présente politique de confidentialité a pour objet d’informer les utilisateurs du site FENUA SIM sur la manière dont leurs données personnelles sont collectées, utilisées et protégées.
+            Elle s’applique à l’utilisation du site, à la création d’un compte client, à l’achat de forfaits eSIM, aux demandes adressées au support client et, plus généralement, à toute interaction avec FENUA SIM.
           </p>
           <p className="text-gray-700 mt-4">
-            FENUA SIM s'engage à respecter vos droits fondamentaux liés à la protection de vos données personnelles, et cette politique vise à vous informer sur la manière dont nous traitons ces données.
+            FENUA SIM traite les données personnelles conformément au Règlement général sur la protection des données UE 2016/679, dit RGPD, et à la réglementation applicable en matière de protection des données.
           </p>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold text-purple-700 mb-4">3. Types de données à caractère personnel que nous traitons</h2>
-          
-          <h3 className="text-lg font-semibold text-purple-600 mb-2">Utilisation du site web et données relatives aux appareils</h3>
-          <p className="text-gray-700 mb-4">
-            Lorsque vous visitez notre site web :
+          <h2 className="text-xl font-semibold text-purple-700 mb-4">
+            2. Responsable du traitement
+          </h2>
+          <p className="text-gray-700">
+            Le responsable du traitement est <strong>FENUA SIM SASU</strong>, société française immatriculée au <strong>RCS de Paris sous le numéro 943 713 875</strong>, dont le siège social est situé au <strong>58 rue Monceau, 75008 Paris, France</strong>.
           </p>
+          <p className="text-gray-700 mt-4">
+            FENUA SIM exploite un service de distribution de forfaits eSIM prépayés pour voyageurs. Son support client est assuré en français, avec une organisation opérationnelle notamment basée en Polynésie française.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-xl font-semibold text-purple-700 mb-4">
+            3. Données personnelles collectées
+          </h2>
+
+          <h3 className="text-lg font-semibold text-purple-600 mb-2">
+            Données liées à l’utilisation du site
+          </h3>
           <ul className="list-disc list-inside text-gray-700 space-y-2 mb-4">
-            <li>Vos visites et interactions avec notre site web, y compris les pages que vous visitez, la date et l'heure de vos visites et vos clics de souris</li>
-            <li>Données relatives à l'appareil, y compris l'adresse IP, la géolocalisation, le type d'appareil et la langue, le type de navigateur et d'autres informations pertinentes</li>
-            <li>Tout site web que vous visitez via un lien sur notre site web</li>
+            <li>Pages consultées, date et heure de navigation</li>
+            <li>Adresse IP, type d’appareil, navigateur, langue et données techniques nécessaires au fonctionnement du site</li>
+            <li>Données de connexion à l’espace client, lorsque celui-ci est utilisé</li>
           </ul>
 
-          <h3 className="text-lg font-semibold text-purple-600 mb-2">Données des clients</h3>
-          <p className="text-gray-700">
-            Lorsque vous achetez une eSIM ou un abonnement internet :
-          </p>
+          <h3 className="text-lg font-semibold text-purple-600 mb-2">
+            Données liées aux commandes
+          </h3>
           <ul className="list-disc list-inside text-gray-700 space-y-2">
-            <li>Nom complet, pays de résidence, géolocalisation actuelle, adresse résidentielle</li>
-            <li>Numéro de téléphone, informations de paiement, adresse électronique</li>
-            <li>Type d'appareil (marque et modèle)</li>
-            <li>Copie du passeport, du permis de conduire ou d'un autre document d'identification (si nécessaire)</li>
+            <li>Nom, prénom et adresse email</li>
+            <li>Pays de destination et forfait eSIM sélectionné</li>
+            <li>Informations nécessaires au traitement de la commande et à l’envoi de l’eSIM</li>
+            <li>Données de paiement traitées de manière sécurisée par notre prestataire de paiement Stripe</li>
+            <li>Échanges avec le support client en cas de demande d’assistance</li>
           </ul>
-        </section>
 
-        <section>
-          <h2 className="text-xl font-semibold text-purple-700 mb-4">4. Source de vos données personnelles</h2>
-          <p className="text-gray-700">
-            Pendant toute période d'engagement contractuel entre vous et nous et lorsque vous visitez notre site web, nous collectons vos données personnelles : (1) directement fournies par vous, ou (2) indirectement fournies par des tiers (par exemple, si vous avez souscrit à nos services par l'intermédiaire de parties affiliées ou d'agences de voyage).
+          <p className="text-gray-700 mt-4">
+            FENUA SIM ne collecte pas de copie de passeport, permis de conduire ou document d’identité, sauf obligation légale ou demande exceptionnelle strictement nécessaire à la fourniture du service.
           </p>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold text-purple-700 mb-4">5. Finalités du traitement</h2>
+          <h2 className="text-xl font-semibold text-purple-700 mb-4">
+            4. Finalités du traitement
+          </h2>
+          <p className="text-gray-700 mb-4">
+            Les données personnelles sont collectées et traitées pour les finalités suivantes :
+          </p>
           <ul className="list-disc list-inside text-gray-700 space-y-2">
-            <li>Respect d'une obligation légale</li>
-            <li>Exécution du contrat</li>
-            <li>Intérêt légitime de FENUA SIM</li>
+            <li>Création et gestion de l’espace client</li>
+            <li>Traitement des commandes de forfaits eSIM</li>
+            <li>Envoi des informations d’activation et de suivi de commande</li>
+            <li>Gestion du support client et des demandes d’assistance</li>
+            <li>Sécurisation du site et prévention des fraudes</li>
+            <li>Respect des obligations légales, fiscales et comptables</li>
+            <li>Amélioration du service et mesure d’audience non intrusive</li>
           </ul>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold text-purple-700 mb-4">6. Destinataires des données</h2>
+          <h2 className="text-xl font-semibold text-purple-700 mb-4">
+            5. Bases légales du traitement
+          </h2>
           <ul className="list-disc list-inside text-gray-700 space-y-2">
-            <li>Les entités internes de FENUA SIM</li>
-            <li>Fournisseurs de services de télécommunications</li>
-            <li>Autorités réglementaires et forces de l'ordre</li>
-            <li>Prestataires de services tiers</li>
+            <li>L’exécution du contrat lorsque vous achetez un forfait eSIM ou utilisez votre espace client</li>
+            <li>Le respect d’obligations légales, notamment fiscales, comptables ou réglementaires</li>
+            <li>L’intérêt légitime de FENUA SIM pour sécuriser le site, améliorer le service et répondre aux demandes clients</li>
+            <li>Votre consentement lorsque celui-ci est requis</li>
           </ul>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold text-purple-700 mb-4">7. Vos droits</h2>
+          <h2 className="text-xl font-semibold text-purple-700 mb-4">
+            6. Destinataires des données
+          </h2>
+          <p className="text-gray-700 mb-4">
+            Les données personnelles peuvent être transmises uniquement aux destinataires nécessaires à la fourniture du service :
+          </p>
           <ul className="list-disc list-inside text-gray-700 space-y-2">
-            <li>Droit d'accès</li>
-            <li>Droit d'opposition</li>
+            <li>Prestataires techniques d’hébergement, de base de données et d’authentification</li>
+            <li>Prestataire de paiement sécurisé Stripe</li>
+            <li>Fournisseurs et partenaires eSIM nécessaires à l’activation du forfait</li>
+            <li>Prestataires de support client, le cas échéant</li>
+            <li>Autorités administratives, judiciaires ou fiscales lorsque la loi l’exige</li>
+          </ul>
+          <p className="text-gray-700 mt-4">
+            FENUA SIM ne revend pas les données personnelles de ses clients à des tiers.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-xl font-semibold text-purple-700 mb-4">
+            7. Transferts hors Union européenne
+          </h2>
+          <p className="text-gray-700">
+            Certains prestataires techniques ou partenaires eSIM peuvent être situés en dehors de l’Union européenne.
+            Dans ce cas, FENUA SIM veille à ce que les transferts soient encadrés par des garanties appropriées conformément au RGPD, notamment des clauses contractuelles types ou tout mécanisme équivalent reconnu par la réglementation applicable.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-xl font-semibold text-purple-700 mb-4">
+            8. Durée de conservation
+          </h2>
+          <p className="text-gray-700">
+            Les données personnelles sont conservées pendant la durée strictement nécessaire aux finalités pour lesquelles elles ont été collectées.
+            Les données liées aux commandes sont conservées pendant la durée nécessaire à la gestion de la relation commerciale, puis archivées conformément aux obligations légales, fiscales et comptables applicables.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-xl font-semibold text-purple-700 mb-4">
+            9. Vos droits
+          </h2>
+          <p className="text-gray-700 mb-4">
+            Conformément au RGPD, vous disposez des droits suivants :
+          </p>
+          <ul className="list-disc list-inside text-gray-700 space-y-2">
+            <li>Droit d’accès à vos données</li>
             <li>Droit de rectification</li>
-            <li>Droit à l'effacement</li>
+            <li>Droit d’effacement</li>
+            <li>Droit d’opposition</li>
             <li>Droit à la limitation du traitement</li>
             <li>Droit à la portabilité des données</li>
-            <li>Droit de déposer une plainte</li>
+            <li>Droit de retirer votre consentement lorsque le traitement repose sur celui-ci</li>
+            <li>Droit d’introduire une réclamation auprès de la CNIL</li>
           </ul>
-        </section>
-
-        <section>
-          <h2 className="text-xl font-semibold text-purple-700 mb-4">8. Durée de conservation</h2>
-          <p className="text-gray-700">
-            En règle générale, nous conservons vos données à caractère personnel conformément aux obligations qui nous incombent en vertu du droit applicable et/ou aussi longtemps que nous en avons besoin dans le cadre de nos obligations contractuelles à votre égard, plus une période raisonnable.
+          <p className="text-gray-700 mt-4">
+            Pour exercer vos droits, vous pouvez nous contacter à l’adresse suivante :
+            <strong> contact@fenuasim.com</strong>.
           </p>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold text-purple-700 mb-4">9. Protection des mineurs</h2>
+          <h2 className="text-xl font-semibold text-purple-700 mb-4">
+            10. Protection des mineurs
+          </h2>
           <p className="text-gray-700">
-            Les services de FENUA SIM sont interdits aux enfants (personnes de moins de 18 ans). À notre connaissance, nous ne collectons pas et n'autorisons pas de tiers à collecter les données personnelles d'individus de moins de 18 ans.
+            Les services FENUA SIM sont destinés aux personnes majeures. Nous ne collectons pas volontairement de données personnelles concernant des mineurs de moins de 18 ans.
           </p>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold text-purple-700 mb-4">10. Contact</h2>
+          <h2 className="text-xl font-semibold text-purple-700 mb-4">
+            11. Sécurité des données
+          </h2>
           <p className="text-gray-700">
-            Pour toute question concernant la présente politique ou pour exercer vos droits en matière de protection des données, veuillez nous contacter à l'adresse suivante : contact@fenuasim.com
+            FENUA SIM met en œuvre des mesures techniques et organisationnelles raisonnables afin de protéger les données personnelles contre l’accès non autorisé, la perte, l’altération ou la divulgation.
+            Les paiements sont traités par un prestataire spécialisé et sécurisé ; FENUA SIM ne conserve pas les données complètes de carte bancaire.
           </p>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold text-purple-700 mb-4">11. Mises à jour</h2>
+          <h2 className="text-xl font-semibold text-purple-700 mb-4">
+            12. Utilisation des cookies
+          </h2>
+          <p className="text-gray-700 mb-4">
+            Le site FENUA SIM utilise uniquement des cookies essentiels au bon fonctionnement du site, de l’espace client et des services associés.
+          </p>
+
+          <h3 className="text-lg font-semibold text-purple-600 mb-2">
+            12.1 Cookies essentiels
+          </h3>
+          <ul className="list-disc list-inside text-gray-700 space-y-2 mb-4">
+            <li>Sécurisation des connexions à l’espace client</li>
+            <li>Maintien de la session utilisateur</li>
+            <li>Fonctionnement du panier, du paiement et des commandes</li>
+          </ul>
+
+          <h3 className="text-lg font-semibold text-purple-600 mb-2">
+            12.2 Mesure d’audience respectueuse de la vie privée
+          </h3>
+          <p className="text-gray-700 mb-4">
+            FENUA SIM peut utiliser une solution de mesure d’audience respectueuse de la vie privée, sans cookies publicitaires et sans identification directe des utilisateurs.
+          </p>
+
+          <h3 className="text-lg font-semibold text-purple-600 mb-2">
+            12.3 Absence de cookies publicitaires
+          </h3>
           <p className="text-gray-700">
-            Nous nous efforçons de maintenir la présente politique à jour. Nous la révisons régulièrement et pouvons la modifier ou la mettre à jour de temps à autre si nécessaire. Toute mise à jour de cette politique sera publiée dans cette section du site web.
+            À ce jour, FENUA SIM n’utilise pas de cookies publicitaires ou de traceurs non essentiels nécessitant un consentement préalable.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-xl font-semibold text-purple-700 mb-4">
+            13. Contact
+          </h2>
+          <p className="text-gray-700">
+            Pour toute question concernant la présente politique de confidentialité ou l’exercice de vos droits, vous pouvez contacter FENUA SIM à l’adresse suivante :
+            <strong> contact@fenuasim.com</strong>.
           </p>
           <p className="text-gray-700 mt-4">
-            La présente politique de confidentialité a été modifiée pour la dernière fois le 1er juillet 2024.
+            Adresse postale : FENUA SIM SASU, 58 rue Monceau, 75008 Paris, France.
           </p>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold text-purple-700 mb-4">12. Utilisation des cookies</h2>
-          <p className="text-gray-700 mb-4">
-            Le site FENUA SIM utilise uniquement des cookies <strong>essentiels</strong> au bon fonctionnement du site et de l’espace client.
-          </p>
-
-          <h3 className="text-lg font-semibold text-purple-600 mb-2">12.1 Cookies essentiels</h3>
-          <p className="text-gray-700 mb-4">
-            Ces cookies sont nécessaires pour :
-          </p>
-          <ul className="list-disc list-inside text-gray-700 space-y-2 mb-4">
-            <li>Sécuriser les connexions à l’espace client (via Supabase)</li>
-            <li>Garantir les fonctionnalités de base du site</li>
-          </ul>
-
-          <h3 className="text-lg font-semibold text-purple-600 mb-2">12.2 Analyse de trafic sans cookies</h3>
-          <p className="text-gray-700 mb-4">
-            Nous utilisons <strong>Plausible Analytics</strong>, une solution de mesure d’audience respectueuse de la vie privée, qui ne repose sur aucun cookie et ne collecte aucune donnée personnelle identifiable.
-          </p>
-
-          <h3 className="text-lg font-semibold text-purple-600 mb-2">12.3 Consentement</h3>
+          <h2 className="text-xl font-semibold text-purple-700 mb-4">
+            14. Mises à jour
+          </h2>
           <p className="text-gray-700">
-            En l’absence de cookies non essentiels ou à des fins publicitaires, aucun bandeau de consentement n’est requis conformément à la réglementation en vigueur.
+            La présente politique peut être modifiée afin de tenir compte des évolutions légales, techniques ou opérationnelles du service FENUA SIM.
+            Toute mise à jour sera publiée sur cette page.
+          </p>
+          <p className="text-gray-700 mt-4">
+            Dernière mise à jour : 23 avril 2026.
           </p>
         </section>
       </div>
     </div>
-  )
+  );
 }
-

@@ -38,14 +38,6 @@ const STATS = [
   { value: "7j/7", label: "disponibilité" },
 ];
 
-const COMPANY_INFOS = [
-  { label: "Raison sociale", value: "FENUA SIM SASU" },
-  { label: "Adresse", value: "58 rue Monceau, 75008 Paris, France" },
-  { label: "Immatriculation", value: "RCS Paris — SIREN : 943 713 875" },
-  { label: "Activité", value: "Distribution de forfaits eSIM prépayés pour voyageurs" },
-  { label: "Contact", value: "support@fenuasim.com" },
-];
-
 export default function AboutPage() {
   return (
     <div className="min-h-screen bg-white">
@@ -66,56 +58,96 @@ export default function AboutPage() {
                 Rester proche.
               </span>
             </h1>
-            <p className="text-xl text-gray-400">
+            <p className="text-xl text-gray-400 leading-relaxed max-w-lg">
               <strong className="text-white">Fenua</strong> — en tahitien, c'est "le pays".
-              FENUA SIM est née de cette idée : rester connecté où qu'on soit.
+              FENUA SIM est née de cette idée : rester connecté où qu'on soit,
+              sans jamais perdre le lien avec ceux qu'on aime.
             </p>
+          </div>
+        </div>
+      </section>
+
+      {/* STATS */}
+      <section className="max-w-5xl mx-auto px-6 -mt-1">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {STATS.map((s) => (
+            <div key={s.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 text-center">
+              <div className="text-3xl font-extrabold text-gray-900 mb-1">{s.value}</div>
+              <div className="text-xs text-gray-500 uppercase">{s.label}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* FONDATEUR */}
+      <section className="max-w-5xl mx-auto px-6 py-20">
+        <div className="grid lg:grid-cols-2 gap-12 items-center">
+
+          <div className="relative">
+            <div className="rounded-3xl overflow-hidden border shadow-lg">
+              <img
+                src="/thomas-fondateur.png"
+                alt="Thomas, fondateur"
+                className="w-full h-full object-cover"
+              />
+            </div>
+
+            <div className="absolute -bottom-4 -right-4 bg-white rounded-2xl shadow px-4 py-3 flex items-center gap-2">
+              <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+              <span className="text-sm font-bold">Support actif</span>
+            </div>
+          </div>
+
+          <div>
+            <span className="text-xs font-bold text-purple-600 uppercase">Le mot du fondateur</span>
+            <h2 className="mt-3 text-3xl font-extrabold mb-6">
+              Une conviction simple,<br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-orange-500">
+                née du Pacifique.
+              </span>
+            </h2>
+
+            <p className="text-gray-600 mb-4">
+              Je suis <strong>Thomas</strong>, fondateur de FENUA SIM.
+              À chaque départ à l’étranger, la même galère : rester connecté simplement.
+            </p>
+
+            <p className="text-gray-600 mb-4">
+              FENUA SIM est née pour répondre à ce besoin, avec une approche plus humaine,
+              plus simple, et pensée pour les voyageurs d’outre-mer.
+            </p>
+
+            <p className="text-gray-400 italic">— Thomas</p>
           </div>
         </div>
       </section>
 
       {/* ENTREPRISE */}
-      <section className="bg-gray-50 border-y border-gray-100">
+      <section className="bg-gray-50 border-y">
         <div className="max-w-5xl mx-auto px-6 py-20">
 
           <div className="text-center mb-12">
-            <span className="text-xs font-bold text-purple-600 uppercase">
-              Transparence
-            </span>
-            <h2 className="mt-3 text-3xl font-extrabold text-gray-900">
-              Une société française, un service clair
+            <span className="text-xs text-purple-600 uppercase">Transparence</span>
+            <h2 className="text-3xl font-extrabold mt-3">
+              Une structure claire, un service maîtrisé
             </h2>
-            <p className="mt-4 text-gray-500 max-w-2xl mx-auto">
-              FENUA SIM SASU — RCS Paris 943 713 875 — est une société spécialisée
-              dans la distribution de solutions eSIM pour voyageurs.
-            </p>
           </div>
 
           <div className="grid lg:grid-cols-2 gap-6">
 
-            {/* INFOS */}
-            <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm">
-              <h3 className="text-xl font-extrabold mb-5">Informations</h3>
-              <div className="space-y-4">
-                {COMPANY_INFOS.map((item) => (
-                  <div key={item.label}>
-                    <p className="text-xs text-gray-400 uppercase">{item.label}</p>
-                    <p className="text-sm font-semibold text-gray-800">{item.value}</p>
-                  </div>
-                ))}
-              </div>
+            <div className="bg-white rounded-3xl p-8 border shadow-sm">
+              <h3 className="font-extrabold mb-4">Informations</h3>
+              <p>FENUA SIM SASU</p>
+              <p>RCS Paris 943 713 875</p>
+              <p>58 rue Monceau, 75008 Paris</p>
+              <p>support@fenuasim.com</p>
             </div>
 
-            {/* ROLE */}
-            <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm">
-              <h3 className="text-xl font-extrabold mb-5">Notre rôle</h3>
-              <p className="text-gray-600 text-sm leading-relaxed">
-                FENUA SIM agit en tant que <strong>distributeur de forfaits eSIM</strong>.
-                Les connexions mobiles sont assurées via des opérateurs partenaires internationaux.
-              </p>
-              <p className="text-gray-600 text-sm mt-4">
-                Nous simplifions l’accès à Internet à l’étranger avec une activation rapide,
-                un paiement sécurisé et un support en français.
+            <div className="bg-white rounded-3xl p-8 border shadow-sm">
+              <h3 className="font-extrabold mb-4">Notre rôle</h3>
+              <p className="text-gray-600">
+                Nous distribuons des forfaits eSIM via des opérateurs partenaires internationaux.
+                Notre mission est de simplifier l’accès à Internet à l’étranger.
               </p>
             </div>
 
@@ -123,21 +155,45 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* CONFORMITÉ */}
-      <section className="bg-gray-50 border-t border-gray-100">
-        <div className="max-w-5xl mx-auto px-6 py-14">
-          <h3 className="font-extrabold text-gray-900 mb-2">
-            🔒 Conformité & protection des données
-          </h3>
-          <p className="text-gray-500 text-sm max-w-2xl">
-            <strong>FENUA SIM SASU — RCS Paris 943 713 875</strong> respecte le RGPD.
-            Les données sont utilisées uniquement pour le service et ne sont jamais revendues.
-          </p>
+      {/* FONCTIONNEMENT */}
+      <section className="max-w-5xl mx-auto px-6 py-20">
+        <h2 className="text-center text-3xl font-extrabold mb-12">
+          Comment ça marche ?
+        </h2>
+
+        <div className="grid md:grid-cols-3 gap-6">
+          <div className="p-6 border rounded-2xl">
+            <h3 className="font-bold mb-2">1. Choisissez</h3>
+            <p className="text-sm text-gray-500">Sélectionnez votre forfait</p>
+          </div>
+          <div className="p-6 border rounded-2xl">
+            <h3 className="font-bold mb-2">2. Recevez</h3>
+            <p className="text-sm text-gray-500">Recevez votre eSIM</p>
+          </div>
+          <div className="p-6 border rounded-2xl">
+            <h3 className="font-bold mb-2">3. Activez</h3>
+            <p className="text-sm text-gray-500">Profitez d’internet</p>
+          </div>
+        </div>
+      </section>
+
+      {/* VALEURS */}
+      <section className="max-w-5xl mx-auto px-6 py-20">
+        <h2 className="text-center text-3xl font-extrabold mb-12">Nos valeurs</h2>
+
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {VALUES.map((v) => (
+            <div key={v.title} className={`p-6 rounded-2xl border ${v.color}`}>
+              <div className={`${v.accent} text-xl mb-3`}>{v.icon}</div>
+              <h3 className="font-bold">{v.title}</h3>
+              <p className="text-sm text-gray-600">{v.desc}</p>
+            </div>
+          ))}
         </div>
       </section>
 
       {/* CTA */}
-      <section className="max-w-5xl mx-auto px-6 py-20 text-center">
+      <section className="text-center py-20">
         <h2 className="text-3xl font-extrabold mb-4">On est là pour vous</h2>
         <Link href="/contact" className="px-6 py-3 bg-purple-600 text-white rounded-xl">
           Nous contacter

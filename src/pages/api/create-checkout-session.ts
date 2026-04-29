@@ -64,12 +64,52 @@ export default async function handler(
       serverPrice = Math.round(Number(pkg.final_price_eur) * 100);
     }
 
+    // ── Validation et application du code promo côté serveur ──
+    const promoCode = cartItems[0].promo_code || null;
+    let finalPrice = serverPrice;
+
+    if (promoCode) {
+      const now = new Date();
+      const { data: promoData, error: promoError } = await supabase
+        .from("promo_codes")
+        .select("*")
+        .eq("code", promoCode)
+        .single();
+
+      if (promoError || !promoData) {
+        return res.status(400).json({ message: "Code promo invalide." });
+      }
+      if (!promoData.is_active) {
+        return res.status(400).json({ message: "Ce code promo n'est plus actif." });
+      }
+      if (new Date(promoData.valid_from) > now || new Date(promoData.valid_until) < now) {
+        return res.status(400).json({ message: "Ce code promo n'est plus valide." });
+      }
+      if (promoData.usage_limit && promoData.times_used >= promoData.usage_limit) {
+        return res.status(400).json({ message: "Ce code promo a atteint sa limite d'utilisation." });
+      }
+
+      // Appliquer la remise sur serverPrice (prix vérifié depuis la DB)
+      if (promoData.discount_percentage) {
+        finalPrice = Math.round(serverPrice * (1 - promoData.discount_percentage / 100));
+      } else if (promoData.discount_amount) {
+        // discount_amount est en EUR/XPF selon la devise
+        const discountInCents = normalizedCurrency === 'xpf'
+          ? Math.round(promoData.discount_amount)
+          : Math.round(promoData.discount_amount * 100);
+        finalPrice = Math.max(0, serverPrice - discountInCents);
+      }
+
+      console.log(`[checkout] Promo "${promoCode}" appliquée: ${serverPrice} → ${finalPrice} (${normalizedCurrency})`);
+    }
+
+    // ── Vérification anti-fraude (hors promo) ──
     const clientPrice = item.price || item.final_price_eur;
     const clientPriceInCents = normalizedCurrency === 'xpf'
       ? Math.round(clientPrice)
       : Math.round(clientPrice * 100);
 
-    if (Math.abs(clientPriceInCents - serverPrice) > 10) {
+    if (!promoCode && Math.abs(clientPriceInCents - serverPrice) > 10) {
       console.warn("PRIX SUSPECT", {
         packageId, clientPriceInCents, serverPrice,
         currency: normalizedCurrency, email: customer_email,
@@ -87,7 +127,7 @@ export default async function handler(
             name: item.name || pkg.name,
             description: item.description || "eSIM FENUA SIM",
           },
-          unit_amount: serverPrice,
+          unit_amount: finalPrice,
         },
         quantity: 1,
       }],

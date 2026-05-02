@@ -18,16 +18,15 @@ type Package = Database["public"]["Tables"]["airalo_packages"]["Row"] & {
   image_url?: string;
 };
 
-type DataTip = { photo: string; web: string; video: string; chat: string; calls: string; };
+type DataTip = { photo: string; web: string; video: string; chat: string; };
 
 function getDataTip(amount: number, unit: string): DataTip {
-  let go = unit.toLowerCase() === "mb" ? amount / 1024 : amount;
+  const go = unit.toLowerCase() === "mb" ? amount / 1024 : amount;
   return {
     photo: Math.floor(go * 500).toLocaleString(),
     web: Math.floor(go / 0.06) + "h",
     video: Math.floor(go / 1) + "h",
     chat: Math.floor(go * 3333).toLocaleString(),
-    calls: Math.floor(go / 0.036) + "h",
   };
 }
 
@@ -45,11 +44,12 @@ const FRENCH_TO_ENGLISH_REGION: Record<string, string> = {
   "afrique-du-sud": "South Africa", "bresil": "Brazil", "argentine": "Argentina",
   "chili": "Chile", "colombie": "Colombia", "perou": "Peru",
   "emirats-arabes-unis": "United Arab Emirates", "arabie-saoudite": "Saudi Arabia",
-  "israel": "Israel", "jordanie": "Jordan", "liban": "Lebanon", "qatar": "Qatar",
+  "israel": "Israel", "jordanie": "Jordan", "qatar": "Qatar",
   "koweit": "Kuwait", "bahrein": "Bahrain", "oman": "Oman",
   "azerbaidjan": "Azerbaijan", "jamaique": "Jamaica", "asie": "Asia",
   "europe": "Europe", "decouvrir-global": "Discover Global",
   "iles-canaries": "Canary Islands", "coree-du-sud": "South Korea",
+  "france": "France", "canada": "Canada",
 };
 
 function slugToRegionFr(slug: string): string {
@@ -57,8 +57,7 @@ function slugToRegionFr(slug: string): string {
 }
 
 function getEnglishRegionFromSlug(slug: string): string {
-  const n = slug.toLowerCase().trim();
-  return FRENCH_TO_ENGLISH_REGION[n] || slug;
+  return FRENCH_TO_ENGLISH_REGION[slug.toLowerCase().trim()] || slug;
 }
 
 async function validateAndApplyPromoCode(code: string, packagePrice: number) {
@@ -83,7 +82,10 @@ async function validateAndApplyPromoCode(code: string, packagePrice: number) {
 // ─────────────────────────────────────────────────────────────────────────────
 // RECOMMANDEUR INTELLIGENT
 // ─────────────────────────────────────────────────────────────────────────────
-function RecommenderWidget({ packages, onRecommend }: { packages: Package[]; onRecommend: (pkg: Package) => void }) {
+function RecommenderWidget({ packages, onRecommend }: {
+  packages: Package[];
+  onRecommend: (pkg: Package) => void;
+}) {
   const [days, setDays] = useState<number | null>(null);
   const [usage, setUsage] = useState<string | null>(null);
   const [recommended, setRecommended] = useState<Package | null>(null);
@@ -91,67 +93,55 @@ function RecommenderWidget({ packages, onRecommend }: { packages: Package[]; onR
 
   if (dismissed) return null;
 
-  // Go nécessaires selon usage × durée
-  const neededGo = (): number => {
-    if (!days || !usage) return 0;
-    const perDay: Record<string, number> = {
-      light: 0.3,    // réseaux sociaux + messages
-      medium: 0.8,   // navigation + maps + appels vidéo occasionnels
-      heavy: 2.0,    // streaming, travail à distance
-    };
-    return Math.ceil(days * (perDay[usage] || 1));
-  };
+  const PER_DAY: Record<string, number> = { light: 0.3, medium: 0.8, heavy: 2.0 };
 
-  const compute = (d: number, u: string) => {
-    const perDay: Record<string, number> = { light: 0.3, medium: 0.8, heavy: 2.0 };
-    const needed = Math.ceil(d * (perDay[u] || 1));
-    // Filtre uniquement sur les Go nécessaires — la durée de validité n'est pas bloquante
-    // Un forfait 30 jours convient pour un séjour de 14 jours
-    const valid = packages.filter(p => {
-      const go = p.data_unit?.toLowerCase().includes('gb') || p.data_unit?.toLowerCase().includes('go')
+  const neededGo = (d: number, u: string) => Math.ceil(d * (PER_DAY[u] || 1));
+
+  const compute = (d: number, u: string): Package | null => {
+    const needed = neededGo(d, u);
+    const valid = packages.filter((p) => {
+      const go = (p.data_unit?.toLowerCase().includes("gb") || p.data_unit?.toLowerCase().includes("go"))
         ? (p.data_amount ?? 0)
         : (p.data_amount ?? 0) / 1024;
+      // Filtre uniquement sur les Go — la validité n'est pas bloquante
+      // Un forfait 30 jours convient très bien pour un séjour de 14 jours
       return go >= needed;
     }).sort((a, b) => (a.final_price_eur ?? 0) - (b.final_price_eur ?? 0));
     return valid[0] || null;
   };
 
-  const USAGE_OPTIONS = [
-    { key: 'light', label: 'Léger', desc: 'Réseaux sociaux, messages, maps', icon: '📱', go: '~300 Mo/jour' },
-    { key: 'medium', label: 'Modéré', desc: 'Navigation, appels vidéo ponctuels', icon: '💻', go: '~800 Mo/jour' },
-    { key: 'heavy', label: 'Intensif', desc: 'Streaming, télétravail, vidéos', icon: '🎬', go: '~2 Go/jour' },
-  ];
-
-  const DAY_OPTIONS = [3, 7, 10, 14, 21, 30];
-
-  const handleCompute = (d: number | null, u: string | null) => {
+  const handleSelect = (d: number | null, u: string | null) => {
     if (!d || !u) return;
     const rec = compute(d, u);
     setRecommended(rec);
     if (rec) onRecommend(rec);
   };
 
-  return (
-    <div style={{ background: 'linear-gradient(135deg,#F9F5FF,#FFF7ED)', borderRadius: '16px', border: '1.5px solid #DDD6FE', padding: '20px', marginBottom: '16px', position: 'relative' }}>
-      <button onClick={() => setDismissed(true)} style={{ position: 'absolute', top: '12px', right: '12px', background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', fontSize: '18px', lineHeight: 1 }}>×</button>
+  const USAGE_OPTIONS = [
+    { key: "light", label: "Léger", desc: "Réseaux sociaux, messages, maps", icon: "📱", go: "~300 Mo/jour" },
+    { key: "medium", label: "Modéré", desc: "Navigation, appels vidéo ponctuels", icon: "💻", go: "~800 Mo/jour" },
+    { key: "heavy", label: "Intensif", desc: "Streaming, télétravail, vidéos", icon: "🎬", go: "~2 Go/jour" },
+  ];
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-        <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg,#A020F0,#FF7F11)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flexShrink: 0 }}>🎯</div>
+  return (
+    <div style={{ background: "linear-gradient(135deg,#F9F5FF,#FFF7ED)", borderRadius: "16px", border: "1.5px solid #DDD6FE", padding: "20px", marginBottom: "16px", position: "relative" }}>
+      <button onClick={() => setDismissed(true)} style={{ position: "absolute", top: "12px", right: "14px", background: "none", border: "none", cursor: "pointer", color: "#9CA3AF", fontSize: "20px", lineHeight: 1 }}>×</button>
+
+      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
+        <div style={{ width: "34px", height: "34px", borderRadius: "50%", background: "linear-gradient(135deg,#A020F0,#FF7F11)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", flexShrink: 0 }}>🎯</div>
         <div>
-          <div style={{ fontWeight: 800, fontSize: '15px', color: '#111827' }}>Quel forfait me convient ?</div>
-          <div style={{ fontSize: '12px', color: '#6B7280' }}>Répondez à 2 questions pour éviter de manquer de data</div>
+          <div style={{ fontWeight: 800, fontSize: "15px", color: "#111827" }}>Quel forfait me convient ?</div>
+          <div style={{ fontSize: "12px", color: "#6B7280" }}>Répondez à 2 questions pour ne pas manquer de data</div>
         </div>
       </div>
 
       {/* Durée */}
-      <div style={{ marginBottom: '14px' }}>
-        <div style={{ fontSize: '12px', fontWeight: 700, color: '#374151', marginBottom: '8px' }}>
-          🗓️ Combien de jours voyagez-vous ?
-        </div>
-        <div style={{ display: 'flex', gap: '7px', flexWrap: 'wrap' }}>
-          {DAY_OPTIONS.map(d => (
-            <button key={d} onClick={() => { setDays(d); setRecommended(null); handleCompute(d, usage); }}
-              style={{ padding: '6px 14px', borderRadius: '50px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', border: 'none', transition: 'all .15s', background: days === d ? 'linear-gradient(90deg,#A020F0,#FF7F11)' : '#fff', color: days === d ? '#fff' : '#374151', boxShadow: days === d ? '0 2px 8px rgba(160,32,240,.2)' : '0 1px 3px rgba(0,0,0,.08)' }}>
+      <div style={{ marginBottom: "14px" }}>
+        <div style={{ fontSize: "12px", fontWeight: 700, color: "#374151", marginBottom: "8px" }}>🗓️ Combien de jours voyagez-vous ?</div>
+        <div style={{ display: "flex", gap: "7px", flexWrap: "wrap" }}>
+          {[3, 7, 10, 14, 21, 30].map((d) => (
+            <button key={d} onClick={() => { setDays(d); handleSelect(d, usage); }}
+              style={{ padding: "6px 14px", borderRadius: "50px", fontSize: "12px", fontWeight: 700, cursor: "pointer", border: "none", transition: "all .15s", background: days === d ? "linear-gradient(90deg,#A020F0,#FF7F11)" : "#fff", color: days === d ? "#fff" : "#374151", boxShadow: days === d ? "0 2px 8px rgba(160,32,240,.2)" : "0 1px 3px rgba(0,0,0,.08)" }}>
               {d} jours
             </button>
           ))}
@@ -159,18 +149,16 @@ function RecommenderWidget({ packages, onRecommend }: { packages: Package[]; onR
       </div>
 
       {/* Usage */}
-      <div style={{ marginBottom: '16px' }}>
-        <div style={{ fontSize: '12px', fontWeight: 700, color: '#374151', marginBottom: '8px' }}>
-          📶 Quel est votre usage prévu ?
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '8px' }}>
+      <div style={{ marginBottom: "16px" }}>
+        <div style={{ fontSize: "12px", fontWeight: 700, color: "#374151", marginBottom: "8px" }}>📶 Quel est votre usage prévu ?</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "8px" }}>
           {USAGE_OPTIONS.map(({ key, label, desc, icon, go }) => (
-            <button key={key} onClick={() => { setUsage(key); setRecommended(null); handleCompute(days, key); }}
-              style={{ padding: '10px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: usage === key ? '2px solid #A020F0' : '1.5px solid #E5E7EB', transition: 'all .15s', background: usage === key ? '#F9F5FF' : '#fff', color: '#374151', textAlign: 'center' }}>
-              <div style={{ fontSize: '20px', marginBottom: '4px' }}>{icon}</div>
-              <div style={{ fontWeight: 700, marginBottom: '2px' }}>{label}</div>
-              <div style={{ fontSize: '10px', color: '#9CA3AF', lineHeight: 1.3 }}>{desc}</div>
-              <div style={{ fontSize: '10px', color: '#A020F0', fontWeight: 700, marginTop: '4px' }}>{go}</div>
+            <button key={key} onClick={() => { setUsage(key); handleSelect(days, key); }}
+              style={{ padding: "10px 8px", borderRadius: "12px", fontSize: "12px", fontWeight: 600, cursor: "pointer", border: usage === key ? "2px solid #A020F0" : "1.5px solid #E5E7EB", transition: "all .15s", background: usage === key ? "#F9F5FF" : "#fff", color: "#374151", textAlign: "center" }}>
+              <div style={{ fontSize: "20px", marginBottom: "4px" }}>{icon}</div>
+              <div style={{ fontWeight: 700, marginBottom: "2px" }}>{label}</div>
+              <div style={{ fontSize: "10px", color: "#9CA3AF", lineHeight: 1.3 }}>{desc}</div>
+              <div style={{ fontSize: "10px", color: "#A020F0", fontWeight: 700, marginTop: "4px" }}>{go}</div>
             </button>
           ))}
         </div>
@@ -178,30 +166,28 @@ function RecommenderWidget({ packages, onRecommend }: { packages: Package[]; onR
 
       {/* Résultat */}
       {days && usage && (
-        <div style={{ borderTop: '0.5px solid #E5E7EB', paddingTop: '14px' }}>
+        <div style={{ borderTop: "0.5px solid #E5E7EB", paddingTop: "14px" }}>
           {recommended ? (
-            <div style={{ background: 'linear-gradient(135deg,#A020F0,#FF7F11)', borderRadius: '12px', padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+            <div style={{ background: "linear-gradient(135deg,#A020F0,#FF7F11)", borderRadius: "12px", padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
               <div>
-                <div style={{ fontSize: '11px', color: 'rgba(255,255,255,.75)', fontWeight: 600, marginBottom: '3px' }}>✅ Forfait recommandé pour vous</div>
-                <div style={{ fontSize: '16px', fontWeight: 800, color: '#fff' }}>{recommended.name}</div>
-                <div style={{ fontSize: '12px', color: 'rgba(255,255,255,.8)', marginTop: '2px' }}>
-                  Couvre vos ~{neededGo()} Go estimés pour {days} jours · valable jusqu'à {recommended.validity}
+                <div style={{ fontSize: "11px", color: "rgba(255,255,255,.75)", fontWeight: 600, marginBottom: "3px" }}>✅ Forfait recommandé pour vous</div>
+                <div style={{ fontSize: "16px", fontWeight: 800, color: "#fff" }}>{recommended.name}</div>
+                <div style={{ fontSize: "12px", color: "rgba(255,255,255,.8)", marginTop: "2px" }}>
+                  ~{neededGo(days, usage)} Go estimés pour {days} jours · valable {recommended.validity}
                 </div>
               </div>
-              <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <div style={{ fontSize: '22px', fontWeight: 900, color: '#fff' }}>
-                  {recommended.final_price_eur?.toFixed(2)}€
-                </div>
-                <div style={{ fontSize: '10px', color: 'rgba(255,255,255,.7)' }}>meilleur rapport</div>
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                <div style={{ fontSize: "22px", fontWeight: 900, color: "#fff" }}>{recommended.final_price_eur?.toFixed(2)}€</div>
+                <div style={{ fontSize: "10px", color: "rgba(255,255,255,.7)" }}>meilleur rapport</div>
               </div>
             </div>
           ) : (
-            <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '12px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ fontSize: '20px' }}>⚠️</span>
+            <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: "12px", padding: "12px 16px", display: "flex", alignItems: "center", gap: "10px" }}>
+              <span style={{ fontSize: "20px" }}>⚠️</span>
               <div>
-                <div style={{ fontWeight: 700, fontSize: '13px', color: '#991B1B' }}>Aucun forfait ne couvre ce besoin</div>
-                <div style={{ fontSize: '12px', color: '#B91C1C' }}>
-                  Vous avez besoin d'environ {neededGo()} Go pour {days} jours. Contactez-nous sur WhatsApp pour une solution sur-mesure.
+                <div style={{ fontWeight: 700, fontSize: "13px", color: "#991B1B" }}>Aucun forfait ne couvre ce besoin</div>
+                <div style={{ fontSize: "12px", color: "#B91C1C" }}>
+                  Vous avez besoin d'environ {neededGo(days, usage)} Go. Contactez-nous sur WhatsApp pour une solution sur-mesure.
                 </div>
               </div>
             </div>
@@ -212,6 +198,9 @@ function RecommenderWidget({ packages, onRecommend }: { packages: Package[]; onR
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// MAIN PAGE
+// ─────────────────────────────────────────────────────────────────────────────
 export default function RegionPage() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const router = useRouter();
@@ -224,9 +213,9 @@ export default function RegionPage() {
   const [showCartModal, setShowCartModal] = useState(false);
   const [showRecapModal, setShowRecapModal] = useState(false);
   const [destinationInfo, setDestinationInfo] = useState<any>();
-  const [form, setForm] = useState({ nom: "", first_name: "", last_name: "", prenom: "", email: "", codePromo: "", codePartenaire: "" });
+  const [form, setForm] = useState({ nom: "", prenom: "", email: "", codePromo: "", codePartenaire: "" });
   const [formError, setFormError] = useState<string | null>(null);
-  const [isMobile, setIsMobile] = useState(false);
+  const [currency, setCurrency] = useState<"EUR" | "USD" | "XPF">("EUR");
   const { partnerCode, promoCode: partnerPromoCode, isFromPartnerLink } = usePartnerCodes();
 
   useEffect(() => {
@@ -236,7 +225,6 @@ export default function RegionPage() {
   }, [partnerCode, partnerPromoCode]);
 
   const [cart, setCart] = useState<Package[]>([]);
-  const [currency, setCurrency] = useState<"EUR" | "USD" | "XPF">("EUR");
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -258,11 +246,11 @@ export default function RegionPage() {
         const englishRegion = getEnglishRegionFromSlug(regionParam);
         const dbSlug = englishRegion.toLowerCase();
         const { data: pkgs, error: pkgError } = await supabase.from("airalo_packages").select("*").eq("slug", dbSlug).gt("final_price_eur", 0).order("final_price_eur", { ascending: true });
-        const { data: dest } = await supabase.from("destination_info").select("*").eq("name", pkgs?.[0].region_fr);
+        const { data: dest } = await supabase.from("destination_info").select("*").eq("name", pkgs?.[0]?.region_fr);
         setDestinationInfo(dest);
         const region = regionFr.toLowerCase().replace(/\s+/g, "-");
         const { data } = await supabase.storage.from("product-images").getPublicUrl(`esim-${region}.jpg`);
-        setDestinationImage(`${data.publicUrl}`);
+        setDestinationImage(data.publicUrl);
         if (pkgError) throw pkgError;
         if (!pkgs || pkgs.length === 0) { setError("Aucun forfait disponible pour cette destination"); setLoading(false); return; }
         setPackages(pkgs);
@@ -273,13 +261,12 @@ export default function RegionPage() {
     fetchData();
   }, [params?.region]);
 
-  useEffect(() => { const check = () => setIsMobile(window.innerWidth < 768); check(); window.addEventListener("resize", check); return () => window.removeEventListener("resize", check); }, []);
   useEffect(() => { if (packages.length > 0) setSelectedPackage(packages[currentIndex]); }, [currentIndex, packages]);
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div style={{ width: '48px', height: '48px', borderRadius: '50%', border: '4px solid #F3E8FF', borderTopColor: '#A020F0', animation: 'spin 1s linear infinite' }} />
+        <div style={{ width: "48px", height: "48px", borderRadius: "50%", border: "4px solid #F3E8FF", borderTopColor: "#A020F0", animation: "spin 1s linear infinite" }} />
         <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       </div>
     );
@@ -289,9 +276,9 @@ export default function RegionPage() {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="text-center">
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>😕</div>
-          <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#111827', marginBottom: '12px' }}>{error}</h2>
-          <button onClick={() => router.push("/shop")} style={{ background: 'linear-gradient(90deg,#A020F0,#FF7F11)', color: '#fff', padding: '10px 24px', borderRadius: '10px', border: 'none', fontWeight: 700, cursor: 'pointer' }}>
+          <div style={{ fontSize: "48px", marginBottom: "16px" }}>😕</div>
+          <h2 style={{ fontSize: "20px", fontWeight: 700, marginBottom: "12px" }}>{error}</h2>
+          <button onClick={() => router.push("/shop")} style={{ background: "linear-gradient(90deg,#A020F0,#FF7F11)", color: "#fff", padding: "10px 24px", borderRadius: "10px", border: "none", fontWeight: 700, cursor: "pointer" }}>
             Retour à la boutique
           </button>
         </div>
@@ -301,37 +288,31 @@ export default function RegionPage() {
 
   const regionParam = Array.isArray(params.region) ? params.region[0] : params.region;
   const regionName = packages[0] ? getFrenchRegionName(packages[0].region_fr, packages[0].region) : regionParam;
-  const margin = parseFloat(localStorage.getItem("global_margin") || "0");
+  const margin = parseFloat(typeof window !== "undefined" ? localStorage.getItem("global_margin") || "0" : "0");
 
   const getPackagePrice = (pkg: Package) => {
     let price = pkg.final_price_eur;
     let symbol = "€";
     if (currency === "USD") { price = pkg.final_price_usd; symbol = "$"; }
     else if (currency === "XPF") { price = pkg.final_price_xpf; symbol = "₣"; }
-    return { price: price! * (1 + margin), symbol };
+    return { price: (price ?? 0) * (1 + margin), symbol };
   };
 
   const selectedPrice = selectedPackage ? getPackagePrice(selectedPackage) : null;
-
-  // Packages affichés dans le carousel
-  const filteredPackages = packages;
-
   const seoTitle = regionName ? `eSIM ${regionName} — Connexion instantanée | FENUA SIM` : "Forfait eSIM — FENUA SIM";
-  const minPrice = packages.length > 0 ? Math.min(...packages.map(p => p.final_price_eur || 999)).toFixed(2) : null;
-  const seoDescription = regionName && minPrice ? `Achetez votre eSIM ${regionName}. ${packages.length} forfait${packages.length > 1 ? "s" : ""} à partir de ${minPrice} €. Activation instantanée, 4G/5G.` : "Forfait eSIM de voyage — Activation instantanée.";
+  const minPrice = packages.length > 0 ? Math.min(...packages.map((p) => p.final_price_eur || 999)).toFixed(2) : null;
+  const seoDescription = regionName && minPrice ? `Achetez votre eSIM ${regionName}. ${packages.length} forfait${packages.length > 1 ? "s" : ""} à partir de ${minPrice}€. Activation instantanée.` : "Forfait eSIM de voyage — Activation instantanée.";
   const canonicalSlug = Array.isArray(params?.region) ? params.region[0] : params?.region || "";
-  const canonicalUrl = `https://www.fenuasim.com/shop/${canonicalSlug}`;
 
   function handleAcheter(pkg: Package) { setSelectedPackage(pkg); setShowRecapModal(true); }
   function handleFormChange(e: React.ChangeEvent<HTMLInputElement>) { setForm({ ...form, [e.target.name]: e.target.value }); }
-  const handlePrev = () => setCurrentIndex((p) => (p === 0 ? packages.length - 1 : p - 1));
-  const handleNext = () => setCurrentIndex((p) => (p === packages.length - 1 ? 0 : p + 1));
+  const handlePrev = () => setCurrentIndex((p) => Math.max(0, p - 3));
+  const handleNext = () => setCurrentIndex((p) => Math.min(packages.length - 1, p + 3));
 
   async function handleRecapSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.nom || !form.prenom || !form.email) { setFormError("Merci de remplir tous les champs obligatoires."); return; }
-    if (!selectedPackage) { setFormError("Aucun forfait sélectionné."); return; }
-    if (!selectedPackage.id) { setFormError("Erreur: Données du forfait incomplètes. Veuillez rafraîchir la page."); return; }
+    if (!selectedPackage?.id) { setFormError("Erreur: Données du forfait incomplètes."); return; }
     setFormError(null);
     let basePrice = selectedPackage.final_price_eur!;
     if (currency === "USD") basePrice = selectedPackage.final_price_usd!;
@@ -345,7 +326,6 @@ export default function RegionPage() {
       promoCodeToSave = form.codePromo;
     }
     localStorage.setItem("packageId", selectedPackage.id);
-    localStorage.setItem("customerId", form.email);
     localStorage.setItem("customerEmail", form.email);
     localStorage.setItem("customerName", `${form.prenom} ${form.nom}`);
     if (form.codePromo) localStorage.setItem("promoCode", form.codePromo);
@@ -363,7 +343,6 @@ export default function RegionPage() {
       const responseData = await response.json();
       if (!response.ok) { setFormError(responseData.message || "Une erreur est survenue."); return; }
       const { sessionId } = responseData;
-      if (!sessionId) throw new Error("Session ID not returned");
       const stripe = await stripePromise;
       if (!stripe) throw new Error("Stripe non initialisé");
       const { error } = await stripe.redirectToCheckout({ sessionId });
@@ -375,251 +354,141 @@ export default function RegionPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F9FAFB' }}>
+    <div style={{ minHeight: "100vh", background: "#F9FAFB" }}>
       <Head>
         <title>{seoTitle}</title>
         <meta name="description" content={seoDescription} />
-        <meta name="keywords" content={regionName ? `eSIM ${regionName}, eSIM ${regionName} Polynésie, forfait data ${regionName}` : "eSIM voyage"} />
-        <link rel="canonical" href={canonicalUrl} />
+        <link rel="canonical" href={`https://www.fenuasim.com/shop/${canonicalSlug}`} />
         <meta property="og:title" content={seoTitle} />
         <meta property="og:description" content={seoDescription} />
-        <meta property="og:url" content={canonicalUrl} />
-        {packages[0]?.flag_url && <meta property="og:image" content={packages[0].flag_url} />}
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({ "@context": "https://schema.org", "@type": "Product", name: regionName ? `eSIM ${regionName} — FENUA SIM` : "eSIM de voyage FENUA SIM", description: seoDescription, brand: { "@type": "Brand", name: "FENUA SIM" }, url: canonicalUrl, offers: packages.slice(0, 5).map(pkg => ({ "@type": "Offer", name: pkg.package_id || pkg.operator_name || "Forfait eSIM", price: pkg.final_price_eur?.toFixed(2) || "0", priceCurrency: "EUR", availability: "https://schema.org/InStock", seller: { "@type": "Organization", name: "FENUA SIM" } })) }) }} />
       </Head>
 
-      {/* ── HERO DESTINATION ── */}
-      <div style={{ position: 'relative', height: '280px', overflow: 'hidden' }}>
+      {/* ── HERO ── */}
+      <div style={{ position: "relative", height: "280px", overflow: "hidden" }}>
         <img
-          src={destinationImage || `https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?q=80&w=1400&fit=crop`}
+          src={destinationImage || "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?q=80&w=1400&fit=crop"}
           alt={regionName || "Destination"}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-          onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?q=80&w=1400&fit=crop'; }}
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+          onError={(e) => { (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?q=80&w=1400&fit=crop"; }}
         />
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg,rgba(160,32,240,.75),rgba(10,2,30,.6) 60%,rgba(255,127,17,.3) 100%)' }} />
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '24px' }}>
-          <button
-            onClick={() => router.push('/shop')}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'rgba(255,255,255,.8)', background: 'rgba(255,255,255,.12)', border: '1px solid rgba(255,255,255,.2)', borderRadius: '50px', padding: '5px 12px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', marginBottom: '14px', width: 'fit-content' }}
-          >
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg,rgba(160,32,240,.75),rgba(10,2,30,.6) 60%,rgba(255,127,17,.3) 100%)" }} />
+        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", justifyContent: "flex-end", padding: "24px" }}>
+          <button onClick={() => router.push("/shop")} style={{ display: "inline-flex", alignItems: "center", gap: "6px", color: "rgba(255,255,255,.85)", background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.2)", borderRadius: "50px", padding: "5px 12px", fontSize: "12px", fontWeight: 600, cursor: "pointer", marginBottom: "14px", width: "fit-content" }}>
             <ArrowLeft size={13} /> Retour
           </button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
             {packages[0]?.flag_url && (
-              <img src={packages[0].flag_url} alt={regionName || ""} style={{ width: '52px', height: '36px', objectFit: 'cover', borderRadius: '6px', border: '2px solid rgba(255,255,255,.3)', flexShrink: 0 }} />
+              <img src={packages[0].flag_url} alt={regionName || ""} style={{ width: "52px", height: "36px", objectFit: "cover", borderRadius: "6px", border: "2px solid rgba(255,255,255,.3)", flexShrink: 0 }} />
             )}
             <div>
-              <h1 style={{ fontSize: 'clamp(24px,5vw,40px)', fontWeight: 900, color: '#fff', letterSpacing: '-.05em', lineHeight: 1.1 }}>
-                {regionName}
-              </h1>
-              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,.7)', marginTop: '4px' }}>
-                {packages.length} forfait{packages.length > 1 ? 's' : ''} disponible{packages.length > 1 ? 's' : ''} · Activation instantanée
+              <h1 style={{ fontSize: "clamp(24px,5vw,40px)", fontWeight: 900, color: "#fff", letterSpacing: "-.05em", lineHeight: 1.1 }}>{regionName}</h1>
+              <p style={{ fontSize: "13px", color: "rgba(255,255,255,.7)", marginTop: "4px" }}>
+                {packages.length} forfait{packages.length > 1 ? "s" : ""} disponible{packages.length > 1 ? "s" : ""} · Activation instantanée
               </p>
             </div>
           </div>
         </div>
       </div>
 
-      <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '24px 20px' }}>
+      <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "24px 20px" }}>
 
-        {/* ── RECOMMANDEUR INTELLIGENT ── */}
-        <RecommenderWidget packages={packages} onRecommend={(pkg) => { setSelectedPackage(pkg); setCurrentIndex(0); }} />
+        {/* ── RECOMMANDEUR ── */}
+        <RecommenderWidget packages={packages} onRecommend={(pkg) => { setSelectedPackage(pkg); setCurrentIndex(packages.indexOf(pkg)); }} />
 
-        {/* ── TRUST + CURRENCY ROW ── */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginBottom: '24px' }}>
-          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-            {["⚡ Activation instantanée", "📩 Email immédiat", "🔒 Paiement Stripe", "💬 Support 24/7"].map(t => (
-              <span key={t} style={{ fontSize: '12px', color: '#6B7280', fontWeight: 600 }}>{t}</span>
+        {/* ── TRUST + CURRENCY ── */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", marginBottom: "24px" }}>
+          <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
+            {["⚡ Activation instantanée", "📩 Email immédiat", "🔒 Paiement Stripe", "💬 Support 24/7"].map((t) => (
+              <span key={t} style={{ fontSize: "12px", color: "#6B7280", fontWeight: 600 }}>{t}</span>
             ))}
           </div>
-          <select
-            value={currency}
-            onChange={(e) => { setCurrency(e.target.value as any); localStorage.setItem("currency", e.target.value); }}
-            style={{ border: '1.5px solid rgba(160,32,240,.3)', borderRadius: '8px', padding: '6px 12px', fontSize: '13px', fontWeight: 700, color: '#A020F0', background: '#F9F5FF', cursor: 'pointer', outline: 'none' }}
-          >
+          <select value={currency} onChange={(e) => { setCurrency(e.target.value as any); localStorage.setItem("currency", e.target.value); }}
+            style={{ border: "1.5px solid rgba(160,32,240,.3)", borderRadius: "8px", padding: "6px 12px", fontSize: "13px", fontWeight: 700, color: "#A020F0", background: "#F9F5FF", cursor: "pointer", outline: "none" }}>
             <option value="EUR">€ EUR</option>
             <option value="XPF">₣ XPF</option>
             <option value="USD">$ USD</option>
           </select>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 340px', gap: '24px', alignItems: 'start' }} className="product-grid">
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 340px", gap: "24px", alignItems: "start" }} className="product-grid">
           <style>{`@media(max-width:768px){.product-grid{grid-template-columns:1fr!important}}`}</style>
 
-          {/* ── LEFT: FORFAITS ── */}
+          {/* ── LEFT ── */}
           <div>
-            <div style={{ background: '#fff', borderRadius: '16px', border: '0.5px solid #E5E7EB', padding: '20px', marginBottom: '16px' }}>
-              <h2 style={{ fontWeight: 800, fontSize: '18px', letterSpacing: '-.04em', marginBottom: '4px' }}>Forfaits disponibles</h2>
-              <p style={{ fontSize: '12px', color: '#9CA3AF', marginBottom: '18px' }}>
-                {filteredPackages.length} forfait{filteredPackages.length > 1 ? 's' : ''} — sélectionnez celui adapté à votre séjour
+            {/* FORFAITS */}
+            <div style={{ background: "#fff", borderRadius: "16px", border: "0.5px solid #E5E7EB", padding: "20px", marginBottom: "16px" }}>
+              <h2 style={{ fontWeight: 800, fontSize: "18px", letterSpacing: "-.04em", marginBottom: "4px" }}>Forfaits disponibles</h2>
+              <p style={{ fontSize: "12px", color: "#9CA3AF", marginBottom: "18px" }}>
+                {packages.length} forfait{packages.length > 1 ? "s" : ""} — sélectionnez celui adapté à votre séjour
               </p>
 
-              {/* Mobile carousel */}
+              {/* Mobile — 1 forfait + flèches */}
               <div className="block sm:hidden">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <button onClick={handlePrev} disabled={filteredPackages.length <= 1} style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1px solid #E5E7EB', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <button onClick={() => setCurrentIndex((p) => Math.max(0, p - 1))} disabled={currentIndex === 0}
+                    style={{ width: "36px", height: "36px", borderRadius: "50%", border: "1px solid #E5E7EB", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, opacity: currentIndex === 0 ? 0.3 : 1 }}>
                     <ChevronLeft size={16} />
                   </button>
-                  {filteredPackages[currentIndex] && (() => {
-                    const pkg = filteredPackages[currentIndex];
+                  {packages[currentIndex] && (() => {
+                    const pkg = packages[currentIndex];
                     const { price, symbol } = getPackagePrice(pkg);
                     return (
-                      <div style={{ flex: 1, background: '#F9F5FF', borderRadius: '12px', border: '2px solid #A020F0', padding: '16px', textAlign: 'center' }}>
-                        <div style={{ fontWeight: 800, fontSize: '18px', marginBottom: '4px' }}>{pkg.name}</div>
-                        <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '12px' }}>{pkg.description}</div>
-                        <div style={{ fontWeight: 900, fontSize: '24px', background: 'linear-gradient(90deg,#A020F0,#FF7F11)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: '14px' }}>
+                      <div style={{ flex: 1, background: "#F9F5FF", borderRadius: "12px", border: "2px solid #A020F0", padding: "16px", textAlign: "center" }}>
+                        <div style={{ fontWeight: 800, fontSize: "18px", marginBottom: "4px" }}>{pkg.name}</div>
+                        <div style={{ fontSize: "12px", color: "#6B7280", marginBottom: "12px" }}>{pkg.description}</div>
+                        <div style={{ fontWeight: 900, fontSize: "24px", background: "linear-gradient(90deg,#A020F0,#FF7F11)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", marginBottom: "14px" }}>
                           {price.toFixed(2)} {symbol}
                         </div>
-                        <button onClick={() => handleAcheter(pkg)} style={{ width: '100%', background: 'linear-gradient(90deg,#A020F0,#FF7F11)', color: '#fff', border: 'none', borderRadius: '10px', padding: '12px', fontWeight: 700, fontSize: '14px', cursor: 'pointer' }}>
+                        <button onClick={() => handleAcheter(pkg)} style={{ width: "100%", background: "linear-gradient(90deg,#A020F0,#FF7F11)", color: "#fff", border: "none", borderRadius: "10px", padding: "12px", fontWeight: 700, fontSize: "14px", cursor: "pointer" }}>
                           Acheter — Paiement sécurisé
                         </button>
                       </div>
                     );
                   })()}
-                  <button onClick={handleNext} disabled={filteredPackages.length <= 1} style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1px solid #E5E7EB', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+                  <button onClick={() => setCurrentIndex((p) => Math.min(packages.length - 1, p + 1))} disabled={currentIndex === packages.length - 1}
+                    style={{ width: "36px", height: "36px", borderRadius: "50%", border: "1px solid #E5E7EB", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, opacity: currentIndex === packages.length - 1 ? 0.3 : 1 }}>
                     <ChevronRight size={16} />
                   </button>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginTop: '12px' }}>
-                  {filteredPackages.map((_, i) => (
-                    <button key={i} onClick={() => setCurrentIndex(i)} style={{ width: '8px', height: '8px', borderRadius: '50%', border: 'none', cursor: 'pointer', background: i === currentIndex ? '#A020F0' : '#E5E7EB' }} />
+                <div style={{ display: "flex", justifyContent: "center", gap: "6px", marginTop: "12px" }}>
+                  {packages.map((_, i) => (
+                    <button key={i} onClick={() => setCurrentIndex(i)}
+                      style={{ width: "8px", height: "8px", borderRadius: "50%", border: "none", cursor: "pointer", background: i === currentIndex ? "#A020F0" : "#E5E7EB" }} />
                   ))}
                 </div>
               </div>
 
-              {/* Desktop carousel — 3 forfaits visibles à la fois */}
+              {/* Desktop — 3 forfaits + flèches */}
               <div className="hidden sm:block">
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <button
-                    onClick={handlePrev}
-                    disabled={filteredPackages.length <= 3}
-                    style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1.5px solid #E5E7EB', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: filteredPackages.length <= 3 ? 'default' : 'pointer', flexShrink: 0, opacity: filteredPackages.length <= 3 ? 0.3 : 1 }}
-                  >
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <button onClick={handlePrev} disabled={currentIndex === 0}
+                    style={{ width: "36px", height: "36px", borderRadius: "50%", border: "1.5px solid #E5E7EB", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: currentIndex === 0 ? "default" : "pointer", flexShrink: 0, opacity: currentIndex === 0 ? 0.3 : 1 }}>
                     <ChevronLeft size={16} color="#374151" />
                   </button>
 
-                  <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px' }}>
-                    {filteredPackages.slice(currentIndex, currentIndex + 3).map((pkg) => {
-                      const { price, symbol } = getPackagePrice(pkg);
-                      const isSelected = selectedPackage?.id === pkg.id;
-                      return (
-                        <div
-                          key={pkg.id}
-                          onClick={() => setSelectedPackage(pkg)}
-                          style={{
-                            background: isSelected ? '#F9F5FF' : '#fff',
-                            borderRadius: '14px',
-                            border: isSelected ? '2px solid #A020F0' : '1px solid #E5E7EB',
-                            padding: '18px 14px',
-                            cursor: 'pointer', transition: 'all .2s',
-                            display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
-                            boxShadow: isSelected ? '0 4px 16px rgba(160,32,240,.12)' : 'none',
-                          }}
-                        >
-                          <div style={{ fontWeight: 800, fontSize: '15px', marginBottom: '4px', color: '#111827' }}>{pkg.name}</div>
-                          <div style={{ fontSize: '11px', color: '#9CA3AF', marginBottom: '10px', lineHeight: 1.4 }}>{pkg.description}</div>
-                          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '12px' }}>
-                            <span style={{ fontSize: '10px', background: pkg.includes_voice ? '#EFF6FF' : '#F9FAFB', color: pkg.includes_voice ? '#1D4ED8' : '#9CA3AF', padding: '2px 8px', borderRadius: '50px', fontWeight: 700 }}>
-                              {pkg.includes_voice ? "Appels ✓" : "Sans appels"}
-                            </span>
-                            <span style={{ fontSize: '10px', background: pkg.includes_sms ? '#FFF7ED' : '#F9FAFB', color: pkg.includes_sms ? '#C2410C' : '#9CA3AF', padding: '2px 8px', borderRadius: '50px', fontWeight: 700 }}>
-                              {pkg.includes_sms ? "SMS ✓" : "Sans SMS"}
-                            </span>
-                          </div>
-                          <div style={{ fontWeight: 900, fontSize: '22px', background: 'linear-gradient(90deg,#A020F0,#FF7F11)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: '14px' }}>
-                            {price > 0 ? `${price.toFixed(2)} ${symbol}` : 'N/A'}
-                          </div>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleAcheter(pkg); }}
-                            style={{ width: '100%', background: 'linear-gradient(90deg,#A020F0,#FF7F11)', color: '#fff', border: 'none', borderRadius: '10px', padding: '11px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', boxShadow: '0 2px 8px rgba(160,32,240,.2)' }}
-                          >
-                            Acheter →
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <button
-                    onClick={handleNext}
-                    disabled={filteredPackages.length <= 3}
-                    style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1.5px solid #E5E7EB', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: filteredPackages.length <= 3 ? 'default' : 'pointer', flexShrink: 0, opacity: filteredPackages.length <= 3 ? 0.3 : 1 }}
-                  >
-                    <ChevronRight size={16} color="#374151" />
-                  </button>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginTop: '16px' }}>
-                  <span style={{ fontSize: '12px', color: '#9CA3AF', fontWeight: 600 }}>
-                    {currentIndex + 1}–{Math.min(currentIndex + 3, filteredPackages.length)} sur {filteredPackages.length} forfaits
-                  </span>
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    {Array.from({ length: Math.ceil(filteredPackages.length / 3) }).map((_, i) => (
-                      <button key={i} onClick={() => setCurrentIndex(i * 3)}
-                        style={{ width: i === Math.floor(currentIndex / 3) ? '20px' : '8px', height: '8px', borderRadius: '50px', border: 'none', cursor: 'pointer', background: i === Math.floor(currentIndex / 3) ? '#A020F0' : '#E5E7EB', transition: 'all .3s' }}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                {/* Message si aucun forfait pour ce filtre */}
-                {filteredPackages.length === 0 && (
-                  <div style={{ textAlign: 'center', padding: '32px', color: '#9CA3AF' }}>
-                    <div style={{ fontSize: '28px', marginBottom: '10px' }}>🔍</div>
-                    <div style={{ fontWeight: 600, marginBottom: '6px' }}>Aucun forfait pour cette durée</div>
-                    <button onClick={() => setDurationFilter({ min: 0, max: 999 })} style={{ color: '#A020F0', background: 'none', border: 'none', fontWeight: 700, cursor: 'pointer', fontSize: '13px' }}>
-                      Voir tous les forfaits
-                    </button>
-                  </div>
-                )}
-              </div>
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  {/* Flèche gauche */}
-                  <button
-                    onClick={handlePrev}
-                    disabled={packages.length <= 3}
-                    style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1.5px solid #E5E7EB', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: packages.length <= 3 ? 'default' : 'pointer', flexShrink: 0, opacity: packages.length <= 3 ? 0.3 : 1 }}
-                  >
-                    <ChevronLeft size={16} color="#374151" />
-                  </button>
-
-                  {/* 3 cartes visibles */}
-                  <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px' }}>
+                  <div style={{ flex: 1, display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "12px" }}>
                     {packages.slice(currentIndex, currentIndex + 3).map((pkg) => {
                       const { price, symbol } = getPackagePrice(pkg);
                       const isSelected = selectedPackage?.id === pkg.id;
+                      const isRecommended = selectedPackage?.id === pkg.id && pkg.id === packages[0]?.id;
                       return (
-                        <div
-                          key={pkg.id}
-                          onClick={() => setSelectedPackage(pkg)}
-                          style={{
-                            background: isSelected ? '#F9F5FF' : '#fff',
-                            borderRadius: '14px',
-                            border: isSelected ? '2px solid #A020F0' : '1px solid #E5E7EB',
-                            padding: '18px 14px',
-                            cursor: 'pointer',
-                            transition: 'all .2s',
-                            display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
-                            boxShadow: isSelected ? '0 4px 16px rgba(160,32,240,.12)' : 'none',
-                          }}
-                        >
-                          <div style={{ fontWeight: 800, fontSize: '15px', marginBottom: '4px', color: '#111827' }}>{pkg.name}</div>
-                          <div style={{ fontSize: '11px', color: '#9CA3AF', marginBottom: '10px', lineHeight: 1.4 }}>{pkg.description}</div>
-                          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '12px' }}>
-                            <span style={{ fontSize: '10px', background: pkg.includes_voice ? '#EFF6FF' : '#F9FAFB', color: pkg.includes_voice ? '#1D4ED8' : '#9CA3AF', padding: '2px 8px', borderRadius: '50px', fontWeight: 700 }}>
+                        <div key={pkg.id} onClick={() => setSelectedPackage(pkg)}
+                          style={{ background: isSelected ? "#F9F5FF" : "#fff", borderRadius: "14px", border: isSelected ? "2px solid #A020F0" : "1px solid #E5E7EB", padding: "18px 14px", cursor: "pointer", transition: "all .2s", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", boxShadow: isSelected ? "0 4px 16px rgba(160,32,240,.12)" : "none", position: "relative" }}>
+                          <div style={{ fontWeight: 800, fontSize: "15px", marginBottom: "4px", color: "#111827" }}>{pkg.name}</div>
+                          <div style={{ fontSize: "11px", color: "#9CA3AF", marginBottom: "10px", lineHeight: 1.4 }}>{pkg.description}</div>
+                          <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", justifyContent: "center", marginBottom: "12px" }}>
+                            <span style={{ fontSize: "10px", background: pkg.includes_voice ? "#EFF6FF" : "#F9FAFB", color: pkg.includes_voice ? "#1D4ED8" : "#9CA3AF", padding: "2px 8px", borderRadius: "50px", fontWeight: 700 }}>
                               {pkg.includes_voice ? "Appels ✓" : "Sans appels"}
                             </span>
-                            <span style={{ fontSize: '10px', background: pkg.includes_sms ? '#FFF7ED' : '#F9FAFB', color: pkg.includes_sms ? '#C2410C' : '#9CA3AF', padding: '2px 8px', borderRadius: '50px', fontWeight: 700 }}>
+                            <span style={{ fontSize: "10px", background: pkg.includes_sms ? "#FFF7ED" : "#F9FAFB", color: pkg.includes_sms ? "#C2410C" : "#9CA3AF", padding: "2px 8px", borderRadius: "50px", fontWeight: 700 }}>
                               {pkg.includes_sms ? "SMS ✓" : "Sans SMS"}
                             </span>
                           </div>
-                          <div style={{ fontWeight: 900, fontSize: '22px', background: 'linear-gradient(90deg,#A020F0,#FF7F11)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: '14px' }}>
-                            {price > 0 ? `${price.toFixed(2)} ${symbol}` : 'N/A'}
+                          <div style={{ fontWeight: 900, fontSize: "22px", background: "linear-gradient(90deg,#A020F0,#FF7F11)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", marginBottom: "14px" }}>
+                            {price > 0 ? `${price.toFixed(2)} ${symbol}` : "N/A"}
                           </div>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleAcheter(pkg); }}
-                            style={{ width: '100%', background: 'linear-gradient(90deg,#A020F0,#FF7F11)', color: '#fff', border: 'none', borderRadius: '10px', padding: '11px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', boxShadow: '0 2px 8px rgba(160,32,240,.2)' }}
-                          >
+                          <button onClick={(e) => { e.stopPropagation(); handleAcheter(pkg); }}
+                            style={{ width: "100%", background: "linear-gradient(90deg,#A020F0,#FF7F11)", color: "#fff", border: "none", borderRadius: "10px", padding: "11px", fontWeight: 700, fontSize: "13px", cursor: "pointer", boxShadow: "0 2px 8px rgba(160,32,240,.2)" }}>
                             Acheter →
                           </button>
                         </div>
@@ -627,63 +496,52 @@ export default function RegionPage() {
                     })}
                   </div>
 
-                  {/* Flèche droite */}
-                  <button
-                    onClick={handleNext}
-                    disabled={packages.length <= 3}
-                    style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1.5px solid #E5E7EB', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: packages.length <= 3 ? 'default' : 'pointer', flexShrink: 0, opacity: packages.length <= 3 ? 0.3 : 1 }}
-                  >
+                  <button onClick={handleNext} disabled={currentIndex + 3 >= packages.length}
+                    style={{ width: "36px", height: "36px", borderRadius: "50%", border: "1.5px solid #E5E7EB", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: currentIndex + 3 >= packages.length ? "default" : "pointer", flexShrink: 0, opacity: currentIndex + 3 >= packages.length ? 0.3 : 1 }}>
                     <ChevronRight size={16} color="#374151" />
                   </button>
                 </div>
 
-                {/* Dots + compteur */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginTop: '16px' }}>
-                  <span style={{ fontSize: '12px', color: '#9CA3AF', fontWeight: 600 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", marginTop: "16px" }}>
+                  <span style={{ fontSize: "12px", color: "#9CA3AF", fontWeight: 600 }}>
                     {currentIndex + 1}–{Math.min(currentIndex + 3, packages.length)} sur {packages.length} forfaits
                   </span>
-                  <div style={{ display: 'flex', gap: '6px' }}>
+                  <div style={{ display: "flex", gap: "6px" }}>
                     {Array.from({ length: Math.ceil(packages.length / 3) }).map((_, i) => (
-                      <button
-                        key={i}
-                        onClick={() => setCurrentIndex(i * 3)}
-                        style={{ width: i === Math.floor(currentIndex / 3) ? '20px' : '8px', height: '8px', borderRadius: '50px', border: 'none', cursor: 'pointer', background: i === Math.floor(currentIndex / 3) ? '#A020F0' : '#E5E7EB', transition: 'all .3s' }}
-                      />
+                      <button key={i} onClick={() => setCurrentIndex(i * 3)}
+                        style={{ width: i === Math.floor(currentIndex / 3) ? "20px" : "8px", height: "8px", borderRadius: "50px", border: "none", cursor: "pointer", background: i === Math.floor(currentIndex / 3) ? "#A020F0" : "#E5E7EB", transition: "all .3s" }} />
                     ))}
                   </div>
                 </div>
               </div>
 
-              <div style={{ marginTop: '14px', background: '#F3E8FF', borderRadius: '10px', padding: '10px 14px', fontSize: '12px', color: '#7B15B8', fontWeight: 600 }}>
+              <div style={{ marginTop: "14px", background: "#F3E8FF", borderRadius: "10px", padding: "10px 14px", fontSize: "12px", color: "#7B15B8", fontWeight: 600 }}>
                 🔄 Tous les forfaits sont rechargeables depuis votre espace client
               </div>
             </div>
 
-            {/* ── QUE FAIRE AVEC X GO ── */}
+            {/* QUE FAIRE AVEC X GO */}
             {selectedPackage && typeof selectedPackage.data_amount === "number" && selectedPackage.data_amount > 0 && selectedPackage.data_unit && (
-              <div style={{ background: '#fff', borderRadius: '16px', border: '0.5px solid #E5E7EB', padding: '20px', marginBottom: '16px' }}>
-                <h2 style={{ fontWeight: 800, fontSize: '16px', marginBottom: '16px' }}>
+              <div style={{ background: "#fff", borderRadius: "16px", border: "0.5px solid #E5E7EB", padding: "20px", marginBottom: "16px" }}>
+                <h2 style={{ fontWeight: 800, fontSize: "16px", marginBottom: "16px" }}>
                   Que faire avec {selectedPackage.data_amount}{" "}
-                  {["gb", "go"].includes(selectedPackage.data_unit?.toLowerCase() ?? "") ? "Go" :
-                   ["mb", "mo"].includes(selectedPackage.data_unit?.toLowerCase() ?? "") ? "Mo" :
-                   selectedPackage.data_unit} ?
+                  {["gb", "go"].includes(selectedPackage.data_unit?.toLowerCase() ?? "") ? "Go" : ["mb", "mo"].includes(selectedPackage.data_unit?.toLowerCase() ?? "") ? "Mo" : selectedPackage.data_unit} ?
                 </h2>
                 {(() => {
                   const tips = getDataTip(selectedPackage.data_amount, selectedPackage.data_unit);
-                  const items = [
-                    { icon: <Camera size={20} />, label: "Photos", value: tips.photo + " photos" },
-                    { icon: <Globe size={20} />, label: "Navigation", value: tips.web },
-                    { icon: <Video size={20} />, label: "Vidéo", value: tips.video },
-                    { icon: <MessageSquare size={20} />, label: "Messages", value: tips.chat },
-                  ];
                   return (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '10px' }}>
-                      {items.map(({ icon, label, value }) => (
-                        <div key={label} style={{ background: '#F9F5FF', borderRadius: '10px', padding: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{ color: '#A020F0', flexShrink: 0 }}>{icon}</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: "10px" }}>
+                      {[
+                        { icon: <Camera size={20} />, label: "Photos", value: tips.photo + " photos" },
+                        { icon: <Globe size={20} />, label: "Navigation", value: tips.web },
+                        { icon: <Video size={20} />, label: "Vidéo HD", value: tips.video },
+                        { icon: <MessageSquare size={20} />, label: "Messages", value: tips.chat },
+                      ].map(({ icon, label, value }) => (
+                        <div key={label} style={{ background: "#F9F5FF", borderRadius: "10px", padding: "12px", display: "flex", alignItems: "center", gap: "10px" }}>
+                          <div style={{ color: "#A020F0", flexShrink: 0 }}>{icon}</div>
                           <div>
-                            <div style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: 600 }}>{label}</div>
-                            <div style={{ fontSize: '14px', fontWeight: 700, color: '#7B15B8' }}>{value}</div>
+                            <div style={{ fontSize: "11px", color: "#9CA3AF", fontWeight: 600 }}>{label}</div>
+                            <div style={{ fontSize: "14px", fontWeight: 700, color: "#7B15B8" }}>{value}</div>
                           </div>
                         </div>
                       ))}
@@ -693,23 +551,21 @@ export default function RegionPage() {
               </div>
             )}
 
-            {/* ── ACTIVATION STEPS ── */}
-            <div style={{ background: '#fff', borderRadius: '16px', border: '0.5px solid #E5E7EB', padding: '20px' }}>
-              <h2 style={{ fontWeight: 800, fontSize: '16px', marginBottom: '16px' }}>Comment activer ma eSIM ?</h2>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '12px' }}>
+            {/* ACTIVATION */}
+            <div style={{ background: "#fff", borderRadius: "16px", border: "0.5px solid #E5E7EB", padding: "20px" }}>
+              <h2 style={{ fontWeight: 800, fontSize: "16px", marginBottom: "16px" }}>Comment activer ma eSIM ?</h2>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: "12px" }}>
                 {[
                   { step: "1", title: "Recevez votre QR code", desc: "Par email immédiatement après paiement." },
                   { step: "2", title: "Ouvrez les réglages", desc: "Allez dans Réglages → Données mobiles." },
                   { step: "3", title: "Scannez le QR code", desc: "Ajoutez la ligne eSIM en scannant." },
                   { step: "4", title: "Connecté !", desc: "Votre eSIM s'active à l'atterrissage." },
                 ].map(({ step, title, desc }) => (
-                  <div key={step} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'linear-gradient(135deg,#A020F0,#FF7F11)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: '12px', flexShrink: 0 }}>
-                      {step}
-                    </div>
+                  <div key={step} style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+                    <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: "linear-gradient(135deg,#A020F0,#FF7F11)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontSize: "12px", flexShrink: 0 }}>{step}</div>
                     <div>
-                      <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: '2px' }}>{title}</div>
-                      <div style={{ fontSize: '11px', color: '#6B7280' }}>{desc}</div>
+                      <div style={{ fontWeight: 700, fontSize: "13px", marginBottom: "2px" }}>{title}</div>
+                      <div style={{ fontSize: "11px", color: "#6B7280" }}>{desc}</div>
                     </div>
                   </div>
                 ))}
@@ -717,64 +573,47 @@ export default function RegionPage() {
             </div>
           </div>
 
-          {/* ── RIGHT: STICKY ORDER SUMMARY ── */}
-          <div style={{ position: 'sticky', top: '80px' }}>
+          {/* ── RIGHT: STICKY RECAP ── */}
+          <div style={{ position: "sticky", top: "80px" }}>
             {selectedPackage && selectedPrice && (
-              <div style={{ background: '#fff', borderRadius: '16px', border: '1.5px solid rgba(160,32,240,.15)', padding: '20px', boxShadow: '0 4px 20px rgba(160,32,240,.08)' }}>
-                <div style={{ fontWeight: 800, fontSize: '15px', marginBottom: '16px', color: '#111827' }}>Récapitulatif</div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-                  {packages[0]?.flag_url && <img src={packages[0].flag_url} alt="" style={{ width: '36px', height: '24px', objectFit: 'cover', borderRadius: '4px' }} />}
+              <div style={{ background: "#fff", borderRadius: "16px", border: "1.5px solid rgba(160,32,240,.15)", padding: "20px", boxShadow: "0 4px 20px rgba(160,32,240,.08)" }}>
+                <div style={{ fontWeight: 800, fontSize: "15px", marginBottom: "16px", color: "#111827" }}>Récapitulatif</div>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
+                  {packages[0]?.flag_url && <img src={packages[0].flag_url} alt="" style={{ width: "36px", height: "24px", objectFit: "cover", borderRadius: "4px" }} />}
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: '15px' }}>{regionName}</div>
-                    <div style={{ fontSize: '12px', color: '#9CA3AF' }}>{selectedPackage.name}</div>
+                    <div style={{ fontWeight: 700, fontSize: "15px" }}>{regionName}</div>
+                    <div style={{ fontSize: "12px", color: "#9CA3AF" }}>{selectedPackage.name}</div>
                   </div>
                 </div>
-
-                <div style={{ background: '#F9F5FF', borderRadius: '10px', padding: '12px', marginBottom: '16px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                    <span style={{ fontSize: '12px', color: '#6B7280' }}>Prix</span>
-                    <span style={{ fontWeight: 800, fontSize: '20px', background: 'linear-gradient(90deg,#A020F0,#FF7F11)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                <div style={{ background: "#F9F5FF", borderRadius: "10px", padding: "12px", marginBottom: "16px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                    <span style={{ fontSize: "12px", color: "#6B7280" }}>Prix</span>
+                    <span style={{ fontWeight: 800, fontSize: "20px", background: "linear-gradient(90deg,#A020F0,#FF7F11)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
                       {selectedPrice.price.toFixed(2)} {selectedPrice.symbol}
                     </span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '12px', color: '#6B7280' }}>Opérateur</span>
-                    <span style={{ fontSize: '12px', fontWeight: 600 }}>{selectedPackage.operator_name}</span>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ fontSize: "12px", color: "#6B7280" }}>Opérateur</span>
+                    <span style={{ fontSize: "12px", fontWeight: 600 }}>{selectedPackage.operator_name}</span>
                   </div>
                 </div>
-
-                {/* Trust icons */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px' }}>
-                  {[
-                    { icon: '⚡', label: 'Activation instantanée' },
-                    { icon: '📩', label: 'Email immédiat' },
-                    { icon: '🔄', label: 'Rechargeable' },
-                    { icon: '💬', label: 'Support 24/7' },
-                  ].map(({ icon, label }) => (
-                    <div key={label} style={{ background: '#F9FAFB', borderRadius: '8px', padding: '8px 10px', fontSize: '11px', fontWeight: 600, color: '#374151', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "16px" }}>
+                  {[{ icon: "⚡", label: "Activation instantanée" }, { icon: "📩", label: "Email immédiat" }, { icon: "🔄", label: "Rechargeable" }, { icon: "💬", label: "Support 24/7" }].map(({ icon, label }) => (
+                    <div key={label} style={{ background: "#F9FAFB", borderRadius: "8px", padding: "8px 10px", fontSize: "11px", fontWeight: 600, color: "#374151", display: "flex", alignItems: "center", gap: "5px" }}>
                       <span>{icon}</span><span>{label}</span>
                     </div>
                   ))}
                 </div>
-
-                <button
-                  onClick={() => handleAcheter(selectedPackage)}
-                  style={{ width: '100%', background: 'linear-gradient(90deg,#A020F0,#FF7F11)', color: '#fff', border: 'none', borderRadius: '12px', padding: '14px', fontWeight: 800, fontSize: '15px', cursor: 'pointer', boxShadow: '0 4px 16px rgba(160,32,240,.3)', marginBottom: '10px' }}
-                >
+                <button onClick={() => handleAcheter(selectedPackage)}
+                  style={{ width: "100%", background: "linear-gradient(90deg,#A020F0,#FF7F11)", color: "#fff", border: "none", borderRadius: "12px", padding: "14px", fontWeight: 800, fontSize: "15px", cursor: "pointer", boxShadow: "0 4px 16px rgba(160,32,240,.3)", marginBottom: "10px" }}>
                   ⚡ Acheter maintenant →
                 </button>
-
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', fontSize: '11px', color: '#9CA3AF' }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "5px", fontSize: "11px", color: "#9CA3AF" }}>
                   <Shield size={12} /> Paiement 100% sécurisé via Stripe
                 </div>
-
-                {/* Description destination */}
                 {destinationInfo?.[0]?.description && (
-                  <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '0.5px solid #F3F4F6' }}>
-                    <div style={{ fontSize: '11px', color: '#6B7280', lineHeight: 1.6 }}>
-                      {destinationInfo[0].description}
-                    </div>
+                  <div style={{ marginTop: "16px", paddingTop: "14px", borderTop: "0.5px solid #F3F4F6", fontSize: "11px", color: "#6B7280", lineHeight: 1.6 }}>
+                    {destinationInfo[0].description}
                   </div>
                 )}
               </div>
@@ -783,7 +622,7 @@ export default function RegionPage() {
         </div>
       </div>
 
-      {/* ── MODAL PANIER ── */}
+      {/* MODAL PANIER */}
       {showCartModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8 max-w-sm w-full text-center">
@@ -797,11 +636,11 @@ export default function RegionPage() {
         </div>
       )}
 
-      {/* ── MODAL RÉCAPITULATIF + PAIEMENT — LOGIQUE INTACTE ── */}
+      {/* MODAL PAIEMENT */}
       {showRecapModal && selectedPackage && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4">
           <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-lg p-4 sm:p-6 w-full max-w-md relative max-h-[85dvh] overflow-y-auto">
-            <button className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-2xl font-bold" onClick={() => setShowRecapModal(false)} aria-label="Fermer">×</button>
+            <button className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-2xl font-bold" onClick={() => setShowRecapModal(false)}>×</button>
             <h2 className="text-xl sm:text-2xl font-bold mb-4 text-purple-700 pr-8">Récapitulatif de la commande</h2>
             <div className="mb-4">
               <div className="flex items-center gap-2 mb-2">
@@ -817,22 +656,19 @@ export default function RegionPage() {
                 <span className={`px-2 py-0.5 rounded-full font-semibold ${selectedPackage.includes_voice ? "bg-blue-50 text-blue-700" : "bg-gray-100 text-gray-400"}`}>Appels {selectedPackage.includes_voice ? "Oui" : "Non"}</span>
               </div>
               <div className="text-xl font-bold text-gray-900 mb-2">
-                {(() => {
-                  const { price, symbol } = getPackagePrice(selectedPackage);
-                  return `${price.toFixed(2)} ${symbol}`;
-                })()}
+                {(() => { const { price, symbol } = getPackagePrice(selectedPackage); return `${price.toFixed(2)} ${symbol}`; })()}
               </div>
             </div>
             <form onSubmit={handleRecapSubmit} className="space-y-3">
               <div className="flex gap-2">
-                <input type="text" name="prenom" placeholder="Prénom *" value={form.prenom} onChange={handleFormChange} className="w-1/2 border border-gray-300 rounded-lg px-3 py-2.5 text-gray-900 text-base focus:ring-2 focus:ring-orange-500" style={{ WebkitTextFillColor: "#111827", color: "#111827" }} required />
-                <input type="text" name="nom" placeholder="Nom *" value={form.nom} onChange={handleFormChange} className="w-1/2 border border-gray-300 rounded-lg px-3 py-2.5 text-gray-900 text-base focus:ring-2 focus:ring-orange-500" style={{ WebkitTextFillColor: "#111827", color: "#111827" } as React.CSSProperties} required />
+                <input type="text" name="prenom" placeholder="Prénom *" value={form.prenom} onChange={handleFormChange} className="w-1/2 border border-gray-300 rounded-lg px-3 py-2.5 text-sm" required />
+                <input type="text" name="nom" placeholder="Nom *" value={form.nom} onChange={handleFormChange} className="w-1/2 border border-gray-300 rounded-lg px-3 py-2.5 text-sm" required />
               </div>
-              <input type="email" name="email" placeholder="Email *" value={form.email} onChange={handleFormChange} className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-gray-900 text-base focus:ring-2 focus:ring-orange-500" style={{ WebkitTextFillColor: "#111827", color: "#111827" } as React.CSSProperties} required />
-              <input type="text" name="codePromo" placeholder="Code promo (optionnel)" value={form.codePromo} onChange={handleFormChange} readOnly={isFromPartnerLink && !!form.codePromo} className={`w-full border border-gray-300 rounded-lg px-3 py-2.5 text-gray-900 text-base focus:ring-2 focus:ring-purple-500 ${isFromPartnerLink && form.codePromo ? "bg-gray-100 cursor-not-allowed" : ""}`} style={{ WebkitTextFillColor: "#111827", color: "#111827" } as React.CSSProperties} />
-              <input type="text" name="codePartenaire" placeholder="Code partenaire (optionnel)" value={form.codePartenaire} onChange={handleFormChange} readOnly={isFromPartnerLink && !!form.codePartenaire} className={`w-full border border-gray-300 rounded-lg px-3 py-2.5 text-gray-900 text-base focus:ring-2 focus:ring-purple-500 ${isFromPartnerLink && form.codePartenaire ? "bg-gray-100 cursor-not-allowed" : ""}`} style={{ WebkitTextFillColor: "#111827", color: "#111827" } as React.CSSProperties} />
+              <input type="email" name="email" placeholder="Email *" value={form.email} onChange={handleFormChange} className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm" required />
+              <input type="text" name="codePromo" placeholder="Code promo (optionnel)" value={form.codePromo} onChange={handleFormChange} readOnly={isFromPartnerLink && !!form.codePromo} className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm" />
+              <input type="text" name="codePartenaire" placeholder="Code partenaire (optionnel)" value={form.codePartenaire} onChange={handleFormChange} readOnly={isFromPartnerLink && !!form.codePartenaire} className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm" />
               {formError && <div className="text-red-500 text-sm">{formError}</div>}
-              <button type="submit" className="w-full bg-gradient-to-r from-purple-600 to-orange-500 text-white py-3 px-4 rounded-xl font-bold text-base sm:text-lg shadow-md hover:from-purple-700 hover:to-orange-600 transition">
+              <button type="submit" className="w-full bg-gradient-to-r from-purple-600 to-orange-500 text-white py-3 px-4 rounded-xl font-bold text-base shadow-md">
                 Payer en toute sécurité 🔒
               </button>
             </form>

@@ -301,7 +301,7 @@ export default function Home() {
       <section className="relative w-full overflow-hidden" style={{ minHeight: '520px' }}>
         {/* Background image */}
         <img
-          src="https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?q=80&w=1600&fit=crop"
+          src="https://images.unsplash.com/photo-1542051841857-5f90071e7989?q=80&w=1600&fit=crop"
           alt="Voyageur connecté"
           className="absolute inset-0 w-full h-full object-cover"
           style={{ zIndex: 0 }}

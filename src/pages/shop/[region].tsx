@@ -6,12 +6,10 @@ import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import type { Database } from "@/lib/supabase/config";
 import Image from "next/image";
-import { Camera, Globe, Video, MessageSquare } from "lucide-react";
+import { Camera, Globe, Video, MessageSquare, ArrowLeft, ChevronLeft, ChevronRight, Shield } from "lucide-react";
 import React from "react";
-import OrderSummary from "@/components/checkout/OrderSummary";
 import { stripePromise } from "@/lib/stripe/config";
 import { getFrenchRegionName } from "@/lib/regionTranslations";
-
 
 type Package = Database["public"]["Tables"]["airalo_packages"]["Row"] & {
   region_image_url?: string;
@@ -20,16 +18,9 @@ type Package = Database["public"]["Tables"]["airalo_packages"]["Row"] & {
   image_url?: string;
 };
 
-type DataTip = {
-  photo: string;
-  web: string;
-  video: string;
-  chat: string;
-  calls: string;
-};
+type DataTip = { photo: string; web: string; video: string; chat: string; calls: string; };
 
 function getDataTip(amount: number, unit: string): DataTip {
-  // FIX: "mb" (not "mo") is the correct unit to convert from MB to GB
   let go = unit.toLowerCase() === "mb" ? amount / 1024 : amount;
   return {
     photo: Math.floor(go * 500).toLocaleString(),
@@ -40,131 +31,52 @@ function getDataTip(amount: number, unit: string): DataTip {
   };
 }
 
-function deburr(str: string) {
-  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-}
-
-function getCountryCode(region: string | null): string {
-  if (!region) return "xx";
-  const cleaned = region.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  const words = cleaned.trim().split(/\s+/);
-  if (words.length >= 2) {
-    return (words[0][0] + words[1][0]).toLowerCase();
-  } else {
-    return words[0].slice(0, 2).toLowerCase();
-  }
-}
-
 const FRENCH_TO_ENGLISH_REGION: Record<string, string> = {
-  "japon": "Japan",
-  "etats-unis": "United States",
-  "australie": "Australia",
-  "nouvelle-zelande": "New Zealand",
-  "mexique": "Mexico",
-  "fidji": "Fiji",
-  "thailande": "Thailand",
-  "singapour": "Singapore",
-  "malaisie": "Malaysia",
-  "indonesie": "Indonesia",
-  "philippines": "Philippines",
-  "viet-nam": "Vietnam",
-  "inde": "India",
-  "chine": "China",
-  "taiwan": "Taiwan",
-  "royaume-uni": "United Kingdom",
-  "allemagne": "Germany",
-  "espagne": "Spain",
-  "italie": "Italy",
-  "grece": "Greece",
-  "portugal": "Portugal",
-  "pays-bas": "Netherlands",
-  "belgique": "Belgium",
-  "suisse": "Switzerland",
-  "autriche": "Austria",
-  "pologne": "Poland",
-  "republique-tcheque": "Czech Republic",
-  "turquie": "Turkey",
-  "egypte": "Egypt",
-  "maroc": "Morocco",
-  "afrique-du-sud": "South Africa",
-  "bresil": "Brazil",
-  "argentine": "Argentina",
-  "chili": "Chile",
-  "colombie": "Colombia",
-  "perou": "Peru",
-  "emirats-arabes-unis": "United Arab Emirates",
-  "arabie-saoudite": "Saudi Arabia",
-  "israel": "Israel",
-  "jordanie": "Jordan",
-  "liban": "Lebanon",
-  "qatar": "Qatar",
-  "koweit": "Kuwait",
-  "bahrein": "Bahrain",
-  "oman": "Oman",
-  "azerbaidjan": "Azerbaijan",
-  "jamaique": "Jamaica",
-  "asie": "Asia",
-  "europe": "Europe",
-  "decouvrir-global": "Discover Global",
-  "iles-canaries": "Canary Islands",
-  "coree-du-sud": "South Korea",
+  "japon": "Japan", "etats-unis": "United States", "australie": "Australia",
+  "nouvelle-zelande": "New Zealand", "mexique": "Mexico", "fidji": "Fiji",
+  "thailande": "Thailand", "singapour": "Singapore", "malaisie": "Malaysia",
+  "indonesie": "Indonesia", "philippines": "Philippines", "viet-nam": "Vietnam",
+  "inde": "India", "chine": "China", "taiwan": "Taiwan",
+  "royaume-uni": "United Kingdom", "allemagne": "Germany", "espagne": "Spain",
+  "italie": "Italy", "grece": "Greece", "portugal": "Portugal",
+  "pays-bas": "Netherlands", "belgique": "Belgium", "suisse": "Switzerland",
+  "autriche": "Austria", "pologne": "Poland", "republique-tcheque": "Czech Republic",
+  "turquie": "Turkey", "egypte": "Egypt", "maroc": "Morocco",
+  "afrique-du-sud": "South Africa", "bresil": "Brazil", "argentine": "Argentina",
+  "chili": "Chile", "colombie": "Colombia", "perou": "Peru",
+  "emirats-arabes-unis": "United Arab Emirates", "arabie-saoudite": "Saudi Arabia",
+  "israel": "Israel", "jordanie": "Jordan", "liban": "Lebanon", "qatar": "Qatar",
+  "koweit": "Kuwait", "bahrein": "Bahrain", "oman": "Oman",
+  "azerbaidjan": "Azerbaijan", "jamaique": "Jamaica", "asie": "Asia",
+  "europe": "Europe", "decouvrir-global": "Discover Global",
+  "iles-canaries": "Canary Islands", "coree-du-sud": "South Korea",
 };
 
 function slugToRegionFr(slug: string): string {
-  return slug
-    .split("-")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(" ")
-    .toLowerCase();
+  return slug.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ").toLowerCase();
 }
 
 function getEnglishRegionFromSlug(slug: string): string {
-  const normalizedSlug = slug.toLowerCase().trim();
-  if (FRENCH_TO_ENGLISH_REGION[normalizedSlug]) {
-    return FRENCH_TO_ENGLISH_REGION[normalizedSlug];
-  }
-  return slug;
+  const n = slug.toLowerCase().trim();
+  return FRENCH_TO_ENGLISH_REGION[n] || slug;
 }
 
-async function validateAndApplyPromoCode(
-  code: string,
-  packagePrice: number,
-): Promise<{
-  isValid: boolean;
-  discountedPrice: number;
-  error?: string;
-}> {
+async function validateAndApplyPromoCode(code: string, packagePrice: number) {
   try {
-    const { data: promoCode, error } = await supabase
-      .from("promo_codes")
-      .select("*")
-      .eq("code", code)
-      .single();
-
-    if (error || !promoCode) {
-      return { isValid: false, discountedPrice: packagePrice, error: "Code promo invalide" };
-    }
-    if (!promoCode.is_active) {
-      return { isValid: false, discountedPrice: packagePrice, error: "Ce code promo n'est plus actif" };
-    }
+    const { data: promoCode, error } = await supabase.from("promo_codes").select("*").eq("code", code).single();
+    if (error || !promoCode) return { isValid: false, discountedPrice: packagePrice, error: "Code promo invalide" };
+    if (!promoCode.is_active) return { isValid: false, discountedPrice: packagePrice, error: "Ce code promo n'est plus actif" };
     const now = new Date();
-    if (new Date(promoCode.valid_from) > now || new Date(promoCode.valid_until) < now) {
+    if (new Date(promoCode.valid_from) > now || new Date(promoCode.valid_until) < now)
       return { isValid: false, discountedPrice: packagePrice, error: "Ce code promo n'est plus valide" };
-    }
-    if (promoCode.usage_limit && promoCode.times_used >= promoCode.usage_limit) {
+    if (promoCode.usage_limit && promoCode.times_used >= promoCode.usage_limit)
       return { isValid: false, discountedPrice: packagePrice, error: "Ce code promo a atteint sa limite d'utilisation" };
-    }
-
     let discountedPrice = packagePrice;
-    if (promoCode.discount_percentage) {
-      discountedPrice = packagePrice * (1 - promoCode.discount_percentage / 100);
-    } else if (promoCode.discount_amount) {
-      discountedPrice = Math.max(0, packagePrice - promoCode.discount_amount);
-    }
+    if (promoCode.discount_percentage) discountedPrice = packagePrice * (1 - promoCode.discount_percentage / 100);
+    else if (promoCode.discount_amount) discountedPrice = Math.max(0, packagePrice - promoCode.discount_amount);
     return { isValid: true, discountedPrice };
-  } catch (error) {
-    console.error("Error validating promo code:", error);
-    return { isValid: false, discountedPrice: packagePrice, error: "Une erreur est survenue lors de la validation du code promo" };
+  } catch {
+    return { isValid: false, discountedPrice: packagePrice, error: "Une erreur est survenue" };
   }
 }
 
@@ -178,29 +90,16 @@ export default function RegionPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCartModal, setShowCartModal] = useState(false);
-  const [showSimulator, setShowSimulator] = useState(false);
   const [showRecapModal, setShowRecapModal] = useState(false);
-  const [destinationInfo, setDestinationInfo] = useState();
-  const [form, setForm] = useState({
-    nom: "",
-    first_name: "",
-    last_name: "",
-    prenom: "",
-    email: "",
-    codePromo: "",
-    codePartenaire: "",
-  });
+  const [destinationInfo, setDestinationInfo] = useState<any>();
+  const [form, setForm] = useState({ nom: "", first_name: "", last_name: "", prenom: "", email: "", codePromo: "", codePartenaire: "" });
   const [formError, setFormError] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const { partnerCode, promoCode: partnerPromoCode, isFromPartnerLink } = usePartnerCodes();
 
   useEffect(() => {
     if (partnerCode || partnerPromoCode) {
-      setForm((prev) => ({
-        ...prev,
-        codePartenaire: prev.codePartenaire || partnerCode,
-        codePromo: prev.codePromo || partnerPromoCode,
-      }));
+      setForm((prev) => ({ ...prev, codePartenaire: prev.codePartenaire || partnerCode, codePromo: prev.codePromo || partnerPromoCode }));
     }
   }, [partnerCode, partnerPromoCode]);
 
@@ -214,87 +113,42 @@ export default function RegionPage() {
     }
   }, []);
 
-  useEffect(() => {
-    const stored = localStorage.getItem("cart");
-    if (stored) setCart(JSON.parse(stored));
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem("cart", JSON.stringify(cart));
-  }, [cart]);
+  useEffect(() => { const stored = localStorage.getItem("cart"); if (stored) setCart(JSON.parse(stored)); }, []);
+  useEffect(() => { localStorage.setItem("cart", JSON.stringify(cart)); }, [cart]);
 
   useEffect(() => {
     async function fetchData() {
-      setLoading(true);
-      setError(null);
+      setLoading(true); setError(null);
       try {
-        if (!params?.region) {
-          setError("Destination non trouvée");
-          setLoading(false);
-          return;
-        }
+        if (!params?.region) { setError("Destination non trouvée"); setLoading(false); return; }
         const regionParam = Array.isArray(params.region) ? params.region[0] : params.region;
         const regionFr = slugToRegionFr(regionParam.toLowerCase());
         const englishRegion = getEnglishRegionFromSlug(regionParam);
         const dbSlug = englishRegion.toLowerCase();
-
-        const { data: pkgs, error: pkgError } = await supabase
-          .from("airalo_packages")
-          .select("*")
-          .eq("slug", dbSlug)
-          .gt("final_price_eur", 0)
-          .order("final_price_eur", { ascending: true });
-        const { data: dest, error: destError } = await supabase
-          .from("destination_info")
-          .select("*")
-          .eq("name", pkgs?.[0].region_fr);
-        /* @ts-ignore */
+        const { data: pkgs, error: pkgError } = await supabase.from("airalo_packages").select("*").eq("slug", dbSlug).gt("final_price_eur", 0).order("final_price_eur", { ascending: true });
+        const { data: dest } = await supabase.from("destination_info").select("*").eq("name", pkgs?.[0].region_fr);
         setDestinationInfo(dest);
-
         const region = regionFr.toLowerCase().replace(/\s+/g, "-");
-        const { data } = await supabase.storage
-          .from("product-images")
-          .getPublicUrl(`esim-${region}.jpg`);
+        const { data } = await supabase.storage.from("product-images").getPublicUrl(`esim-${region}.jpg`);
         setDestinationImage(`${data.publicUrl}`);
-
         if (pkgError) throw pkgError;
-        if (!pkgs || pkgs.length === 0) {
-          setError("Aucun forfait disponible pour cette destination");
-          setLoading(false);
-          return;
-        }
+        if (!pkgs || pkgs.length === 0) { setError("Aucun forfait disponible pour cette destination"); setLoading(false); return; }
         setPackages(pkgs);
         setSelectedPackage(pkgs[0]);
-      } catch (err) {
-        setError("Erreur lors du chargement des données");
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
+      } catch (err) { setError("Erreur lors du chargement des données"); console.error(err); }
+      finally { setLoading(false); }
     }
     fetchData();
   }, [params?.region]);
 
-  useEffect(() => {
-    const checkScreenSize = () => setIsMobile(window.innerWidth < 768);
-    checkScreenSize();
-    window.addEventListener("resize", checkScreenSize);
-    return () => window.removeEventListener("resize", checkScreenSize);
-  }, []);
-
-  useEffect(() => { console.log(destinationInfo); }, [destinationInfo]);
-
-  // FIX: keep selectedPackage in sync with currentIndex on mobile
-  useEffect(() => {
-    if (packages.length > 0) {
-      setSelectedPackage(packages[currentIndex]);
-    }
-  }, [currentIndex, packages]);
+  useEffect(() => { const check = () => setIsMobile(window.innerWidth < 768); check(); window.addEventListener("resize", check); return () => window.removeEventListener("resize", check); }, []);
+  useEffect(() => { if (packages.length > 0) setSelectedPackage(packages[currentIndex]); }, [currentIndex, packages]);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-t-2 border-b-2 border-purple-600"></div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div style={{ width: '48px', height: '48px', borderRadius: '50%', border: '4px solid #F3E8FF', borderTopColor: '#A020F0', animation: 'spin 1s linear infinite' }} />
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       </div>
     );
   }
@@ -303,11 +157,9 @@ export default function RegionPage() {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="text-center">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4">{error}</h2>
-          <button
-            onClick={() => router.push("/shop")}
-            className="bg-purple-600 text-white px-4 sm:px-6 py-2 rounded-xl hover:bg-purple-700 transition-colors text-sm sm:text-base"
-          >
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>😕</div>
+          <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#111827', marginBottom: '12px' }}>{error}</h2>
+          <button onClick={() => router.push("/shop")} style={{ background: 'linear-gradient(90deg,#A020F0,#FF7F11)', color: '#fff', padding: '10px 24px', borderRadius: '10px', border: 'none', fontWeight: 700, cursor: 'pointer' }}>
             Retour à la boutique
           </button>
         </div>
@@ -316,691 +168,410 @@ export default function RegionPage() {
   }
 
   const regionParam = Array.isArray(params.region) ? params.region[0] : params.region;
-  const regionName = packages[0]
-    ? getFrenchRegionName(packages[0].region_fr, packages[0].region)
-    : regionParam;
-  const regionDescription = packages[0]?.region_description || "";
+  const regionName = packages[0] ? getFrenchRegionName(packages[0].region_fr, packages[0].region) : regionParam;
+  const margin = parseFloat(localStorage.getItem("global_margin") || "0");
 
-  function handleAddToCart(pkg: Package) {
-    const margin = parseFloat(localStorage.getItem("global_margin") || "0");
-    const pkgWithMargin = { ...pkg, final_price_eur: pkg.final_price_eur! * (1 + margin) };
-    setCart((prev) => [...prev, pkgWithMargin]);
-    setShowCartModal(true);
-  }
+  const getPackagePrice = (pkg: Package) => {
+    let price = pkg.final_price_eur;
+    let symbol = "€";
+    if (currency === "USD") { price = pkg.final_price_usd; symbol = "$"; }
+    else if (currency === "XPF") { price = pkg.final_price_xpf; symbol = "₣"; }
+    return { price: price! * (1 + margin), symbol };
+  };
 
-  function handleAcheter(pkg: Package) {
-    setSelectedPackage(pkg);
-    setShowSimulator(true);
-    setShowRecapModal(true);
-  }
+  const selectedPrice = selectedPackage ? getPackagePrice(selectedPackage) : null;
 
-  function handleFormChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  }
+  const seoTitle = regionName ? `eSIM ${regionName} — Connexion instantanée | FENUA SIM` : "Forfait eSIM — FENUA SIM";
+  const minPrice = packages.length > 0 ? Math.min(...packages.map(p => p.final_price_eur || 999)).toFixed(2) : null;
+  const seoDescription = regionName && minPrice ? `Achetez votre eSIM ${regionName}. ${packages.length} forfait${packages.length > 1 ? "s" : ""} à partir de ${minPrice} €. Activation instantanée, 4G/5G.` : "Forfait eSIM de voyage — Activation instantanée.";
+  const canonicalSlug = Array.isArray(params?.region) ? params.region[0] : params?.region || "";
+  const canonicalUrl = `https://www.fenuasim.com/shop/${canonicalSlug}`;
+
+  function handleAcheter(pkg: Package) { setSelectedPackage(pkg); setShowRecapModal(true); }
+  function handleFormChange(e: React.ChangeEvent<HTMLInputElement>) { setForm({ ...form, [e.target.name]: e.target.value }); }
+  const handlePrev = () => setCurrentIndex((p) => (p === 0 ? packages.length - 1 : p - 1));
+  const handleNext = () => setCurrentIndex((p) => (p === packages.length - 1 ? 0 : p + 1));
 
   async function handleRecapSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.nom || !form.prenom || !form.email) {
-      setFormError("Merci de remplir tous les champs obligatoires.");
-      return;
-    }
-    if (!selectedPackage) {
-      setFormError("Aucun forfait sélectionné.");
-      return;
-    }
-    if (!selectedPackage.id) {
-      console.error("Missing package ID - selectedPackage:", JSON.stringify(selectedPackage));
-      setFormError("Erreur: Données du forfait incomplètes. Veuillez rafraîchir la page et réessayer.");
-      return;
-    }
+    if (!form.nom || !form.prenom || !form.email) { setFormError("Merci de remplir tous les champs obligatoires."); return; }
+    if (!selectedPackage) { setFormError("Aucun forfait sélectionné."); return; }
+    if (!selectedPackage.id) { setFormError("Erreur: Données du forfait incomplètes. Veuillez rafraîchir la page."); return; }
     setFormError(null);
-
-    let promoCodeToSave = null;
     let basePrice = selectedPackage.final_price_eur!;
     if (currency === "USD") basePrice = selectedPackage.final_price_usd!;
     else if (currency === "XPF") basePrice = selectedPackage.final_price_xpf!;
-
     let finalPrice = basePrice * (1 + margin);
-
+    let promoCodeToSave = null;
     if (form.codePromo) {
       const promoResult = await validateAndApplyPromoCode(form.codePromo, finalPrice);
-      if (!promoResult.isValid) {
-        setFormError(promoResult.error || "Code promo invalide");
-        return;
-      }
+      if (!promoResult.isValid) { setFormError(promoResult.error || "Code promo invalide"); return; }
       finalPrice = promoResult.discountedPrice;
       promoCodeToSave = form.codePromo;
     }
-
     localStorage.setItem("packageId", selectedPackage.id);
     localStorage.setItem("customerId", form.email);
     localStorage.setItem("customerEmail", form.email);
     localStorage.setItem("customerName", `${form.prenom} ${form.nom}`);
     if (form.codePromo) localStorage.setItem("promoCode", form.codePromo);
     if (form.codePartenaire) localStorage.setItem("partnerCode", form.codePartenaire);
-
     setShowRecapModal(false);
     try {
       const response = await fetch("/api/create-checkout-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          first_name: form.prenom,
-          last_name: form.nom,
-          customer_email: form.email,
-          cartItems: [
-            {
-              id: selectedPackage.id,
-              name: selectedPackage.name,
-              description: selectedPackage.description ?? "",
-              price: finalPrice,
-              currency: currency,
-              final_price_eur: selectedPackage.final_price_eur! * (1 + margin),
-              final_price_usd: selectedPackage.final_price_usd! * (1 + margin),
-              final_price_xpf: selectedPackage.final_price_xpf! * (1 + margin),
-              promo_code: promoCodeToSave || undefined,
-              partner_code: form.codePartenaire || undefined,
-            },
-          ],
+          first_name: form.prenom, last_name: form.nom, customer_email: form.email,
+          cartItems: [{ id: selectedPackage.id, name: selectedPackage.name, description: selectedPackage.description ?? "", price: finalPrice, currency, final_price_eur: selectedPackage.final_price_eur! * (1 + margin), final_price_usd: selectedPackage.final_price_usd! * (1 + margin), final_price_xpf: selectedPackage.final_price_xpf! * (1 + margin), promo_code: promoCodeToSave || undefined, partner_code: form.codePartenaire || undefined }],
         }),
       });
-
       const responseData = await response.json();
-      if (!response.ok) {
-        console.error("Checkout session creation failed:", responseData);
-        if (responseData.error === "MISSING_PACKAGE_ID") {
-          setFormError("Erreur: Données du forfait incomplètes. Veuillez rafraîchir la page et réessayer.");
-        } else {
-          setFormError(responseData.message || "Une erreur est survenue. Veuillez réessayer.");
-        }
-        return;
-      }
-
+      if (!response.ok) { setFormError(responseData.message || "Une erreur est survenue."); return; }
       const { sessionId } = responseData;
-      if (!sessionId) throw new Error("Session ID not returned from API");
-
+      if (!sessionId) throw new Error("Session ID not returned");
       const stripe = await stripePromise;
       if (!stripe) throw new Error("Stripe non initialisé");
       const { error } = await stripe.redirectToCheckout({ sessionId });
       if (error) throw error;
     } catch (err) {
-      console.error("Erreur lors de la redirection Stripe:", err);
-      setFormError("Une erreur est survenue lors de la redirection vers le paiement. Veuillez rafraîchir la page et réessayer.");
+      console.error("Erreur Stripe:", err);
+      setFormError("Une erreur est survenue lors du paiement. Veuillez réessayer.");
     }
   }
 
-  const handlePrev = () => {
-    setCurrentIndex((prev) => (prev === 0 ? packages.length - 1 : prev - 1));
-  };
-  const handleNext = () => {
-    setCurrentIndex((prev) => (prev === packages.length - 1 ? 0 : prev + 1));
-  };
-
-  const margin = parseFloat(localStorage.getItem("global_margin")!);
-
-  const selectedPackagePrice = () => {
-    let price = selectedPackage?.final_price_eur;
-    let symbol = "€";
-    if (currency === "USD") { price = selectedPackage?.final_price_usd; symbol = "$"; }
-    else if (currency === "XPF") { price = selectedPackage?.final_price_xpf; symbol = "₣"; }
-    const priceWithMargin = price! * (1 + margin);
-    return `${priceWithMargin.toFixed(2)} ${symbol}`;
-  };
-
-  // ── SEO dynamique ──────────────────────────────────────────────────────
-  const seoTitle = regionName
-    ? `eSIM ${regionName} — Connexion instantanée à l'étranger | FENUA SIM`
-    : "Forfait eSIM — FENUA SIM";
-
-  const minPrice = packages.length > 0
-    ? Math.min(...packages.map(p => p.final_price_eur || 999)).toFixed(2)
-    : null;
-
-  const packageCount = packages.length;
-
-  const seoDescription = regionName && minPrice
-    ? `Achetez votre eSIM ${regionName} depuis N'importe où . ${packageCount} forfait${packageCount > 1 ? "s" : ""} disponible${packageCount > 1 ? "s" : ""} à partir de ${minPrice} €. Activation instantanée, couverture 4G/5G, support 7j/7.`
-    : `Forfait eSIM de voyage — Activation instantanée.`;
-
-  const canonicalSlug = Array.isArray(params?.region) ? params.region[0] : params?.region || "";
-  const canonicalUrl = `https://www.fenuasim.com/shop/${canonicalSlug}`;
-
   return (
-    <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 lg:py-8 space-y-6 sm:space-y-8 lg:space-y-10">
-    <Head>
-      <title>{seoTitle}</title>
-      <meta name="description" content={seoDescription} />
-      <meta name="keywords" content={regionName ? `eSIM ${regionName}, eSIM ${regionName} Polynésie, eSIM ${regionName} Tahiti, forfait data ${regionName}, acheter eSIM ${regionName}` : "eSIM voyage"} />
-      <link rel="canonical" href={canonicalUrl} />
-      <meta property="og:title" content={seoTitle} />
-      <meta property="og:description" content={seoDescription} />
-      <meta property="og:url" content={canonicalUrl} />
-      {packages[0]?.flag_url && (
-        <meta property="og:image" content={packages[0].flag_url} />
-      )}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify({
-          "@context": "https://schema.org",
-          "@type": "Product",
-          name: regionName ? `eSIM ${regionName} — FENUA SIM` : "eSIM de voyage FENUA SIM",
-          description: seoDescription,
-          brand: { "@type": "Brand", name: "FENUA SIM" },
-          url: canonicalUrl,
-          offers: packages.slice(0, 5).map(pkg => ({
-            "@type": "Offer",
-            name: pkg.package_id || pkg.operator_name || "Forfait eSIM",
-            price: pkg.final_price_eur?.toFixed(2) || "0",
-            priceCurrency: "EUR",
-            availability: "https://schema.org/InStock",
-            seller: { "@type": "Organization", name: "FENUA SIM" }
-          }))
-        })}}
-      />
-    </Head>
+    <div style={{ minHeight: '100vh', background: '#F9FAFB' }}>
+      <Head>
+        <title>{seoTitle}</title>
+        <meta name="description" content={seoDescription} />
+        <meta name="keywords" content={regionName ? `eSIM ${regionName}, eSIM ${regionName} Polynésie, forfait data ${regionName}` : "eSIM voyage"} />
+        <link rel="canonical" href={canonicalUrl} />
+        <meta property="og:title" content={seoTitle} />
+        <meta property="og:description" content={seoDescription} />
+        <meta property="og:url" content={canonicalUrl} />
+        {packages[0]?.flag_url && <meta property="og:image" content={packages[0].flag_url} />}
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({ "@context": "https://schema.org", "@type": "Product", name: regionName ? `eSIM ${regionName} — FENUA SIM` : "eSIM de voyage FENUA SIM", description: seoDescription, brand: { "@type": "Brand", name: "FENUA SIM" }, url: canonicalUrl, offers: packages.slice(0, 5).map(pkg => ({ "@type": "Offer", name: pkg.package_id || pkg.operator_name || "Forfait eSIM", price: pkg.final_price_eur?.toFixed(2) || "0", priceCurrency: "EUR", availability: "https://schema.org/InStock", seller: { "@type": "Organization", name: "FENUA SIM" } })) }) }} />
+      </Head>
 
-      {/* ── Bloc 1 : Présentation destination ── */}
-      <section className="bg-white rounded-xl sm:rounded-2xl shadow-sm p-4 sm:p-6 flex flex-col md:flex-row gap-4 sm:gap-6 lg:gap-8 items-start">
-
-        {/* Destination image — desktop only */}
-        <div className="relative w-1/3 h-[40rem] hidden md:block rounded-lg overflow-hidden flex-shrink-0">
-          <Image src={destinationImage} alt="Region" fill className="object-cover" />
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute bottom-0 left-0 w-full h-1/3 bg-gradient-to-t from-white via-white/30 to-transparent" />
+      {/* ── HERO DESTINATION ── */}
+      <div style={{ position: 'relative', height: '280px', overflow: 'hidden' }}>
+        <img
+          src={destinationImage || `https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?q=80&w=1400&fit=crop`}
+          alt={regionName || "Destination"}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?q=80&w=1400&fit=crop'; }}
+        />
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg,rgba(160,32,240,.75),rgba(10,2,30,.6) 60%,rgba(255,127,17,.3) 100%)' }} />
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '24px' }}>
+          <button
+            onClick={() => router.push('/shop')}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'rgba(255,255,255,.8)', background: 'rgba(255,255,255,.12)', border: '1px solid rgba(255,255,255,.2)', borderRadius: '50px', padding: '5px 12px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', marginBottom: '14px', width: 'fit-content' }}
+          >
+            <ArrowLeft size={13} /> Retour
+          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            {packages[0]?.flag_url && (
+              <img src={packages[0].flag_url} alt={regionName || ""} style={{ width: '52px', height: '36px', objectFit: 'cover', borderRadius: '6px', border: '2px solid rgba(255,255,255,.3)', flexShrink: 0 }} />
+            )}
+            <div>
+              <h1 style={{ fontSize: 'clamp(24px,5vw,40px)', fontWeight: 900, color: '#fff', letterSpacing: '-.05em', lineHeight: 1.1 }}>
+                {regionName}
+              </h1>
+              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,.7)', marginTop: '4px' }}>
+                {packages.length} forfait{packages.length > 1 ? 's' : ''} disponible{packages.length > 1 ? 's' : ''} · Activation instantanée
+              </p>
+            </div>
           </div>
         </div>
+      </div>
 
-        {/* Right column */}
-        <div className="flex-1 min-w-0 w-full">
+      <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '24px 20px' }}>
 
-          {/* Header row: flag + title + price */}
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
-            {/* Flag + title + description */}
-            <div className="flex flex-row items-start gap-3 min-w-0">
-              <div className="flex-shrink-0 pt-1">
-                <img
-                  src={packages[0]?.flag_url ?? ""}
-                  alt={regionName || ""}
-                  width={60}
-                  height={40}
-                  className="rounded object-cover"
-                />
-              </div>
-              <div className="min-w-0">
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-purple-800 leading-tight">
-                  {regionName}
-                </h1>
-                <p className="text-purple-700 text-sm sm:text-base leading-relaxed mt-1">
-                  {packages[0]?.region_description || "Découvrez nos forfaits eSIM pour cette destination."}
-                </p>
-              </div>
-            </div>
-            {/* Price — always visible */}
-            <div className="text-xl sm:text-2xl font-bold text-purple-700 sm:flex-shrink-0">
-              {selectedPackagePrice()}
-            </div>
+        {/* ── TRUST + CURRENCY ROW ── */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginBottom: '24px' }}>
+          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+            {["⚡ Activation instantanée", "📩 Email immédiat", "🔒 Paiement Stripe", "💬 Support 24/7"].map(t => (
+              <span key={t} style={{ fontSize: '12px', color: '#6B7280', fontWeight: 600 }}>{t}</span>
+            ))}
           </div>
+          <select
+            value={currency}
+            onChange={(e) => { setCurrency(e.target.value as any); localStorage.setItem("currency", e.target.value); }}
+            style={{ border: '1.5px solid rgba(160,32,240,.3)', borderRadius: '8px', padding: '6px 12px', fontSize: '13px', fontWeight: 700, color: '#A020F0', background: '#F9F5FF', cursor: 'pointer', outline: 'none' }}
+          >
+            <option value="EUR">€ EUR</option>
+            <option value="XPF">₣ XPF</option>
+            <option value="USD">$ USD</option>
+          </select>
+        </div>
 
-          {/* Description + CTA */}
-          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mt-6">
-            <div className="flex flex-col gap-3">
-              <div className="text-black font-semibold text-sm border rounded-xl text-center py-1 bg-gray-200 w-32">
-                Description
-              </div>
-              <div className="flex items-start gap-2 max-w-xs sm:max-w-sm">
-                <svg
-                  className="w-5 h-5 mt-0.5 flex-shrink-0 text-purple-600"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z"
-                    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                  />
-                </svg>
-                <span className="text-gray-700 text-sm">
-                  {/* @ts-ignore */}
-                  {destinationInfo?.[0]?.description ?? "Description"}
-                </span>
-              </div>
-            </div>
-            <button
-              className="bg-gradient-to-r from-purple-600 to-orange-500 text-white px-5 py-2.5 rounded-xl hover:from-purple-700 hover:to-orange-600 transition-all duration-300 text-sm sm:text-base whitespace-nowrap self-start sm:self-auto"
-              onClick={() => router.push("/compatibilite")}
-            >
-              Vérifier la compatibilité
-            </button>
-          </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 340px', gap: '24px', alignItems: 'start' }} className="product-grid">
+          <style>{`@media(max-width:768px){.product-grid{grid-template-columns:1fr!important}}`}</style>
 
-          {/* Currency selector */}
-          <div className="flex justify-end mt-5">
-            <select
-              value={currency}
-              onChange={(e) => {
-                setCurrency(e.target.value as "EUR" | "XPF" | "USD");
-                localStorage.setItem("currency", e.target.value);
-              }}
-              className="border border-purple-300 text-purple-800 bg-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 shadow-md font-semibold text-sm sm:text-base min-w-[6rem]"
-            >
-              <option value="EUR">€ EUR</option>
-              <option value="XPF">₣ XPF</option>
-              <option value="USD">$ USD</option>
-            </select>
-          </div>
+          {/* ── LEFT: FORFAITS ── */}
+          <div>
+            <div style={{ background: '#fff', borderRadius: '16px', border: '0.5px solid #E5E7EB', padding: '20px', marginBottom: '16px' }}>
+              <h2 style={{ fontWeight: 800, fontSize: '18px', letterSpacing: '-.04em', marginBottom: '4px' }}>Forfaits disponibles</h2>
+              <p style={{ fontSize: '12px', color: '#9CA3AF', marginBottom: '18px' }}>
+                {packages.length} forfait{packages.length > 1 ? 's' : ''} — sélectionnez celui adapté à votre séjour
+              </p>
 
-          {/* ── Forfaits ── */}
-          <div className="mt-8 rounded-xl shadow bg-gray-100 p-4 sm:p-6">
-            <h2 className="text-xl sm:text-2xl text-purple-800 font-bold mb-4 sm:mb-6">
-              Forfaits disponibles
-            </h2>
-
-            {/* Nombre de forfaits */}
-            <p className="text-sm text-gray-500 mb-3">
-              <span className="font-semibold text-purple-700">{packages.length}</span> forfait{packages.length > 1 ? "s" : ""} disponible{packages.length > 1 ? "s" : ""} pour cette destination
-            </p>
-
-            {/* ── Mobile : carousel avec flèches ── */}
-            <div className="flex sm:hidden flex-col gap-3">
-              <div className="relative flex items-center gap-2">
-                {/* Flèche gauche */}
-                <button
-                  onClick={handlePrev}
-                  className="flex-shrink-0 bg-white border border-gray-200 rounded-full p-2 shadow hover:bg-purple-50 transition disabled:opacity-30"
-                  aria-label="Précédent"
-                  disabled={packages.length <= 1}
-                >
-                  <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M11 14l-5-5 5-5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-
-                {/* Carte du forfait courant */}
-                {packages[currentIndex] && (() => {
-                  const pkg = packages[currentIndex];
-                  let price = pkg.final_price_eur;
-                  let symbol = "€";
-                  if (currency === "USD") { price = pkg.final_price_usd; symbol = "$"; }
-                  else if (currency === "XPF") { price = pkg.final_price_xpf; symbol = "₣"; }
-                  const priceWithMargin = price! * (1 + margin);
-                  return (
-                    <div
-                      className={`flex-1 bg-white rounded-xl border-2 p-4 flex flex-col items-center shadow transition-all cursor-pointer ${
-                        selectedPackage?.id === pkg.id ? "border-purple-500 shadow-lg" : "border-gray-100"
-                      }`}
-                      onClick={() => setSelectedPackage(pkg)}
-                    >
-                      <div className="flex items-center gap-2 mb-3">
-                        <img src={pkg.image_url} alt="" width={36} height={26} className="rounded object-cover border" />
-                        <h3 className="text-base font-bold text-purple-800 text-center">{pkg.name}</h3>
+              {/* Mobile carousel */}
+              <div className="block sm:hidden">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button onClick={handlePrev} disabled={packages.length <= 1} style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1px solid #E5E7EB', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+                    <ChevronLeft size={16} />
+                  </button>
+                  {packages[currentIndex] && (() => {
+                    const pkg = packages[currentIndex];
+                    const { price, symbol } = getPackagePrice(pkg);
+                    return (
+                      <div style={{ flex: 1, background: '#F9F5FF', borderRadius: '12px', border: '2px solid #A020F0', padding: '16px', textAlign: 'center' }}>
+                        <div style={{ fontWeight: 800, fontSize: '18px', marginBottom: '4px' }}>{pkg.name}</div>
+                        <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '12px' }}>{pkg.description}</div>
+                        <div style={{ fontWeight: 900, fontSize: '24px', background: 'linear-gradient(90deg,#A020F0,#FF7F11)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: '14px' }}>
+                          {price.toFixed(2)} {symbol}
+                        </div>
+                        <button onClick={() => handleAcheter(pkg)} style={{ width: '100%', background: 'linear-gradient(90deg,#A020F0,#FF7F11)', color: '#fff', border: 'none', borderRadius: '10px', padding: '12px', fontWeight: 700, fontSize: '14px', cursor: 'pointer' }}>
+                          Acheter — Paiement sécurisé
+                        </button>
                       </div>
-                      <div className="flex flex-wrap gap-1.5 mb-3 justify-center">
-                        <span className="text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full font-bold">
-                          {pkg.includes_voice ? "Appels inclus" : "Pas d'appels"}
-                        </span>
-                        <span className="text-xs bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full font-bold">
-                          {pkg.includes_sms ? "SMS inclus" : "Pas de SMS"}
-                        </span>
-                      </div>
-                      <div className="text-gray-700 text-xs mb-3 text-center min-h-[36px]">{pkg.description}</div>
-                      <div className="text-lg font-bold text-purple-700 mb-4">
-                        {priceWithMargin && priceWithMargin > 0
-                          ? `${priceWithMargin.toFixed(2)} ${symbol}`
-                          : <span className="text-gray-400">Prix indisponible</span>}
-                      </div>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleAcheter(pkg); }}
-                        className="w-full py-3 bg-gradient-to-r from-purple-600 to-orange-500 text-white font-semibold rounded-xl hover:from-purple-700 hover:to-orange-600 transition-all text-sm"
-                      >
-                        Acheter - Paiement Sécurisé
-                      </button>
-                    </div>
-                  );
-                })()}
-
-                {/* Flèche droite */}
-                <button
-                  onClick={handleNext}
-                  className="flex-shrink-0 bg-white border border-gray-200 rounded-full p-2 shadow hover:bg-purple-50 transition disabled:opacity-30"
-                  aria-label="Suivant"
-                  disabled={packages.length <= 1}
-                >
-                  <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M7 4l5 5-5 5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-              </div>
-
-              {/* Compteur + dots mobile */}
-              <div className="flex flex-col items-center gap-1.5">
-                <span className="text-xs text-gray-400 font-medium">
-                  {currentIndex + 1} / {packages.length}
-                </span>
-                <div className="flex justify-center gap-1.5 flex-wrap max-w-[240px]">
-                  {packages.map((_, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setCurrentIndex(idx)}
-                      className={`w-2.5 h-2.5 rounded-full transition-colors ${
-                        idx === currentIndex ? "bg-purple-600" : "bg-gray-300 hover:bg-purple-400"
-                      }`}
-                    />
+                    );
+                  })()}
+                  <button onClick={handleNext} disabled={packages.length <= 1} style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1px solid #E5E7EB', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginTop: '12px' }}>
+                  {packages.map((_, i) => (
+                    <button key={i} onClick={() => setCurrentIndex(i)} style={{ width: '8px', height: '8px', borderRadius: '50%', border: 'none', cursor: 'pointer', background: i === currentIndex ? '#A020F0' : '#E5E7EB' }} />
                   ))}
                 </div>
               </div>
+
+              {/* Desktop grid */}
+              <div className="hidden sm:grid" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: '12px' }}>
+                {packages.map((pkg) => {
+                  const { price, symbol } = getPackagePrice(pkg);
+                  const isSelected = selectedPackage?.id === pkg.id;
+                  return (
+                    <div
+                      key={pkg.id}
+                      onClick={() => setSelectedPackage(pkg)}
+                      style={{
+                        background: isSelected ? '#F9F5FF' : '#fff',
+                        borderRadius: '12px',
+                        border: isSelected ? '2px solid #A020F0' : '1px solid #E5E7EB',
+                        padding: '16px',
+                        cursor: 'pointer',
+                        transition: 'all .2s',
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
+                      }}
+                    >
+                      <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '4px' }}>{pkg.name}</div>
+                      <div style={{ fontSize: '11px', color: '#9CA3AF', marginBottom: '8px' }}>{pkg.description}</div>
+                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '10px' }}>
+                        <span style={{ fontSize: '10px', background: '#EFF6FF', color: '#1D4ED8', padding: '2px 7px', borderRadius: '50px', fontWeight: 700 }}>
+                          {pkg.includes_voice ? "Appels ✓" : "Sans appels"}
+                        </span>
+                        <span style={{ fontSize: '10px', background: '#FFF7ED', color: '#C2410C', padding: '2px 7px', borderRadius: '50px', fontWeight: 700 }}>
+                          {pkg.includes_sms ? "SMS ✓" : "Sans SMS"}
+                        </span>
+                      </div>
+                      <div style={{ fontWeight: 900, fontSize: '20px', background: 'linear-gradient(90deg,#A020F0,#FF7F11)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: '12px' }}>
+                        {price > 0 ? `${price.toFixed(2)} ${symbol}` : 'N/A'}
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleAcheter(pkg); }}
+                        style={{ width: '100%', background: 'linear-gradient(90deg,#A020F0,#FF7F11)', color: '#fff', border: 'none', borderRadius: '9px', padding: '10px', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}
+                      >
+                        Acheter →
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div style={{ marginTop: '14px', background: '#F3E8FF', borderRadius: '10px', padding: '10px 14px', fontSize: '12px', color: '#7B15B8', fontWeight: 600 }}>
+                🔄 Tous les forfaits sont rechargeables depuis votre espace client
+              </div>
             </div>
 
-            {/* ── Desktop : carousel avec flèches ── */}
-            <div className="hidden sm:block">
-              <div className="relative flex items-center justify-center px-10">
-                <button
-                  onClick={handlePrev}
-                  className="absolute left-0 z-10 bg-white border border-gray-200 rounded-full p-2 shadow hover:bg-purple-50 transition disabled:opacity-50"
-                  style={{ top: "50%", transform: "translateY(-50%)" }}
-                  aria-label="Précédent"
-                  disabled={packages.length <= 2}
-                >
-                  <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M13 16l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-                {packages.length > 0 && (
-                  <div className="w-full flex justify-center gap-4">
-                    {packages.slice(currentIndex, currentIndex + 2).map((pkg) => {
-                      let price = pkg.final_price_eur;
-                      let symbol = "€";
-                      if (currency === "USD") { price = pkg.final_price_usd; symbol = "$"; }
-                      else if (currency === "XPF") { price = pkg.final_price_xpf; symbol = "₣"; }
-                      const priceWithMargin = price! * (1 + margin);
-                      return (
-                        <div
-                          key={pkg.id}
-                          className={`flex-1 min-w-0 bg-white rounded-xl border-2 p-6 flex flex-col items-center shadow transition-all duration-200 cursor-pointer ${
-                            selectedPackage?.id === pkg.id ? "border-purple-500 shadow-lg" : "border-gray-100 hover:border-purple-300"
-                          }`}
-                          onClick={() => setSelectedPackage(pkg)}
-                        >
-                          <div className="flex items-center gap-3 mb-3">
-                            <img src={pkg.image_url} alt="" width={36} height={26} className="rounded object-cover border" />
-                            <h3 className="text-lg font-bold text-purple-800 text-center">{pkg.name}</h3>
+            {/* ── QUE FAIRE AVEC X GO ── */}
+            {selectedPackage && typeof selectedPackage.data_amount === "number" && selectedPackage.data_amount > 0 && selectedPackage.data_unit && (
+              <div style={{ background: '#fff', borderRadius: '16px', border: '0.5px solid #E5E7EB', padding: '20px', marginBottom: '16px' }}>
+                <h2 style={{ fontWeight: 800, fontSize: '16px', marginBottom: '16px' }}>
+                  Que faire avec {selectedPackage.data_amount}{" "}
+                  {["gb", "go"].includes(selectedPackage.data_unit?.toLowerCase() ?? "") ? "Go" :
+                   ["mb", "mo"].includes(selectedPackage.data_unit?.toLowerCase() ?? "") ? "Mo" :
+                   selectedPackage.data_unit} ?
+                </h2>
+                {(() => {
+                  const tips = getDataTip(selectedPackage.data_amount, selectedPackage.data_unit);
+                  const items = [
+                    { icon: <Camera size={20} />, label: "Photos", value: tips.photo + " photos" },
+                    { icon: <Globe size={20} />, label: "Navigation", value: tips.web },
+                    { icon: <Video size={20} />, label: "Vidéo", value: tips.video },
+                    { icon: <MessageSquare size={20} />, label: "Messages", value: tips.chat },
+                  ];
+                  return (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '10px' }}>
+                      {items.map(({ icon, label, value }) => (
+                        <div key={label} style={{ background: '#F9F5FF', borderRadius: '10px', padding: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{ color: '#A020F0', flexShrink: 0 }}>{icon}</div>
+                          <div>
+                            <div style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: 600 }}>{label}</div>
+                            <div style={{ fontSize: '14px', fontWeight: 700, color: '#7B15B8' }}>{value}</div>
                           </div>
-                          <div className="flex flex-wrap gap-1.5 mb-3 justify-center">
-                            <span className="text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full font-bold">
-                              {pkg.includes_voice ? "Appels inclus" : "Pas d'appels"}
-                            </span>
-                            <span className="text-xs bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full font-bold">
-                              {pkg.includes_sms ? "SMS inclus" : "Pas de SMS"}
-                            </span>
-                          </div>
-                          <div className="text-gray-700 text-sm mb-3 text-center min-h-[36px]">{pkg.description}</div>
-                          <div className="text-xl font-bold text-purple-700 mb-4">
-                            {priceWithMargin && priceWithMargin > 0 ? `${priceWithMargin.toFixed(2)} ${symbol}` : <span className="text-gray-400">Prix indisponible</span>}
-                          </div>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleAcheter(pkg); }}
-                            className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-orange-500 text-white font-semibold rounded-xl hover:from-purple-700 hover:to-orange-600 transition-all"
-                          >
-                            Acheter - Paiement Sécurisé
-                          </button>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
-                <button
-                  onClick={handleNext}
-                  className="absolute right-0 z-10 bg-white border border-gray-200 rounded-full p-2 shadow hover:bg-purple-50 transition disabled:opacity-50"
-                  style={{ top: "50%", transform: "translateY(-50%)" }}
-                  aria-label="Suivant"
-                  disabled={packages.length <= 2}
-                >
-                  <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M7 4l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
-              <div className="flex justify-center mt-4 gap-2">
-                {packages.map((_, idx) => (
-                  <button
-                    key={idx}
-                    className={`w-2.5 h-2.5 rounded-full transition-colors ${idx === currentIndex ? "bg-purple-600" : "bg-gray-300"}`}
-                    onClick={() => setCurrentIndex(idx)}
-                  />
+            )}
+
+            {/* ── ACTIVATION STEPS ── */}
+            <div style={{ background: '#fff', borderRadius: '16px', border: '0.5px solid #E5E7EB', padding: '20px' }}>
+              <h2 style={{ fontWeight: 800, fontSize: '16px', marginBottom: '16px' }}>Comment activer ma eSIM ?</h2>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '12px' }}>
+                {[
+                  { step: "1", title: "Recevez votre QR code", desc: "Par email immédiatement après paiement." },
+                  { step: "2", title: "Ouvrez les réglages", desc: "Allez dans Réglages → Données mobiles." },
+                  { step: "3", title: "Scannez le QR code", desc: "Ajoutez la ligne eSIM en scannant." },
+                  { step: "4", title: "Connecté !", desc: "Votre eSIM s'active à l'atterrissage." },
+                ].map(({ step, title, desc }) => (
+                  <div key={step} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'linear-gradient(135deg,#A020F0,#FF7F11)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: '12px', flexShrink: 0 }}>
+                      {step}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: '2px' }}>{title}</div>
+                      <div style={{ fontSize: '11px', color: '#6B7280' }}>{desc}</div>
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
           </div>
 
-          {/* Rechargeable notice */}
-          <div className="mt-5 p-3 text-gray-600 text-sm font-semibold rounded-lg shadow bg-gray-100">
-            Tous les forfaits sont rechargeables après commande depuis votre espace client
+          {/* ── RIGHT: STICKY ORDER SUMMARY ── */}
+          <div style={{ position: 'sticky', top: '80px' }}>
+            {selectedPackage && selectedPrice && (
+              <div style={{ background: '#fff', borderRadius: '16px', border: '1.5px solid rgba(160,32,240,.15)', padding: '20px', boxShadow: '0 4px 20px rgba(160,32,240,.08)' }}>
+                <div style={{ fontWeight: 800, fontSize: '15px', marginBottom: '16px', color: '#111827' }}>Récapitulatif</div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+                  {packages[0]?.flag_url && <img src={packages[0].flag_url} alt="" style={{ width: '36px', height: '24px', objectFit: 'cover', borderRadius: '4px' }} />}
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '15px' }}>{regionName}</div>
+                    <div style={{ fontSize: '12px', color: '#9CA3AF' }}>{selectedPackage.name}</div>
+                  </div>
+                </div>
+
+                <div style={{ background: '#F9F5FF', borderRadius: '10px', padding: '12px', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '12px', color: '#6B7280' }}>Prix</span>
+                    <span style={{ fontWeight: 800, fontSize: '20px', background: 'linear-gradient(90deg,#A020F0,#FF7F11)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                      {selectedPrice.price.toFixed(2)} {selectedPrice.symbol}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '12px', color: '#6B7280' }}>Opérateur</span>
+                    <span style={{ fontSize: '12px', fontWeight: 600 }}>{selectedPackage.operator_name}</span>
+                  </div>
+                </div>
+
+                {/* Trust icons */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px' }}>
+                  {[
+                    { icon: '⚡', label: 'Activation instantanée' },
+                    { icon: '📩', label: 'Email immédiat' },
+                    { icon: '🔄', label: 'Rechargeable' },
+                    { icon: '💬', label: 'Support 24/7' },
+                  ].map(({ icon, label }) => (
+                    <div key={label} style={{ background: '#F9FAFB', borderRadius: '8px', padding: '8px 10px', fontSize: '11px', fontWeight: 600, color: '#374151', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <span>{icon}</span><span>{label}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => handleAcheter(selectedPackage)}
+                  style={{ width: '100%', background: 'linear-gradient(90deg,#A020F0,#FF7F11)', color: '#fff', border: 'none', borderRadius: '12px', padding: '14px', fontWeight: 800, fontSize: '15px', cursor: 'pointer', boxShadow: '0 4px 16px rgba(160,32,240,.3)', marginBottom: '10px' }}
+                >
+                  ⚡ Acheter maintenant →
+                </button>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', fontSize: '11px', color: '#9CA3AF' }}>
+                  <Shield size={12} /> Paiement 100% sécurisé via Stripe
+                </div>
+
+                {/* Description destination */}
+                {destinationInfo?.[0]?.description && (
+                  <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '0.5px solid #F3F4F6' }}>
+                    <div style={{ fontSize: '11px', color: '#6B7280', lineHeight: 1.6 }}>
+                      {destinationInfo[0].description}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
-      </section>
+      </div>
 
-      {/* ── Bloc 2 : Que faire avec XX Go ? ── */}
-      {selectedPackage &&
-      typeof selectedPackage.data_amount === "number" &&
-      selectedPackage.data_amount > 0 &&
-      selectedPackage.data_unit &&
-      selectedPackage.data_unit.trim() !== "" ? (
-        <section className="bg-white rounded-xl sm:rounded-2xl shadow-sm p-4 sm:p-6 lg:p-8 text-gray-700">
-          <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 text-center sm:text-left">
-            Que faire avec {selectedPackage.data_amount}{" "}
-            {["gb", "go"].includes(selectedPackage.data_unit?.toLowerCase() ?? "") ? "Go" :
-             ["mb", "mo"].includes(selectedPackage.data_unit?.toLowerCase() ?? "") ? "Mo" :
-             selectedPackage.data_unit || "Go"} ?
-          </h2>
-          {(() => {
-            const tips = getDataTip(selectedPackage.data_amount, selectedPackage.data_unit);
-            return (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
-                <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-3 sm:p-5 text-center">
-                  <Camera className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2 text-purple-600" />
-                  <h3 className="font-semibold mb-1 text-sm">Photos</h3>
-                  <p className="text-purple-700 text-xs sm:text-sm">{tips.photo} photos</p>
-                </div>
-                <div className="bg-gradient-to-br from-purple-100 to-pink-100 rounded-xl p-3 sm:p-5 text-center">
-                  <Globe className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2 text-purple-600" />
-                  <h3 className="font-semibold mb-1 text-sm">Navigation</h3>
-                  <p className="text-purple-700 text-xs sm:text-sm">{tips.web} heures</p>
-                </div>
-                <div className="bg-gradient-to-br from-pink-100 to-red-100 rounded-xl p-3 sm:p-5 text-center">
-                  <Video className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2 text-purple-600" />
-                  <h3 className="font-semibold mb-1 text-sm">Vidéo</h3>
-                  <p className="text-purple-700 text-xs sm:text-sm">{tips.video} heures</p>
-                </div>
-                <div className="bg-gradient-to-br from-red-100 to-orange-100 rounded-xl p-3 sm:p-5 text-center">
-                  <MessageSquare className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2 text-purple-600" />
-                  <h3 className="font-semibold mb-1 text-sm">Messages</h3>
-                  <p className="text-purple-700 text-xs sm:text-sm">{tips.chat} messages</p>
-                </div>
-                <div className="bg-gradient-to-br from-orange-100 to-orange-50 rounded-xl p-3 sm:p-5 text-center col-span-2 sm:col-span-1">
-                  <svg className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                  </svg>
-                  <h3 className="font-semibold mb-1 text-sm">Appels</h3>
-                  <p className="text-purple-700 text-xs sm:text-sm">{tips.calls} heures</p>
-                  <p className="text-xs text-purple-700 mt-1">WhatsApp/Messenger</p>
-                </div>
-              </div>
-            );
-          })()}
-        </section>
-      ) : null}
-
-      {/* ── Bloc 3 : Comment activer ma eSIM ? ── */}
-      <section className="bg-white rounded-xl sm:rounded-2xl shadow-sm p-4 sm:p-6 lg:p-8 text-gray-800">
-        <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 text-center sm:text-left">
-          Comment activer ma eSIM ?
-        </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          {[
-            { step: "1", title: "Scanner le QR code", desc: "Scannez le QR code reçu par email." },
-            { step: "2", title: "Aller dans les réglages", desc: "Ouvrez les réglages de votre téléphone." },
-            { step: "3", title: "Activer la ligne eSIM", desc: "Ajoutez et activez la ligne eSIM dans les réglages." },
-            { step: "4", title: "Confirmation", desc: "Votre eSIM est prête à être utilisée !" },
-          ].map(({ step, title, desc }) => (
-            <div key={step} className="flex flex-col items-center text-center">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-purple-100 rounded-full flex items-center justify-center mb-3">
-                <span className="text-base sm:text-xl font-bold text-purple-600">{step}</span>
-              </div>
-              <h3 className="font-semibold mb-1.5 text-xs sm:text-base leading-snug">{title}</h3>
-              <p className="text-purple-700 text-xs sm:text-sm">{desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── Modal panier ── */}
+      {/* ── MODAL PANIER ── */}
       {showCartModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8 max-w-sm w-full text-center">
             <h2 className="text-xl sm:text-2xl font-bold mb-4 text-purple-700">Ajouté au panier !</h2>
-            <p className="mb-6 text-sm sm:text-base">
-              Le forfait{" "}
-              <span className="font-semibold">
-                {selectedPackage?.data_amount} {selectedPackage?.data_unit}
-              </span>{" "}
-              a bien été ajouté à votre panier.
-            </p>
+            <p className="mb-6 text-sm sm:text-base">Le forfait <span className="font-semibold">{selectedPackage?.data_amount} {selectedPackage?.data_unit}</span> a bien été ajouté.</p>
             <div className="flex flex-col gap-3">
-              <button
-                className="w-full bg-gradient-to-r from-purple-600 to-pink-500 text-white py-3 px-4 rounded-xl font-semibold hover:from-purple-700 hover:to-pink-600 transition-all duration-300 text-sm sm:text-base"
-                onClick={() => router.push("/cart")}
-              >
-                Voir le panier
-              </button>
-              <button
-                className="w-full border border-purple-200 text-purple-700 py-3 px-4 rounded-xl font-semibold hover:bg-purple-50 transition-all duration-300 text-sm sm:text-base"
-                onClick={() => setShowCartModal(false)}
-              >
-                Continuer mes achats
-              </button>
+              <button className="w-full bg-gradient-to-r from-purple-600 to-pink-500 text-white py-3 px-4 rounded-xl font-semibold" onClick={() => router.push("/cart")}>Voir le panier</button>
+              <button className="w-full border border-purple-200 text-purple-700 py-3 px-4 rounded-xl font-semibold" onClick={() => setShowCartModal(false)}>Continuer mes achats</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── Modal récapitulatif + formulaire ── */}
+      {/* ── MODAL RÉCAPITULATIF + PAIEMENT — LOGIQUE INTACTE ── */}
       {showRecapModal && selectedPackage && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4">
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-lg p-4 sm:p-6 w-full max-w-md relative animate-fade-in max-h-[85dvh] overflow-y-auto">
-            <button
-              className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-2xl font-bold leading-none"
-              onClick={() => setShowRecapModal(false)}
-              aria-label="Fermer"
-            >
-              ×
-            </button>
-            <h2 className="text-xl sm:text-2xl font-bold mb-4 text-purple-700 pr-8">
-              Récapitulatif de la commande
-            </h2>
-
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-lg p-4 sm:p-6 w-full max-w-md relative max-h-[85dvh] overflow-y-auto">
+            <button className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-2xl font-bold" onClick={() => setShowRecapModal(false)} aria-label="Fermer">×</button>
+            <h2 className="text-xl sm:text-2xl font-bold mb-4 text-purple-700 pr-8">Récapitulatif de la commande</h2>
             <div className="mb-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-base sm:text-lg font-bold">
-                  {selectedPackage.data_amount}{" "}
-                  {selectedPackage.data_unit === "GB" ? "Go" : selectedPackage.data_unit}
-                </span>
+                <span className="text-base sm:text-lg font-bold">{selectedPackage.data_amount} {selectedPackage.data_unit === "GB" ? "Go" : selectedPackage.data_unit}</span>
                 {selectedPackage.operator_logo_url ? (
-                  <Image
-                    src={selectedPackage.operator_logo_url}
-                    alt={selectedPackage.operator_name || ""}
-                    width={24}
-                    height={24}
-                    className="rounded-full bg-white border border-gray-100"
-                  />
+                  <Image src={selectedPackage.operator_logo_url} alt={selectedPackage.operator_name || ""} width={24} height={24} className="rounded-full bg-white border border-gray-100" />
                 ) : (
                   <span className="text-xs text-gray-400">{selectedPackage.operator_name}</span>
                 )}
               </div>
-              <div className="text-gray-500 text-sm mb-1">
-                {selectedPackage.slug &&
-                  selectedPackage.slug
-                    .replace(/days?/gi, "jours")
-                    .replace(/gb/gi, "Go")}
-              </div>
               <div className="flex gap-1 flex-wrap text-xs mb-2">
-                <span className={`px-2 py-0.5 rounded-full font-semibold ${selectedPackage.includes_sms ? "bg-orange-50 text-orange-700" : "bg-gray-100 text-gray-400"}`}>
-                  SMS {selectedPackage.includes_sms ? "Oui" : "Non"}
-                </span>
-                <span className={`px-2 py-0.5 rounded-full font-semibold ${selectedPackage.includes_voice ? "bg-blue-50 text-blue-700" : "bg-gray-100 text-gray-400"}`}>
-                  Appels {selectedPackage.includes_voice ? "Oui" : "Non"}
-                </span>
+                <span className={`px-2 py-0.5 rounded-full font-semibold ${selectedPackage.includes_sms ? "bg-orange-50 text-orange-700" : "bg-gray-100 text-gray-400"}`}>SMS {selectedPackage.includes_sms ? "Oui" : "Non"}</span>
+                <span className={`px-2 py-0.5 rounded-full font-semibold ${selectedPackage.includes_voice ? "bg-blue-50 text-blue-700" : "bg-gray-100 text-gray-400"}`}>Appels {selectedPackage.includes_voice ? "Oui" : "Non"}</span>
               </div>
               <div className="text-xl font-bold text-gray-900 mb-2">
                 {(() => {
-                  let price = selectedPackage.final_price_eur! * (1 + margin);
-                  let symbol = "€";
-                  if (currency === "USD") { price = selectedPackage.final_price_usd! * (1 + margin); symbol = "$"; }
-                  else if (currency === "XPF") { price = selectedPackage.final_price_xpf! * (1 + margin); symbol = "₣"; }
+                  const { price, symbol } = getPackagePrice(selectedPackage);
                   return `${price.toFixed(2)} ${symbol}`;
                 })()}
               </div>
             </div>
-
             <form onSubmit={handleRecapSubmit} className="space-y-3">
               <div className="flex gap-2">
-                <input
-                  type="text"
-                  name="prenom"
-                  placeholder="Prénom *"
-                  value={form.prenom}
-                  onChange={handleFormChange}
-                  className="w-1/2 border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-900 placeholder-gray-500 text-base"
-                  style={{ WebkitTextFillColor: "#111827", opacity: 1, color: "#111827" }}
-                  required
-                />
-                <input
-                  type="text"
-                  name="nom"
-                  placeholder="Nom *"
-                  value={form.nom}
-                  onChange={handleFormChange}
-                  className="w-1/2 border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-900 placeholder-gray-500 text-base"
-                  style={{ WebkitTextFillColor: "#111827", color: "#111827" } as React.CSSProperties}
-                  required
-                />
+                <input type="text" name="prenom" placeholder="Prénom *" value={form.prenom} onChange={handleFormChange} className="w-1/2 border border-gray-300 rounded-lg px-3 py-2.5 text-gray-900 text-base focus:ring-2 focus:ring-orange-500" style={{ WebkitTextFillColor: "#111827", color: "#111827" }} required />
+                <input type="text" name="nom" placeholder="Nom *" value={form.nom} onChange={handleFormChange} className="w-1/2 border border-gray-300 rounded-lg px-3 py-2.5 text-gray-900 text-base focus:ring-2 focus:ring-orange-500" style={{ WebkitTextFillColor: "#111827", color: "#111827" } as React.CSSProperties} required />
               </div>
-              <input
-                type="email"
-                name="email"
-                placeholder="Email *"
-                value={form.email}
-                onChange={handleFormChange}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-900 placeholder-gray-500 text-base"
-                style={{ WebkitTextFillColor: "#111827", color: "#111827" } as React.CSSProperties}
-                required
-              />
-              <input
-                type="text"
-                name="codePromo"
-                placeholder="Code promo (optionnel)"
-                value={form.codePromo}
-                onChange={handleFormChange}
-                readOnly={isFromPartnerLink && !!form.codePromo}
-                className={`w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-900 placeholder-gray-500 text-base ${isFromPartnerLink && form.codePromo ? "bg-gray-100 cursor-not-allowed" : ""}`}
-                style={{ WebkitTextFillColor: "#111827", color: "#111827" } as React.CSSProperties}
-              />
-              <input
-                type="text"
-                name="codePartenaire"
-                placeholder="Code partenaire (optionnel)"
-                value={form.codePartenaire}
-                onChange={handleFormChange}
-                readOnly={isFromPartnerLink && !!form.codePartenaire}
-                className={`w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-900 placeholder-gray-500 text-base ${isFromPartnerLink && form.codePartenaire ? "bg-gray-100 cursor-not-allowed" : ""}`}
-                style={{ WebkitTextFillColor: "#111827", color: "#111827" } as React.CSSProperties}
-              />
-              {formError && (
-                <div className="text-red-500 text-sm">{formError}</div>
-              )}
-              <button
-                type="submit"
-                className="w-full bg-gradient-to-r from-purple-600 to-orange-500 text-white py-3 px-4 rounded-xl font-bold text-base sm:text-lg shadow-md hover:from-purple-700 hover:to-orange-600 transition"
-              >
-                Payer
+              <input type="email" name="email" placeholder="Email *" value={form.email} onChange={handleFormChange} className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-gray-900 text-base focus:ring-2 focus:ring-orange-500" style={{ WebkitTextFillColor: "#111827", color: "#111827" } as React.CSSProperties} required />
+              <input type="text" name="codePromo" placeholder="Code promo (optionnel)" value={form.codePromo} onChange={handleFormChange} readOnly={isFromPartnerLink && !!form.codePromo} className={`w-full border border-gray-300 rounded-lg px-3 py-2.5 text-gray-900 text-base focus:ring-2 focus:ring-purple-500 ${isFromPartnerLink && form.codePromo ? "bg-gray-100 cursor-not-allowed" : ""}`} style={{ WebkitTextFillColor: "#111827", color: "#111827" } as React.CSSProperties} />
+              <input type="text" name="codePartenaire" placeholder="Code partenaire (optionnel)" value={form.codePartenaire} onChange={handleFormChange} readOnly={isFromPartnerLink && !!form.codePartenaire} className={`w-full border border-gray-300 rounded-lg px-3 py-2.5 text-gray-900 text-base focus:ring-2 focus:ring-purple-500 ${isFromPartnerLink && form.codePartenaire ? "bg-gray-100 cursor-not-allowed" : ""}`} style={{ WebkitTextFillColor: "#111827", color: "#111827" } as React.CSSProperties} />
+              {formError && <div className="text-red-500 text-sm">{formError}</div>}
+              <button type="submit" className="w-full bg-gradient-to-r from-purple-600 to-orange-500 text-white py-3 px-4 rounded-xl font-bold text-base sm:text-lg shadow-md hover:from-purple-700 hover:to-orange-600 transition">
+                Payer en toute sécurité 🔒
               </button>
             </form>
           </div>

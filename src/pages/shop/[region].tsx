@@ -100,13 +100,32 @@ function RecommenderWidget({ packages, currency, onRecommend }: {
 
   const compute = (d: number, u: string): Package | null => {
     const needed = neededGo(d, u);
+
+    // Pour usage intensif, chercher d'abord un forfait illimité valable assez longtemps
+    if (u === "heavy") {
+      const unlimited = packages.filter((p) => {
+        const name = (p.name || "").toLowerCase();
+        const desc = (p.description || "").toLowerCase();
+        const pkgDays = parseInt(p.validity?.toString().split(" ")[0] || "0");
+        const isUnlimited = name.includes("illimit") || name.includes("unlimited") || name.includes("∞") || desc.includes("illimit") || desc.includes("unlimited");
+        return isUnlimited && pkgDays >= d;
+      }).sort((a, b) => (a.final_price_eur ?? 0) - (b.final_price_eur ?? 0));
+      if (unlimited.length > 0) return unlimited[0];
+
+      // Pas d'illimité → proposer le plus gros forfait disponible (max Go)
+      const biggest = packages.filter((p) => {
+        const pkgDays = parseInt(p.validity?.toString().split(" ")[0] || "0");
+        return pkgDays >= d;
+      }).sort((a, b) => (b.data_amount ?? 0) - (a.data_amount ?? 0));
+      return biggest[0] || null;
+    }
+
+    // Léger / Modéré → forfait avec assez de Go ET validité suffisante, prix le plus bas
     const valid = packages.filter((p) => {
       const go = (p.data_unit?.toLowerCase().includes("gb") || p.data_unit?.toLowerCase().includes("go"))
         ? (p.data_amount ?? 0)
         : (p.data_amount ?? 0) / 1024;
       const pkgDays = parseInt(p.validity?.toString().split(" ")[0] || "0");
-      // Filtre sur les Go nécessaires ET sur la durée de validité
-      // Si le client choisit 21 jours, on ne lui montre que des forfaits valables ≥ 21 jours
       return go >= needed && pkgDays >= d;
     }).sort((a, b) => (a.final_price_eur ?? 0) - (b.final_price_eur ?? 0));
     return valid[0] || null;
@@ -201,7 +220,7 @@ function RecommenderWidget({ packages, currency, onRecommend }: {
         <div style={{ borderTop: "0.5px solid #E5E7EB", paddingTop: "14px" }}>
           {recommended ? (
             <div style={{ background: "linear-gradient(135deg,#A020F0,#FF7F11)", borderRadius: "12px", padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
-              <div>
+              <div style={{ flex: 1 }}>
                 <div style={{ fontSize: "11px", color: "rgba(255,255,255,.75)", fontWeight: 600, marginBottom: "3px" }}>✅ Forfait recommandé pour vous</div>
                 <div style={{ fontSize: "16px", fontWeight: 800, color: "#fff" }}>{recommended.name}</div>
                 <div style={{ fontSize: "12px", color: "rgba(255,255,255,.8)", marginTop: "2px" }}>
@@ -211,6 +230,13 @@ function RecommenderWidget({ packages, currency, onRecommend }: {
                       .replace(/\bday\b/g, "jour")
                   }
                 </div>
+                {/* Message recharge si usage intensif et pas illimité */}
+                {usage === "heavy" && !["illimit","unlimited","∞"].some(k => (recommended.name || "").toLowerCase().includes(k) || (recommended.description || "").toLowerCase().includes(k)) && (
+                  <div style={{ marginTop: "8px", background: "rgba(255,255,255,.15)", borderRadius: "8px", padding: "7px 10px", fontSize: "11px", color: "#fff", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span>🔄</span>
+                    <span>Pas d'illimité disponible pour cette durée. Vous pouvez recharger ce forfait directement depuis votre espace client sans racheter de nouvelle eSIM.</span>
+                  </div>
+                )}
               </div>
               <div style={{ textAlign: "right", flexShrink: 0 }}>
                 <div style={{ fontSize: "22px", fontWeight: 900, color: "#fff" }}>

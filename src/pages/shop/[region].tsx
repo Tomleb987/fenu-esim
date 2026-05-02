@@ -349,47 +349,87 @@ export default function RegionPage() {
                 </div>
               </div>
 
-              {/* Desktop grid */}
-              <div className="hidden sm:grid" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: '12px' }}>
-                {packages.map((pkg) => {
-                  const { price, symbol } = getPackagePrice(pkg);
-                  const isSelected = selectedPackage?.id === pkg.id;
-                  return (
-                    <div
-                      key={pkg.id}
-                      onClick={() => setSelectedPackage(pkg)}
-                      style={{
-                        background: isSelected ? '#F9F5FF' : '#fff',
-                        borderRadius: '12px',
-                        border: isSelected ? '2px solid #A020F0' : '1px solid #E5E7EB',
-                        padding: '16px',
-                        cursor: 'pointer',
-                        transition: 'all .2s',
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
-                      }}
-                    >
-                      <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '4px' }}>{pkg.name}</div>
-                      <div style={{ fontSize: '11px', color: '#9CA3AF', marginBottom: '8px' }}>{pkg.description}</div>
-                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '10px' }}>
-                        <span style={{ fontSize: '10px', background: '#EFF6FF', color: '#1D4ED8', padding: '2px 7px', borderRadius: '50px', fontWeight: 700 }}>
-                          {pkg.includes_voice ? "Appels ✓" : "Sans appels"}
-                        </span>
-                        <span style={{ fontSize: '10px', background: '#FFF7ED', color: '#C2410C', padding: '2px 7px', borderRadius: '50px', fontWeight: 700 }}>
-                          {pkg.includes_sms ? "SMS ✓" : "Sans SMS"}
-                        </span>
-                      </div>
-                      <div style={{ fontWeight: 900, fontSize: '20px', background: 'linear-gradient(90deg,#A020F0,#FF7F11)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: '12px' }}>
-                        {price > 0 ? `${price.toFixed(2)} ${symbol}` : 'N/A'}
-                      </div>
+              {/* Desktop carousel — 3 forfaits visibles à la fois */}
+              <div className="hidden sm:block">
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  {/* Flèche gauche */}
+                  <button
+                    onClick={handlePrev}
+                    disabled={packages.length <= 3}
+                    style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1.5px solid #E5E7EB', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: packages.length <= 3 ? 'default' : 'pointer', flexShrink: 0, opacity: packages.length <= 3 ? 0.3 : 1 }}
+                  >
+                    <ChevronLeft size={16} color="#374151" />
+                  </button>
+
+                  {/* 3 cartes visibles */}
+                  <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px' }}>
+                    {packages.slice(currentIndex, currentIndex + 3).map((pkg) => {
+                      const { price, symbol } = getPackagePrice(pkg);
+                      const isSelected = selectedPackage?.id === pkg.id;
+                      return (
+                        <div
+                          key={pkg.id}
+                          onClick={() => setSelectedPackage(pkg)}
+                          style={{
+                            background: isSelected ? '#F9F5FF' : '#fff',
+                            borderRadius: '14px',
+                            border: isSelected ? '2px solid #A020F0' : '1px solid #E5E7EB',
+                            padding: '18px 14px',
+                            cursor: 'pointer',
+                            transition: 'all .2s',
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
+                            boxShadow: isSelected ? '0 4px 16px rgba(160,32,240,.12)' : 'none',
+                          }}
+                        >
+                          <div style={{ fontWeight: 800, fontSize: '15px', marginBottom: '4px', color: '#111827' }}>{pkg.name}</div>
+                          <div style={{ fontSize: '11px', color: '#9CA3AF', marginBottom: '10px', lineHeight: 1.4 }}>{pkg.description}</div>
+                          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '12px' }}>
+                            <span style={{ fontSize: '10px', background: pkg.includes_voice ? '#EFF6FF' : '#F9FAFB', color: pkg.includes_voice ? '#1D4ED8' : '#9CA3AF', padding: '2px 8px', borderRadius: '50px', fontWeight: 700 }}>
+                              {pkg.includes_voice ? "Appels ✓" : "Sans appels"}
+                            </span>
+                            <span style={{ fontSize: '10px', background: pkg.includes_sms ? '#FFF7ED' : '#F9FAFB', color: pkg.includes_sms ? '#C2410C' : '#9CA3AF', padding: '2px 8px', borderRadius: '50px', fontWeight: 700 }}>
+                              {pkg.includes_sms ? "SMS ✓" : "Sans SMS"}
+                            </span>
+                          </div>
+                          <div style={{ fontWeight: 900, fontSize: '22px', background: 'linear-gradient(90deg,#A020F0,#FF7F11)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: '14px' }}>
+                            {price > 0 ? `${price.toFixed(2)} ${symbol}` : 'N/A'}
+                          </div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleAcheter(pkg); }}
+                            style={{ width: '100%', background: 'linear-gradient(90deg,#A020F0,#FF7F11)', color: '#fff', border: 'none', borderRadius: '10px', padding: '11px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', boxShadow: '0 2px 8px rgba(160,32,240,.2)' }}
+                          >
+                            Acheter →
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Flèche droite */}
+                  <button
+                    onClick={handleNext}
+                    disabled={packages.length <= 3}
+                    style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1.5px solid #E5E7EB', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: packages.length <= 3 ? 'default' : 'pointer', flexShrink: 0, opacity: packages.length <= 3 ? 0.3 : 1 }}
+                  >
+                    <ChevronRight size={16} color="#374151" />
+                  </button>
+                </div>
+
+                {/* Dots + compteur */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginTop: '16px' }}>
+                  <span style={{ fontSize: '12px', color: '#9CA3AF', fontWeight: 600 }}>
+                    {currentIndex + 1}–{Math.min(currentIndex + 3, packages.length)} sur {packages.length} forfaits
+                  </span>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {Array.from({ length: Math.ceil(packages.length / 3) }).map((_, i) => (
                       <button
-                        onClick={(e) => { e.stopPropagation(); handleAcheter(pkg); }}
-                        style={{ width: '100%', background: 'linear-gradient(90deg,#A020F0,#FF7F11)', color: '#fff', border: 'none', borderRadius: '9px', padding: '10px', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}
-                      >
-                        Acheter →
-                      </button>
-                    </div>
-                  );
-                })}
+                        key={i}
+                        onClick={() => setCurrentIndex(i * 3)}
+                        style={{ width: i === Math.floor(currentIndex / 3) ? '20px' : '8px', height: '8px', borderRadius: '50px', border: 'none', cursor: 'pointer', background: i === Math.floor(currentIndex / 3) ? '#A020F0' : '#E5E7EB', transition: 'all .3s' }}
+                      />
+                    ))}
+                  </div>
+                </div>
               </div>
 
               <div style={{ marginTop: '14px', background: '#F3E8FF', borderRadius: '10px', padding: '10px 14px', fontSize: '12px', color: '#7B15B8', fontWeight: 600 }}>

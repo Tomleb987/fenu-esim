@@ -82,8 +82,9 @@ async function validateAndApplyPromoCode(code: string, packagePrice: number) {
 // ─────────────────────────────────────────────────────────────────────────────
 // RECOMMANDEUR INTELLIGENT
 // ─────────────────────────────────────────────────────────────────────────────
-function RecommenderWidget({ packages, onRecommend }: {
+function RecommenderWidget({ packages, currency, onRecommend }: {
   packages: Package[];
+  currency: "EUR" | "USD" | "XPF";
   onRecommend: (pkg: Package) => void;
 }) {
   const [days, setDays] = useState<number | null>(null);
@@ -103,12 +104,15 @@ function RecommenderWidget({ packages, onRecommend }: {
       const go = (p.data_unit?.toLowerCase().includes("gb") || p.data_unit?.toLowerCase().includes("go"))
         ? (p.data_amount ?? 0)
         : (p.data_amount ?? 0) / 1024;
-      // Filtre uniquement sur les Go — la validité n'est pas bloquante
-      // Un forfait 30 jours convient très bien pour un séjour de 14 jours
-      return go >= needed;
+      const pkgDays = parseInt(p.validity?.toString().split(" ")[0] || "0");
+      // Filtre sur les Go nécessaires ET sur la durée de validité
+      // Si le client choisit 21 jours, on ne lui montre que des forfaits valables ≥ 21 jours
+      return go >= needed && pkgDays >= d;
     }).sort((a, b) => (a.final_price_eur ?? 0) - (b.final_price_eur ?? 0));
     return valid[0] || null;
   };
+
+  const DAY_OPTIONS = [3, 7, 10, 14, 21, 30];
 
   const handleSelect = (d: number | null, u: string | null) => {
     if (!d || !u) return;
@@ -135,16 +139,44 @@ function RecommenderWidget({ packages, onRecommend }: {
         </div>
       </div>
 
-      {/* Durée */}
+      {/* Durée — slider */}
       <div style={{ marginBottom: "14px" }}>
-        <div style={{ fontSize: "12px", fontWeight: 700, color: "#374151", marginBottom: "8px" }}>🗓️ Combien de jours voyagez-vous ?</div>
-        <div style={{ display: "flex", gap: "7px", flexWrap: "wrap" }}>
-          {[3, 7, 10, 14, 21, 30].map((d) => (
-            <button key={d} onClick={() => { setDays(d); handleSelect(d, usage); }}
-              style={{ padding: "6px 14px", borderRadius: "50px", fontSize: "12px", fontWeight: 700, cursor: "pointer", border: "none", transition: "all .15s", background: days === d ? "linear-gradient(90deg,#A020F0,#FF7F11)" : "#fff", color: days === d ? "#fff" : "#374151", boxShadow: days === d ? "0 2px 8px rgba(160,32,240,.2)" : "0 1px 3px rgba(0,0,0,.08)" }}>
-              {d} jours
-            </button>
-          ))}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+          <div style={{ fontSize: "12px", fontWeight: 700, color: "#374151" }}>🗓️ Combien de jours voyagez-vous ?</div>
+          {days && (
+            <div style={{ fontWeight: 800, fontSize: "14px", background: "linear-gradient(90deg,#A020F0,#FF7F11)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+              {days} jours
+            </div>
+          )}
+        </div>
+
+        {/* Track + labels */}
+        <div style={{ position: "relative", padding: "0 4px" }}>
+          <input
+            type="range"
+            min={0}
+            max={DAY_OPTIONS.length - 1}
+            step={1}
+            value={days ? DAY_OPTIONS.indexOf(days) : 0}
+            onChange={(e) => {
+              const d = DAY_OPTIONS[parseInt(e.target.value)];
+              setDays(d);
+              handleSelect(d, usage);
+            }}
+            style={{ width: "100%", accentColor: "#A020F0", cursor: "pointer", height: "4px" }}
+          />
+          <style>{`
+            input[type=range]::-webkit-slider-thumb { width:20px; height:20px; border-radius:50%; background:linear-gradient(135deg,#A020F0,#FF7F11); border:2px solid #fff; box-shadow:0 1px 6px rgba(160,32,240,.3); }
+            input[type=range]::-webkit-slider-runnable-track { height:4px; border-radius:2px; background:linear-gradient(90deg,#A020F0,#E5E7EB); }
+          `}</style>
+          {/* Labels sous le slider */}
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: "6px" }}>
+            {DAY_OPTIONS.map((d) => (
+              <span key={d} style={{ fontSize: "10px", fontWeight: days === d ? 800 : 500, color: days === d ? "#A020F0" : "#9CA3AF", transition: "all .15s" }}>
+                {d}j
+              </span>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -173,11 +205,21 @@ function RecommenderWidget({ packages, onRecommend }: {
                 <div style={{ fontSize: "11px", color: "rgba(255,255,255,.75)", fontWeight: 600, marginBottom: "3px" }}>✅ Forfait recommandé pour vous</div>
                 <div style={{ fontSize: "16px", fontWeight: 800, color: "#fff" }}>{recommended.name}</div>
                 <div style={{ fontSize: "12px", color: "rgba(255,255,255,.8)", marginTop: "2px" }}>
-                  ~{neededGo(days, usage)} Go estimés pour {days} jours · valable {recommended.validity}
+                  ~{neededGo(days, usage)} Go estimés pour {days} jours · valable {
+                    recommended.validity?.toString()
+                      .replace(/\bdays\b/g, "jours")
+                      .replace(/\bday\b/g, "jour")
+                  }
                 </div>
               </div>
               <div style={{ textAlign: "right", flexShrink: 0 }}>
-                <div style={{ fontSize: "22px", fontWeight: 900, color: "#fff" }}>{recommended.final_price_eur?.toFixed(2)}€</div>
+                <div style={{ fontSize: "22px", fontWeight: 900, color: "#fff" }}>
+                  {currency === "XPF"
+                    ? `${Math.round(recommended.final_price_xpf ?? 0).toLocaleString("fr-FR")} ₣`
+                    : currency === "USD"
+                    ? `$${recommended.final_price_usd?.toFixed(2)}`
+                    : `${recommended.final_price_eur?.toFixed(2)}€`}
+                </div>
                 <div style={{ fontSize: "10px", color: "rgba(255,255,255,.7)" }}>meilleur rapport</div>
               </div>
             </div>
@@ -393,7 +435,7 @@ export default function RegionPage() {
       <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "24px 20px" }}>
 
         {/* ── RECOMMANDEUR ── */}
-        <RecommenderWidget packages={packages} onRecommend={(pkg) => { setSelectedPackage(pkg); setCurrentIndex(packages.indexOf(pkg)); }} />
+        <RecommenderWidget packages={packages} currency={currency} onRecommend={(pkg) => { setSelectedPackage(pkg); setCurrentIndex(packages.indexOf(pkg)); }} />
 
         {/* ── TRUST + CURRENCY ── */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", marginBottom: "24px" }}>

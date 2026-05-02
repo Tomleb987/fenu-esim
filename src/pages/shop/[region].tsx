@@ -80,6 +80,138 @@ async function validateAndApplyPromoCode(code: string, packagePrice: number) {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// RECOMMANDEUR INTELLIGENT
+// ─────────────────────────────────────────────────────────────────────────────
+function RecommenderWidget({ packages, onRecommend }: { packages: Package[]; onRecommend: (pkg: Package) => void }) {
+  const [days, setDays] = useState<number | null>(null);
+  const [usage, setUsage] = useState<string | null>(null);
+  const [recommended, setRecommended] = useState<Package | null>(null);
+  const [dismissed, setDismissed] = useState(false);
+
+  if (dismissed) return null;
+
+  // Go nécessaires selon usage × durée
+  const neededGo = (): number => {
+    if (!days || !usage) return 0;
+    const perDay: Record<string, number> = {
+      light: 0.3,    // réseaux sociaux + messages
+      medium: 0.8,   // navigation + maps + appels vidéo occasionnels
+      heavy: 2.0,    // streaming, travail à distance
+    };
+    return Math.ceil(days * (perDay[usage] || 1));
+  };
+
+  const compute = (d: number, u: string) => {
+    const perDay: Record<string, number> = { light: 0.3, medium: 0.8, heavy: 2.0 };
+    const needed = Math.ceil(d * (perDay[u] || 1));
+    // Filtre uniquement sur les Go nécessaires — la durée de validité n'est pas bloquante
+    // Un forfait 30 jours convient pour un séjour de 14 jours
+    const valid = packages.filter(p => {
+      const go = p.data_unit?.toLowerCase().includes('gb') || p.data_unit?.toLowerCase().includes('go')
+        ? (p.data_amount ?? 0)
+        : (p.data_amount ?? 0) / 1024;
+      return go >= needed;
+    }).sort((a, b) => (a.final_price_eur ?? 0) - (b.final_price_eur ?? 0));
+    return valid[0] || null;
+  };
+
+  const USAGE_OPTIONS = [
+    { key: 'light', label: 'Léger', desc: 'Réseaux sociaux, messages, maps', icon: '📱', go: '~300 Mo/jour' },
+    { key: 'medium', label: 'Modéré', desc: 'Navigation, appels vidéo ponctuels', icon: '💻', go: '~800 Mo/jour' },
+    { key: 'heavy', label: 'Intensif', desc: 'Streaming, télétravail, vidéos', icon: '🎬', go: '~2 Go/jour' },
+  ];
+
+  const DAY_OPTIONS = [3, 7, 10, 14, 21, 30];
+
+  const handleCompute = (d: number | null, u: string | null) => {
+    if (!d || !u) return;
+    const rec = compute(d, u);
+    setRecommended(rec);
+    if (rec) onRecommend(rec);
+  };
+
+  return (
+    <div style={{ background: 'linear-gradient(135deg,#F9F5FF,#FFF7ED)', borderRadius: '16px', border: '1.5px solid #DDD6FE', padding: '20px', marginBottom: '16px', position: 'relative' }}>
+      <button onClick={() => setDismissed(true)} style={{ position: 'absolute', top: '12px', right: '12px', background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', fontSize: '18px', lineHeight: 1 }}>×</button>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+        <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg,#A020F0,#FF7F11)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flexShrink: 0 }}>🎯</div>
+        <div>
+          <div style={{ fontWeight: 800, fontSize: '15px', color: '#111827' }}>Quel forfait me convient ?</div>
+          <div style={{ fontSize: '12px', color: '#6B7280' }}>Répondez à 2 questions pour éviter de manquer de data</div>
+        </div>
+      </div>
+
+      {/* Durée */}
+      <div style={{ marginBottom: '14px' }}>
+        <div style={{ fontSize: '12px', fontWeight: 700, color: '#374151', marginBottom: '8px' }}>
+          🗓️ Combien de jours voyagez-vous ?
+        </div>
+        <div style={{ display: 'flex', gap: '7px', flexWrap: 'wrap' }}>
+          {DAY_OPTIONS.map(d => (
+            <button key={d} onClick={() => { setDays(d); setRecommended(null); handleCompute(d, usage); }}
+              style={{ padding: '6px 14px', borderRadius: '50px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', border: 'none', transition: 'all .15s', background: days === d ? 'linear-gradient(90deg,#A020F0,#FF7F11)' : '#fff', color: days === d ? '#fff' : '#374151', boxShadow: days === d ? '0 2px 8px rgba(160,32,240,.2)' : '0 1px 3px rgba(0,0,0,.08)' }}>
+              {d} jours
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Usage */}
+      <div style={{ marginBottom: '16px' }}>
+        <div style={{ fontSize: '12px', fontWeight: 700, color: '#374151', marginBottom: '8px' }}>
+          📶 Quel est votre usage prévu ?
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '8px' }}>
+          {USAGE_OPTIONS.map(({ key, label, desc, icon, go }) => (
+            <button key={key} onClick={() => { setUsage(key); setRecommended(null); handleCompute(days, key); }}
+              style={{ padding: '10px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: usage === key ? '2px solid #A020F0' : '1.5px solid #E5E7EB', transition: 'all .15s', background: usage === key ? '#F9F5FF' : '#fff', color: '#374151', textAlign: 'center' }}>
+              <div style={{ fontSize: '20px', marginBottom: '4px' }}>{icon}</div>
+              <div style={{ fontWeight: 700, marginBottom: '2px' }}>{label}</div>
+              <div style={{ fontSize: '10px', color: '#9CA3AF', lineHeight: 1.3 }}>{desc}</div>
+              <div style={{ fontSize: '10px', color: '#A020F0', fontWeight: 700, marginTop: '4px' }}>{go}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Résultat */}
+      {days && usage && (
+        <div style={{ borderTop: '0.5px solid #E5E7EB', paddingTop: '14px' }}>
+          {recommended ? (
+            <div style={{ background: 'linear-gradient(135deg,#A020F0,#FF7F11)', borderRadius: '12px', padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+              <div>
+                <div style={{ fontSize: '11px', color: 'rgba(255,255,255,.75)', fontWeight: 600, marginBottom: '3px' }}>✅ Forfait recommandé pour vous</div>
+                <div style={{ fontSize: '16px', fontWeight: 800, color: '#fff' }}>{recommended.name}</div>
+                <div style={{ fontSize: '12px', color: 'rgba(255,255,255,.8)', marginTop: '2px' }}>
+                  Couvre vos ~{neededGo()} Go estimés pour {days} jours · valable jusqu'à {recommended.validity}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <div style={{ fontSize: '22px', fontWeight: 900, color: '#fff' }}>
+                  {recommended.final_price_eur?.toFixed(2)}€
+                </div>
+                <div style={{ fontSize: '10px', color: 'rgba(255,255,255,.7)' }}>meilleur rapport</div>
+              </div>
+            </div>
+          ) : (
+            <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '12px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '20px' }}>⚠️</span>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '13px', color: '#991B1B' }}>Aucun forfait ne couvre ce besoin</div>
+                <div style={{ fontSize: '12px', color: '#B91C1C' }}>
+                  Vous avez besoin d'environ {neededGo()} Go pour {days} jours. Contactez-nous sur WhatsApp pour une solution sur-mesure.
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function RegionPage() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const router = useRouter();
@@ -180,6 +312,9 @@ export default function RegionPage() {
   };
 
   const selectedPrice = selectedPackage ? getPackagePrice(selectedPackage) : null;
+
+  // Packages affichés dans le carousel
+  const filteredPackages = packages;
 
   const seoTitle = regionName ? `eSIM ${regionName} — Connexion instantanée | FENUA SIM` : "Forfait eSIM — FENUA SIM";
   const minPrice = packages.length > 0 ? Math.min(...packages.map(p => p.final_price_eur || 999)).toFixed(2) : null;
@@ -287,6 +422,9 @@ export default function RegionPage() {
 
       <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '24px 20px' }}>
 
+        {/* ── RECOMMANDEUR INTELLIGENT ── */}
+        <RecommenderWidget packages={packages} onRecommend={(pkg) => { setSelectedPackage(pkg); setCurrentIndex(0); }} />
+
         {/* ── TRUST + CURRENCY ROW ── */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginBottom: '24px' }}>
           <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
@@ -313,17 +451,17 @@ export default function RegionPage() {
             <div style={{ background: '#fff', borderRadius: '16px', border: '0.5px solid #E5E7EB', padding: '20px', marginBottom: '16px' }}>
               <h2 style={{ fontWeight: 800, fontSize: '18px', letterSpacing: '-.04em', marginBottom: '4px' }}>Forfaits disponibles</h2>
               <p style={{ fontSize: '12px', color: '#9CA3AF', marginBottom: '18px' }}>
-                {packages.length} forfait{packages.length > 1 ? 's' : ''} — sélectionnez celui adapté à votre séjour
+                {filteredPackages.length} forfait{filteredPackages.length > 1 ? 's' : ''} — sélectionnez celui adapté à votre séjour
               </p>
 
               {/* Mobile carousel */}
               <div className="block sm:hidden">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <button onClick={handlePrev} disabled={packages.length <= 1} style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1px solid #E5E7EB', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+                  <button onClick={handlePrev} disabled={filteredPackages.length <= 1} style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1px solid #E5E7EB', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
                     <ChevronLeft size={16} />
                   </button>
-                  {packages[currentIndex] && (() => {
-                    const pkg = packages[currentIndex];
+                  {filteredPackages[currentIndex] && (() => {
+                    const pkg = filteredPackages[currentIndex];
                     const { price, symbol } = getPackagePrice(pkg);
                     return (
                       <div style={{ flex: 1, background: '#F9F5FF', borderRadius: '12px', border: '2px solid #A020F0', padding: '16px', textAlign: 'center' }}>
@@ -338,12 +476,12 @@ export default function RegionPage() {
                       </div>
                     );
                   })()}
-                  <button onClick={handleNext} disabled={packages.length <= 1} style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1px solid #E5E7EB', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+                  <button onClick={handleNext} disabled={filteredPackages.length <= 1} style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1px solid #E5E7EB', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
                     <ChevronRight size={16} />
                   </button>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginTop: '12px' }}>
-                  {packages.map((_, i) => (
+                  {filteredPackages.map((_, i) => (
                     <button key={i} onClick={() => setCurrentIndex(i)} style={{ width: '8px', height: '8px', borderRadius: '50%', border: 'none', cursor: 'pointer', background: i === currentIndex ? '#A020F0' : '#E5E7EB' }} />
                   ))}
                 </div>
@@ -351,6 +489,90 @@ export default function RegionPage() {
 
               {/* Desktop carousel — 3 forfaits visibles à la fois */}
               <div className="hidden sm:block">
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <button
+                    onClick={handlePrev}
+                    disabled={filteredPackages.length <= 3}
+                    style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1.5px solid #E5E7EB', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: filteredPackages.length <= 3 ? 'default' : 'pointer', flexShrink: 0, opacity: filteredPackages.length <= 3 ? 0.3 : 1 }}
+                  >
+                    <ChevronLeft size={16} color="#374151" />
+                  </button>
+
+                  <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px' }}>
+                    {filteredPackages.slice(currentIndex, currentIndex + 3).map((pkg) => {
+                      const { price, symbol } = getPackagePrice(pkg);
+                      const isSelected = selectedPackage?.id === pkg.id;
+                      return (
+                        <div
+                          key={pkg.id}
+                          onClick={() => setSelectedPackage(pkg)}
+                          style={{
+                            background: isSelected ? '#F9F5FF' : '#fff',
+                            borderRadius: '14px',
+                            border: isSelected ? '2px solid #A020F0' : '1px solid #E5E7EB',
+                            padding: '18px 14px',
+                            cursor: 'pointer', transition: 'all .2s',
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
+                            boxShadow: isSelected ? '0 4px 16px rgba(160,32,240,.12)' : 'none',
+                          }}
+                        >
+                          <div style={{ fontWeight: 800, fontSize: '15px', marginBottom: '4px', color: '#111827' }}>{pkg.name}</div>
+                          <div style={{ fontSize: '11px', color: '#9CA3AF', marginBottom: '10px', lineHeight: 1.4 }}>{pkg.description}</div>
+                          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '12px' }}>
+                            <span style={{ fontSize: '10px', background: pkg.includes_voice ? '#EFF6FF' : '#F9FAFB', color: pkg.includes_voice ? '#1D4ED8' : '#9CA3AF', padding: '2px 8px', borderRadius: '50px', fontWeight: 700 }}>
+                              {pkg.includes_voice ? "Appels ✓" : "Sans appels"}
+                            </span>
+                            <span style={{ fontSize: '10px', background: pkg.includes_sms ? '#FFF7ED' : '#F9FAFB', color: pkg.includes_sms ? '#C2410C' : '#9CA3AF', padding: '2px 8px', borderRadius: '50px', fontWeight: 700 }}>
+                              {pkg.includes_sms ? "SMS ✓" : "Sans SMS"}
+                            </span>
+                          </div>
+                          <div style={{ fontWeight: 900, fontSize: '22px', background: 'linear-gradient(90deg,#A020F0,#FF7F11)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: '14px' }}>
+                            {price > 0 ? `${price.toFixed(2)} ${symbol}` : 'N/A'}
+                          </div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleAcheter(pkg); }}
+                            style={{ width: '100%', background: 'linear-gradient(90deg,#A020F0,#FF7F11)', color: '#fff', border: 'none', borderRadius: '10px', padding: '11px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', boxShadow: '0 2px 8px rgba(160,32,240,.2)' }}
+                          >
+                            Acheter →
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <button
+                    onClick={handleNext}
+                    disabled={filteredPackages.length <= 3}
+                    style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1.5px solid #E5E7EB', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: filteredPackages.length <= 3 ? 'default' : 'pointer', flexShrink: 0, opacity: filteredPackages.length <= 3 ? 0.3 : 1 }}
+                  >
+                    <ChevronRight size={16} color="#374151" />
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginTop: '16px' }}>
+                  <span style={{ fontSize: '12px', color: '#9CA3AF', fontWeight: 600 }}>
+                    {currentIndex + 1}–{Math.min(currentIndex + 3, filteredPackages.length)} sur {filteredPackages.length} forfaits
+                  </span>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {Array.from({ length: Math.ceil(filteredPackages.length / 3) }).map((_, i) => (
+                      <button key={i} onClick={() => setCurrentIndex(i * 3)}
+                        style={{ width: i === Math.floor(currentIndex / 3) ? '20px' : '8px', height: '8px', borderRadius: '50px', border: 'none', cursor: 'pointer', background: i === Math.floor(currentIndex / 3) ? '#A020F0' : '#E5E7EB', transition: 'all .3s' }}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Message si aucun forfait pour ce filtre */}
+                {filteredPackages.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '32px', color: '#9CA3AF' }}>
+                    <div style={{ fontSize: '28px', marginBottom: '10px' }}>🔍</div>
+                    <div style={{ fontWeight: 600, marginBottom: '6px' }}>Aucun forfait pour cette durée</div>
+                    <button onClick={() => setDurationFilter({ min: 0, max: 999 })} style={{ color: '#A020F0', background: 'none', border: 'none', fontWeight: 700, cursor: 'pointer', fontSize: '13px' }}>
+                      Voir tous les forfaits
+                    </button>
+                  </div>
+                )}
+              </div>
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '10px' }}>
                   {/* Flèche gauche */}
                   <button

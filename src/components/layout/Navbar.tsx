@@ -85,7 +85,11 @@ export default function Navbar() {
 
           {/* Nav links desktop */}
           <ul className="hidden md:flex items-center gap-6 flex-1 justify-center">
-            <li><Link href="/shop" style={navLink(pathname.startsWith('/shop'))}>Nos eSIM</Link></li>
+            <li>
+              <Link href="/shop" style={{ display: 'inline-block', background: 'linear-gradient(90deg,#A020F0,#FF7F11)', color: '#fff', padding: '8px 18px', borderRadius: '50px', fontSize: '14px', fontWeight: 700, textDecoration: 'none', boxShadow: '0 2px 10px rgba(160,32,240,.25)' }}>
+                Trouver mon eSIM →
+              </Link>
+            </li>
             <li><Link href="/assurance" style={navLink(pathname === '/assurance')}>Assurance voyage</Link></li>
             <li>
               <Link href="/fenuasimbox" style={{ fontSize: '14px', fontWeight: 700, background: 'linear-gradient(90deg,#A020F0,#FF7F11)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', textDecoration: 'none' }}>
@@ -169,8 +173,8 @@ export default function Navbar() {
             ) : (
               /* Non connecté */
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Link href="/login" style={{ fontSize: '13px', fontWeight: 600, color: '#6B7280', textDecoration: 'none' }}>
-                  Connexion
+                <Link href="/dashboard" style={{ fontSize: '13px', fontWeight: 600, color: '#6B7280', textDecoration: 'none' }}>
+                  Espace client
                 </Link>
                 <Link href="/shop" style={{
                   background: 'linear-gradient(90deg,#A020F0,#FF7F11)',

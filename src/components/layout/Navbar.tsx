@@ -98,6 +98,7 @@ export default function Navbar() {
             </li>
             <li><Link href="/blog" style={navLink(pathname === '/blog')}>Blog</Link></li>
             <li><Link href="/faq" style={navLink(pathname === '/faq')}>FAQ</Link></li>
+            <li><Link href="/partenaires" style={navLink(pathname === '/partenaires')}>Partenaires</Link></li>
           </ul>
 
           {/* Right side */}

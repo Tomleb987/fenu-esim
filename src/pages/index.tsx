@@ -6,7 +6,6 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import PackageCard from "@/components/shop/PackageCard";
 import type { Database } from "@/lib/supabase/config";
-import ChatWidget from "@/components/ChatWidget";
 import { ChevronLeft, ChevronRight, ArrowRight } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -23,9 +22,6 @@ const REVIEWS = [
   { id: 8, author: "Thomas", country: "🇳🇨 Nouvelle-Calédonie", rating: 5, date: "Juillet 2025", title: "eSIM Nouvelle-Zélande", text: "C'était rapide et efficace. La eSIM s'est activée dès mon arrivée à l'aéroport, aucun problème de connexion pendant mon séjour.", destination: "Nouvelle-Zélande" },
 ];
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CONSTANTS
-// ─────────────────────────────────────────────────────────────────────────────
 const TOP_DESTINATIONS = [
   "Europe", "Japon", "Australie", "États-Unis", "Fidji",
   "Nouvelle-Zélande", "Mexique", "France", "Asie", "Monde",
@@ -64,9 +60,6 @@ function getFrenchRegionName(regionFr: string | null, region: string | null): st
 
 type Package = Database["public"]["Tables"]["airalo_packages"]["Row"];
 
-// ─────────────────────────────────────────────────────────────────────────────
-// STAR RATING
-// ─────────────────────────────────────────────────────────────────────────────
 function StarRating({ rating }: { rating: number }) {
   return (
     <div className="flex gap-0.5">
@@ -79,9 +72,6 @@ function StarRating({ rating }: { rating: number }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// REVIEWS CAROUSEL
-// ─────────────────────────────────────────────────────────────────────────────
 function ReviewsSection() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -116,7 +106,6 @@ function ReviewsSection() {
   return (
     <section style={{ background: 'linear-gradient(135deg, #F3E8FF 0%, #fff 60%)', padding: '56px 0' }}>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
         <div className="text-center mb-10">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-4"
             style={{ background: '#F3E8FF', border: '1px solid #DDD6FE' }}>
@@ -132,7 +121,6 @@ function ReviewsSection() {
           </h2>
           <p className="text-gray-500 max-w-md mx-auto text-sm">Des milliers de voyageurs nous font confiance pour rester connectés partout dans le monde.</p>
 
-          {/* Score Trustpilot */}
           <div className="inline-flex items-center gap-6 mt-6 px-8 py-4 bg-white rounded-2xl shadow-sm border border-gray-100">
             <div className="flex items-center gap-2">
               <div style={{ width: '28px', height: '28px', background: '#00b67a', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -152,13 +140,12 @@ function ReviewsSection() {
             </div>
             <div className="w-px h-8 bg-gray-200" />
             <div className="text-center">
-              <div className="text-2xl font-extrabold text-gray-900">14</div>
-              <div className="text-xs text-gray-400">Avis clients</div>
+              <div className="text-2xl font-extrabold text-gray-900">4,8</div>
+              <div className="text-xs text-gray-400">sur 5</div>
             </div>
           </div>
         </div>
 
-        {/* Cards */}
         <div
           className="grid grid-cols-1 sm:grid-cols-3 gap-5"
           style={{ opacity: isAnimating ? 0 : 1, transition: 'opacity 0.25s ease' }}
@@ -195,7 +182,6 @@ function ReviewsSection() {
           ))}
         </div>
 
-        {/* Controls */}
         <div className="flex items-center justify-center gap-4 mt-8">
           <button onClick={() => go(-1)} style={{ width: '40px', height: '40px', borderRadius: '50%', border: '1px solid #DDD6FE', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#A020F0' }}>
             <ChevronLeft className="w-4 h-4" />
@@ -234,10 +220,7 @@ export default function Home() {
 
   useEffect(() => {
     async function fetchPackages() {
-      const { data } = await supabase
-        .from("airalo_packages")
-        .select("*")
-        .order("final_price_eur", { ascending: true });
+      const { data } = await supabase.from("airalo_packages").select("*").order("final_price_eur", { ascending: true });
       setPackages(data || []);
       setLoading(false);
     }
@@ -283,8 +266,6 @@ export default function Home() {
 
   const topDestinations = TOP_DESTINATIONS.filter((r) => packagesByRegion[r]);
 
-  const currencySymbol = currency === "XPF" ? "₣" : currency === "USD" ? "$" : "€";
-
   return (
     <div className="min-h-screen bg-white">
       <Head>
@@ -297,22 +278,19 @@ export default function Home() {
         <meta property="og:url" content="https://www.fenuasim.com/" />
       </Head>
 
-      {/* ── HERO ─────────────────────────────────────────────────────────────── */}
+      {/* ── HERO ── */}
       <section className="relative w-full overflow-hidden" style={{ minHeight: '520px' }}>
-        {/* Background image */}
         <img
           src="https://images.unsplash.com/photo-1542051841857-5f90071e7989?q=80&w=1600&fit=crop"
           alt="Voyageur connecté"
           className="absolute inset-0 w-full h-full object-cover"
           style={{ zIndex: 0 }}
         />
-        {/* Overlays */}
         <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg,rgba(5,0,20,.1) 0%,rgba(5,0,20,.45) 40%,rgba(5,0,20,.92) 100%)', zIndex: 1 }} />
         <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg,rgba(160,32,240,.3) 0%,transparent 55%,rgba(255,127,17,.2) 100%)', zIndex: 2 }} />
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24" style={{ zIndex: 3 }}>
           <div className="max-w-2xl">
-            {/* Social proof */}
             <div className="flex items-center gap-3 mb-6">
               <div className="flex">
                 {["L", "P", "H", "N"].map((l, i) => (
@@ -334,7 +312,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* H1 */}
             <h1 className="font-extrabold leading-tight mb-4" style={{ fontSize: 'clamp(32px,5vw,52px)', color: '#fff', letterSpacing: '-.03em' }}>
               Restez connecté<br />
               partout dans{" "}
@@ -346,39 +323,15 @@ export default function Home() {
               eSIM instantanée dans 180+ pays. Pensé pour les voyageurs depuis l'Outre-mer et d'ailleurs. Activation en 2 minutes.
             </p>
 
-            {/* CTA principal */}
             <div className="flex flex-col sm:flex-row gap-3 mb-6">
-              <Link
-                href="/shop"
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: '8px',
-                  background: 'linear-gradient(90deg,#A020F0,#FF7F11)',
-                  color: '#fff', padding: '14px 28px',
-                  borderRadius: '12px', fontWeight: 800, fontSize: '15px',
-                  boxShadow: '0 4px 20px rgba(160,32,240,.4)',
-                  transition: 'transform .15s, box-shadow .15s',
-                  textDecoration: 'none',
-                }}
-              >
+              <Link href="/shop" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'linear-gradient(90deg,#A020F0,#FF7F11)', color: '#fff', padding: '14px 28px', borderRadius: '12px', fontWeight: 800, fontSize: '15px', boxShadow: '0 4px 20px rgba(160,32,240,.4)', transition: 'transform .15s, box-shadow .15s', textDecoration: 'none' }}>
                 Trouver mon eSIM <ArrowRight size={18} />
               </Link>
-              <Link
-                href="/compatibilite"
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: '8px',
-                  background: 'rgba(255,255,255,.12)',
-                  backdropFilter: 'blur(8px)',
-                  border: '1px solid rgba(255,255,255,.25)',
-                  color: '#fff', padding: '14px 22px',
-                  borderRadius: '12px', fontWeight: 600, fontSize: '14px',
-                  textDecoration: 'none',
-                }}
-              >
+              <Link href="/compatibilite" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,.12)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,.25)', color: '#fff', padding: '14px 22px', borderRadius: '12px', fontWeight: 600, fontSize: '14px', textDecoration: 'none' }}>
                 📱 Vérifier compatibilité
               </Link>
             </div>
 
-            {/* Micro-trust */}
             <div className="flex flex-wrap gap-x-5 gap-y-2">
               {["⚡ 2 min activation", "📩 Email immédiat", "🔒 Stripe sécurisé", "💬 WhatsApp 24/7"].map((t) => (
                 <span key={t} style={{ fontSize: '12px', color: 'rgba(255,255,255,.65)', fontWeight: 600 }}>{t}</span>
@@ -388,14 +341,9 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── STATS STRIP ──────────────────────────────────────────────────────── */}
+      {/* ── STATS STRIP ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', borderBottom: '1px solid #F3F4F6' }}>
-        {[
-          { n: "180+", l: "destinations" },
-          { n: "2 min", l: "activation" },
-          { n: "4,8★", l: "Trustpilot" },
-          { n: "24/7", l: "support" },
-        ].map(({ n, l }) => (
+        {[{ n: "180+", l: "destinations" }, { n: "2 min", l: "activation" }, { n: "4,8★", l: "Trustpilot" }, { n: "24/7", l: "support" }].map(({ n, l }) => (
           <div key={l} style={{ padding: '16px 8px', textAlign: 'center', borderRight: '1px solid #F3F4F6' }}>
             <div style={{ fontWeight: 800, fontSize: '20px', background: 'linear-gradient(90deg,#A020F0,#FF7F11)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{n}</div>
             <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px', fontWeight: 500 }}>{l}</div>
@@ -403,23 +351,19 @@ export default function Home() {
         ))}
       </div>
 
-      {/* ── TRUST PILLS ──────────────────────────────────────────────────────── */}
+      {/* ── TRUST PILLS ── */}
       <div style={{ background: '#F3E8FF', borderBottom: '1px solid #DDD6FE', padding: '12px 20px', display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap' }}>
         {["✓ QR code par email", "✓ Paiement EUR & XPF", "✓ Rechargeable", "✓ Sans engagement"].map((t) => (
           <span key={t} style={{ fontSize: '12px', fontWeight: 700, color: '#7B15B8' }}>{t}</span>
         ))}
       </div>
 
-      {/* ── DESTINATIONS ─────────────────────────────────────────────────────── */}
+      {/* ── DESTINATIONS ── */}
       <div className="py-12 sm:py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-baseline justify-between mb-3">
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900">
-              Destinations populaires
-            </h2>
-            <Link href="/shop" style={{ fontSize: '13px', color: '#A020F0', fontWeight: 700, textDecoration: 'none' }}>
-              Voir tout →
-            </Link>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900">Destinations populaires</h2>
+            <Link href="/shop" style={{ fontSize: '13px', color: '#A020F0', fontWeight: 700, textDecoration: 'none' }}>Voir tout →</Link>
           </div>
           <p className="text-gray-400 text-sm mb-8">Sélectionnées pour les voyageurs d'outre-mer</p>
 
@@ -435,13 +379,7 @@ export default function Home() {
                 const pkg = packagesByRegion[region]?.[0];
                 if (!pkg) return null;
                 return (
-                  <PackageCard
-                    key={region}
-                    pkg={pkg}
-                    {...regionStats[region]}
-                    currency={currency}
-                    isPopular={true}
-                  />
+                  <PackageCard key={region} pkg={pkg} {...regionStats[region]} currency={currency} isPopular={true} />
                 );
               })}
             </div>
@@ -449,46 +387,30 @@ export default function Home() {
         </div>
       </div>
 
-      {/* ── ASSURANCE BANNER ─────────────────────────────────────────────────── */}
+      {/* ── ASSURANCE BANNER ── */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
         <div className="relative rounded-2xl overflow-hidden cursor-pointer" style={{ boxShadow: '0 4px 20px rgba(255,127,17,.15)' }}>
-          <img
-            src="https://images.unsplash.com/photo-1436491865332-7a61a109cc05?q=80&w=1200&fit=crop"
-            alt="Assurance voyage"
-            className="w-full object-cover"
-            style={{ height: '130px' }}
-          />
+          <img src="https://images.unsplash.com/photo-1436491865332-7a61a109cc05?q=80&w=1200&fit=crop" alt="Assurance voyage" className="w-full object-cover" style={{ height: '130px' }} />
           <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg,rgba(160,32,240,.88),rgba(255,127,17,.75))' }} />
           <div className="absolute inset-0 flex items-center justify-between px-6 sm:px-10">
             <div>
               <h3 className="font-extrabold text-white text-lg sm:text-xl mb-1">🛡️ Assurance voyage FENUASIM</h3>
               <p className="text-white text-sm" style={{ opacity: .85 }}>Médical · Annulation · Bagages — dès 8,90€ / personne</p>
             </div>
-            <Link
-              href="/assurance"
-              style={{
-                background: '#fff', color: '#7B15B8',
-                padding: '10px 18px', borderRadius: '10px',
-                fontWeight: 800, fontSize: '13px',
-                whiteSpace: 'nowrap', textDecoration: 'none',
-                boxShadow: '0 2px 8px rgba(0,0,0,.15)',
-              }}
-            >
+            <Link href="/assurance" style={{ background: '#fff', color: '#7B15B8', padding: '10px 18px', borderRadius: '10px', fontWeight: 800, fontSize: '13px', whiteSpace: 'nowrap', textDecoration: 'none', boxShadow: '0 2px 8px rgba(0,0,0,.15)' }}>
               Découvrir →
             </Link>
           </div>
         </div>
       </div>
 
-      {/* ── REVIEWS ──────────────────────────────────────────────────────────── */}
+      {/* ── REVIEWS ── */}
       <ReviewsSection />
 
-      {/* ── HOW IT WORKS ─────────────────────────────────────────────────────── */}
+      {/* ── HOW IT WORKS ── */}
       <div style={{ background: '#F9FAFB', padding: '56px 0' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 text-center mb-12">
-            Comment ça marche ?
-          </h2>
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 text-center mb-12">Comment ça marche ?</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
             {[
               { step: "1", icon: "🛒", title: "Choisissez votre forfait", desc: "Sélectionnez la destination et le volume de data adapté à votre séjour." },
@@ -496,17 +418,10 @@ export default function Home() {
               { step: "3", icon: "⚡", title: "Connectez-vous", desc: "Scannez le QR code et profitez d'une connexion locale dès l'atterrissage." },
             ].map(({ step, icon, title, desc }) => (
               <div key={step} className="text-center">
-                <div style={{
-                  width: '64px', height: '64px', borderRadius: '50%', margin: '0 auto 16px',
-                  background: 'linear-gradient(135deg,#A020F0,#FF7F11)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '28px', boxShadow: '0 4px 14px rgba(160,32,240,.25)',
-                }}>
+                <div style={{ width: '64px', height: '64px', borderRadius: '50%', margin: '0 auto 16px', background: 'linear-gradient(135deg,#A020F0,#FF7F11)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px', boxShadow: '0 4px 14px rgba(160,32,240,.25)' }}>
                   {icon}
                 </div>
-                <div style={{ fontWeight: 800, fontSize: '13px', color: '#A020F0', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '.05em' }}>
-                  Étape {step}
-                </div>
+                <div style={{ fontWeight: 800, fontSize: '13px', color: '#A020F0', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '.05em' }}>Étape {step}</div>
                 <h3 className="font-bold text-gray-900 text-base mb-2">{title}</h3>
                 <p className="text-gray-500 text-sm leading-relaxed">{desc}</p>
               </div>
@@ -515,12 +430,10 @@ export default function Home() {
         </div>
       </div>
 
-      {/* ── FAQ ──────────────────────────────────────────────────────────────── */}
+      {/* ── FAQ ── */}
       <div className="py-12 sm:py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 text-center mb-8">
-            Questions fréquentes
-          </h2>
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 text-center mb-8">Questions fréquentes</h2>
           <div className="max-w-3xl mx-auto space-y-4">
             {[
               { q: "Comment fonctionne l'eSIM ?", a: "Vous recevez un QR code par email immédiatement après achat. Scannez-le dans les réglages de votre téléphone — vous serez connecté dès l'atterrissage dans votre pays de destination." },
@@ -541,8 +454,6 @@ export default function Home() {
           </div>
         </div>
       </div>
-
-      <ChatWidget />
     </div>
   );
 }

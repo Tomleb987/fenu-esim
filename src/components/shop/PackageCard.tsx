@@ -7,21 +7,93 @@ import { Star } from "lucide-react";
 
 type Package = Database["public"]["Tables"]["airalo_packages"]["Row"];
 
-// garde ici tes REGION_TRANSLATIONS, getFrenchRegionName,
-// regionFrToSlug et formatPrice identiques
+interface PackageCardProps {
+  pkg: Package;
+  minData: number;
+  maxData: number;
+  minDays: number;
+  maxDays: number;
+  minPrice: number;
+  packageCount: number;
+  isPopular?: boolean;
+  currency: "EUR" | "XPF" | "USD";
+  isRechargeable?: boolean;
+  isTop?: boolean;
+}
+
+// ─────────────────────────────────────────
+// HELPERS (IMPORTANT POUR ÉVITER CRASH)
+// ─────────────────────────────────────────
+
+const REGION_TRANSLATIONS: Record<string, string> = {
+  "Discover Global": "Monde",
+  "Asia": "Asie",
+  "Europe": "Europe",
+  "Japan": "Japon",
+  "United States": "États-Unis",
+  "Australia": "Australie",
+  "New Zealand": "Nouvelle-Zélande",
+  "Mexico": "Mexique",
+  "Fiji": "Fidji",
+  "France": "France",
+};
+
+function getFrenchRegionName(
+  regionFr: string | null,
+  region: string | null
+): string {
+  if (regionFr?.trim()) {
+    const t = regionFr.trim();
+    return REGION_TRANSLATIONS[t] ?? t;
+  }
+
+  if (region?.trim()) {
+    const t = region.trim();
+    if (REGION_TRANSLATIONS[t]) return REGION_TRANSLATIONS[t];
+
+    const lower = t.toLowerCase();
+    for (const [k, v] of Object.entries(REGION_TRANSLATIONS)) {
+      if (k.toLowerCase() === lower) return v;
+    }
+
+    return t;
+  }
+
+  return "Autres";
+}
+
+function regionFrToSlug(regionFr: string | null): string {
+  if (!regionFr) return "";
+  return regionFr
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, "")
+    .trim()
+    .replace(/\s+/g, "-");
+}
+
+function formatPrice(
+  price: number,
+  currency: "EUR" | "XPF" | "USD"
+): string {
+  if (currency === "XPF")
+    return `${Math.round(price).toLocaleString("fr-FR")} ₣`;
+  if (currency === "USD") return `$${price.toFixed(2)}`;
+  return `${price.toFixed(2)} €`;
+}
+
+// ─────────────────────────────────────────
+// COMPONENT
+// ─────────────────────────────────────────
 
 export default function PackageCard({
   pkg,
   minData,
-  maxData,
   minDays,
-  maxDays,
   minPrice,
-  packageCount,
-  isPopular = false,
-  currency,
-  isRechargeable,
   isTop = false,
+  currency,
 }: PackageCardProps) {
   const router = useRouter();
   const [showAllNetworks, setShowAllNetworks] = useState(false);
@@ -46,8 +118,8 @@ export default function PackageCard({
   const networkDisplay = showAllNetworks
     ? rawNetwork
     : hasMore
-      ? networkParts.slice(0, 2).join(" · ")
-      : rawNetwork;
+    ? networkParts.slice(0, 2).join(" · ")
+    : rawNetwork;
 
   const cardClasses = isTop
     ? "group relative h-full flex flex-col bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-purple-200 hover:border-purple-400 transform hover:-translate-y-2 cursor-pointer overflow-hidden w-full"
@@ -59,12 +131,13 @@ export default function PackageCard({
         <div className="absolute top-2 right-2 z-10">
           <div className="bg-gradient-to-r from-purple-600 to-orange-500 text-white px-2 py-1 rounded-full text-xs font-semibold flex items-center">
             <Star className="w-3 h-3 mr-1" />
-            <span className="hidden xs:inline">TOP</span>
+            TOP
           </div>
         </div>
       )}
 
       <div className="p-4 sm:p-6 flex flex-col flex-1">
+        {/* HEADER */}
         <div className="flex items-center mb-3 sm:mb-4">
           <div className="relative w-8 h-6 sm:w-12 sm:h-8 mr-2 sm:mr-3 rounded overflow-hidden shadow-sm flex-shrink-0">
             <img
@@ -75,119 +148,74 @@ export default function PackageCard({
           </div>
 
           <div className="min-w-0 flex-1">
-            <h3
-              className={`font-bold truncate ${
-                isTop
-                  ? "text-base sm:text-lg text-purple-800"
-                  : "text-sm sm:text-base text-gray-800"
-              }`}
-            >
+            <h3 className="font-bold truncate text-sm sm:text-base text-gray-800">
               {getFrenchRegionName(pkg.region_fr, pkg.region)}
             </h3>
           </div>
         </div>
 
+        {/* CONTENT */}
         <div className="space-y-2 sm:space-y-3 mb-4 sm:mb-6">
-          <div className="flex items-center justify-between">
-            <span className="text-xs sm:text-sm text-gray-600">À partir de</span>
-            <span
-              className={`font-bold ${
-                isTop
-                  ? "text-lg sm:text-2xl text-purple-600"
-                  : "text-base sm:text-xl text-purple-500"
-              }`}
-            >
+          <div className="flex justify-between">
+            <span className="text-xs text-gray-600">À partir de</span>
+            <span className="font-bold text-purple-500">
               {formatPrice(priceWithMargin, currency)}
             </span>
           </div>
 
-          <div className="flex items-center justify-between">
-            <span className="text-xs sm:text-sm text-gray-600">Jusqu'à</span>
-            <span className="text-xs sm:text-sm font-medium text-gray-800">
+          <div className="flex justify-between">
+            <span className="text-xs text-gray-600">Jusqu'à</span>
+            <span className="text-xs text-gray-800">
               {minDays} jour{minDays > 1 ? "s" : ""}
             </span>
           </div>
 
-          <div className="flex items-start justify-between gap-2">
-            <span className="text-xs sm:text-sm text-gray-600 flex-shrink-0">
-              Réseau
-            </span>
-
-            <span className="text-xs sm:text-sm font-medium text-gray-800 text-right leading-relaxed">
+          {/* RÉSEAU */}
+          <div className="flex justify-between gap-2">
+            <span className="text-xs text-gray-600">Réseau</span>
+            <span className="text-xs text-gray-800 text-right">
               {networkDisplay}
 
               {hasMore && !showAllNetworks && (
-                <>
-                  {" "}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowAllNetworks(true);
-                    }}
-                    style={{
-                      color: "#A020F0",
-                      fontWeight: 700,
-                      fontSize: "11px",
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      padding: 0,
-                    }}
-                  >
-                    +{networkParts.length - 2} voir tout
-                  </button>
-                </>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowAllNetworks(true);
+                  }}
+                  className="text-purple-600 font-semibold ml-1"
+                >
+                  +{networkParts.length - 2}
+                </button>
               )}
 
               {showAllNetworks && (
-                <>
-                  {" "}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowAllNetworks(false);
-                    }}
-                    style={{
-                      color: "#A020F0",
-                      fontWeight: 700,
-                      fontSize: "11px",
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      padding: 0,
-                    }}
-                  >
-                    réduire
-                  </button>
-                </>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowAllNetworks(false);
+                  }}
+                  className="text-purple-600 font-semibold ml-1"
+                >
+                  réduire
+                </button>
               )}
             </span>
           </div>
         </div>
 
+        {/* CTA FIX ALIGNEMENT */}
         <div className="mt-auto">
           <button
-            className={`w-full py-2 sm:py-3 px-3 sm:px-4 rounded-lg sm:rounded-xl font-semibold text-sm sm:text-base transition-all duration-300 ${
-              isTop
-                ? "bg-gradient-to-r from-purple-600 to-orange-500 hover:from-purple-700 hover:to-orange-600 text-white shadow-lg hover:shadow-xl"
-                : "bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white shadow-md hover:shadow-lg"
-            }`}
+            className="w-full py-2 sm:py-3 rounded-xl font-semibold text-sm bg-gradient-to-r from-purple-500 to-purple-600 text-white"
             onClick={(e) => {
               e.stopPropagation();
               handleClick();
             }}
           >
-            <span className="hidden xs:inline">
-              {isTop ? "Découvrir" : "Voir les forfaits"}
-            </span>
-            <span className="xs:hidden">Voir</span>
+            Voir
           </button>
         </div>
       </div>
-
-      {isTop && (
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-50/20 to-orange-50/20 pointer-events-none" />
-      )}
     </div>
   );
 }

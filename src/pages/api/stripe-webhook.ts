@@ -171,8 +171,9 @@ export default async function handler(
           transaction_type: "topup",
           first_name: topUpFirstName,
           last_name: topUpLastName,
-          nom: session.customer_details?.name || null,
+          // FIX : prenom = premier mot uniquement, nom = reste (ex: "Thomas lebeau" → prenom:"Thomas" nom:"lebeau")
           prenom: session.customer_details?.name?.split(" ")[0] || null,
+          nom: session.customer_details?.name?.split(" ").slice(1).join(" ") || null,
           promo_code: promo_code || null,
           partner_code: partner_code || null,
         };

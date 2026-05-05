@@ -76,7 +76,7 @@ const PARTNERS = [
   {
     id: "go-frenchies",
     initials: "GF",
-    logo: "/logos/logo-gofrenchies.png",
+    logo: "/logos/logo-gofrenchies.jpg",
     logoBackground: "#fff",
     color: "linear-gradient(135deg, #2563EB, #1E40AF)",
     name: "GO FRENCHIES",
@@ -86,7 +86,7 @@ const PARTNERS = [
     description:
       "Go Frenchies accompagne les francophones dans leur projet de départ, d’installation ou de voyage en Australie. FENUA SIM permet de rester connecté dès l’arrivée.",
     tags: ["Australie", "Francophones", "Voyage"],
-    website: "https://www.gofrenchies.com/",
+    website: "https://gofrenchies.fr",
   },
 ];
 
@@ -122,6 +122,50 @@ const AVANTAGES = [
     desc: "Aucune intégration complexe : un lien, un QR code ou un code partenaire suffit.",
   },
 ];
+
+function PartnerLogo({
+  partner,
+  compact = false,
+}: {
+  partner: (typeof PARTNERS)[number];
+  compact?: boolean;
+}) {
+  return (
+    <div
+      style={{
+        width: compact ? 48 : 74,
+        height: compact ? 48 : 74,
+        borderRadius: compact ? 16 : 22,
+        background: partner.logo ? partner.logoBackground : partner.color,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "#fff",
+        fontWeight: 950,
+        fontSize: compact ? 15 : 19,
+        border: "1px solid #E5E7EB",
+        overflow: "hidden",
+        padding: compact ? 7 : 10,
+        flexShrink: 0,
+      }}
+    >
+      {partner.logo ? (
+        <img
+          src={partner.logo}
+          alt={`Logo ${partner.name}`}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "contain",
+            backgroundColor: partner.logoBackground,
+          }}
+        />
+      ) : (
+        partner.initials
+      )}
+    </div>
+  );
+}
 
 function PartnerForm() {
   const [form, setForm] = useState({
@@ -159,7 +203,9 @@ function PartnerForm() {
   };
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
   ) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
@@ -167,7 +213,14 @@ function PartnerForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!form.societe || !form.nom || !form.prenom || !form.email || !form.activite || !form.territoire) {
+    if (
+      !form.societe ||
+      !form.nom ||
+      !form.prenom ||
+      !form.email ||
+      !form.activite ||
+      !form.territoire
+    ) {
       setError("Merci de remplir tous les champs obligatoires.");
       return;
     }
@@ -211,12 +264,28 @@ function PartnerForm() {
           ✓
         </div>
 
-        <h3 style={{ fontSize: 24, fontWeight: 900, color: "#111827", marginBottom: 10 }}>
+        <h3
+          style={{
+            fontSize: 24,
+            fontWeight: 900,
+            color: "#111827",
+            marginBottom: 10,
+          }}
+        >
           Candidature reçue
         </h3>
 
-        <p style={{ color: "#6B7280", fontSize: 15, lineHeight: 1.6, maxWidth: 420, margin: "0 auto 24px" }}>
-          Merci pour votre intérêt. Notre équipe vous contactera rapidement pour discuter du partenariat.
+        <p
+          style={{
+            color: "#6B7280",
+            fontSize: 15,
+            lineHeight: 1.6,
+            maxWidth: 420,
+            margin: "0 auto 24px",
+          }}
+        >
+          Merci pour votre intérêt. Notre équipe vous contactera rapidement pour
+          discuter du partenariat.
         </p>
 
         <Link
@@ -245,18 +314,31 @@ function PartnerForm() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))",
+          gridTemplateColumns:
+            "repeat(auto-fit, minmax(min(100%, 260px), 1fr))",
           gap: 16,
         }}
       >
         <div>
           <label style={labelStyle}>Société / Structure *</label>
-          <input name="societe" value={form.societe} onChange={handleChange} style={inputStyle} required />
+          <input
+            name="societe"
+            value={form.societe}
+            onChange={handleChange}
+            style={inputStyle}
+            required
+          />
         </div>
 
         <div>
           <label style={labelStyle}>Secteur d’activité *</label>
-          <select name="activite" value={form.activite} onChange={handleChange} style={inputStyle} required>
+          <select
+            name="activite"
+            value={form.activite}
+            onChange={handleChange}
+            style={inputStyle}
+            required
+          >
             <option value="">Sélectionner…</option>
             <option value="agence_voyage">Agence de voyages</option>
             <option value="assurance">Assurance / Courtage</option>
@@ -271,27 +353,57 @@ function PartnerForm() {
 
         <div>
           <label style={labelStyle}>Prénom *</label>
-          <input name="prenom" value={form.prenom} onChange={handleChange} style={inputStyle} required />
+          <input
+            name="prenom"
+            value={form.prenom}
+            onChange={handleChange}
+            style={inputStyle}
+            required
+          />
         </div>
 
         <div>
           <label style={labelStyle}>Nom *</label>
-          <input name="nom" value={form.nom} onChange={handleChange} style={inputStyle} required />
+          <input
+            name="nom"
+            value={form.nom}
+            onChange={handleChange}
+            style={inputStyle}
+            required
+          />
         </div>
 
         <div>
           <label style={labelStyle}>Email *</label>
-          <input type="email" name="email" value={form.email} onChange={handleChange} style={inputStyle} required />
+          <input
+            type="email"
+            name="email"
+            value={form.email}
+            onChange={handleChange}
+            style={inputStyle}
+            required
+          />
         </div>
 
         <div>
           <label style={labelStyle}>Téléphone</label>
-          <input name="telephone" value={form.telephone} onChange={handleChange} style={inputStyle} />
+          <input
+            name="telephone"
+            value={form.telephone}
+            onChange={handleChange}
+            style={inputStyle}
+          />
         </div>
 
         <div style={{ gridColumn: "1 / -1" }}>
           <label style={labelStyle}>Territoire d’activité *</label>
-          <select name="territoire" value={form.territoire} onChange={handleChange} style={inputStyle} required>
+          <select
+            name="territoire"
+            value={form.territoire}
+            onChange={handleChange}
+            style={inputStyle}
+            required
+          >
             <option value="">Sélectionner…</option>
             <option value="pf">Polynésie française</option>
             <option value="nc">Nouvelle-Calédonie</option>
@@ -352,8 +464,16 @@ function PartnerForm() {
         {loading ? "Envoi en cours…" : "Soumettre ma candidature →"}
       </button>
 
-      <p style={{ textAlign: "center", marginTop: 12, fontSize: 11, color: "#9CA3AF" }}>
-        Vos données sont utilisées uniquement pour traiter votre demande de partenariat.
+      <p
+        style={{
+          textAlign: "center",
+          marginTop: 12,
+          fontSize: 11,
+          color: "#9CA3AF",
+        }}
+      >
+        Vos données sont utilisées uniquement pour traiter votre demande de
+        partenariat.
       </p>
     </form>
   );
@@ -376,7 +496,8 @@ export default function PartenairesPage() {
             maxWidth: 1120,
             margin: "0 auto",
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 420px), 1fr))",
+            gridTemplateColumns:
+              "repeat(auto-fit, minmax(min(100%, 420px), 1fr))",
             gap: 40,
             alignItems: "center",
           }}
@@ -413,8 +534,18 @@ export default function PartenairesPage() {
               Des partenaires qui accompagnent les voyageurs connectés.
             </h1>
 
-            <p style={{ color: "rgba(255,255,255,.68)", fontSize: 17, lineHeight: 1.75, maxWidth: 590, marginBottom: 30 }}>
-              Agences de voyages, assurances, mobilité et accompagnement à l’étranger : FENUA SIM s’associe à des acteurs de confiance pour simplifier la connectivité des voyageurs.
+            <p
+              style={{
+                color: "rgba(255,255,255,.68)",
+                fontSize: 17,
+                lineHeight: 1.75,
+                maxWidth: 590,
+                marginBottom: 30,
+              }}
+            >
+              Agences de voyages, assurances, mobilité et accompagnement à
+              l’étranger : FENUA SIM s’associe à des acteurs de confiance pour
+              simplifier la connectivité des voyageurs.
             </p>
 
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
@@ -437,7 +568,13 @@ export default function PartenairesPage() {
               backdropFilter: "blur(18px)",
             }}
           >
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 12,
+              }}
+            >
               {PARTNERS.slice(0, 4).map((p) => (
                 <div
                   key={p.id}
@@ -452,10 +589,19 @@ export default function PartenairesPage() {
                   }}
                 >
                   <PartnerLogo partner={p} compact />
-                  <div style={{ fontSize: 12, fontWeight: 900, color: "#111827", marginTop: 12 }}>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 900,
+                      color: "#111827",
+                      marginTop: 12,
+                    }}
+                  >
                     {p.name}
                   </div>
-                  <div style={{ fontSize: 11, color: "#6B7280", marginTop: 3 }}>{p.territory}</div>
+                  <div style={{ fontSize: 11, color: "#6B7280", marginTop: 3 }}>
+                    {p.territory}
+                  </div>
                 </div>
               ))}
             </div>
@@ -463,25 +609,46 @@ export default function PartenairesPage() {
         </div>
       </section>
 
-      <section id="partenaires" style={{ maxWidth: 1180, margin: "0 auto", padding: "72px 24px" }}>
+      <section
+        id="partenaires"
+        style={{ maxWidth: 1180, margin: "0 auto", padding: "72px 24px" }}
+      >
         <div style={{ textAlign: "center", marginBottom: 44 }}>
           <div style={eyebrow}>
             <Sparkles size={14} /> Partenaires officiels
           </div>
 
-          <h2 style={{ fontSize: "clamp(28px,4vw,42px)", fontWeight: 950, color: "#111827", letterSpacing: "-.05em", marginBottom: 12 }}>
+          <h2
+            style={{
+              fontSize: "clamp(28px,4vw,42px)",
+              fontWeight: 950,
+              color: "#111827",
+              letterSpacing: "-.05em",
+              marginBottom: 12,
+            }}
+          >
             Ils recommandent FENUA SIM
           </h2>
 
-          <p style={{ color: "#6B7280", maxWidth: 560, margin: "0 auto", lineHeight: 1.7, fontSize: 15 }}>
-            Des partenaires sélectionnés pour leur proximité avec les voyageurs et leur expertise dans leur domaine.
+          <p
+            style={{
+              color: "#6B7280",
+              maxWidth: 560,
+              margin: "0 auto",
+              lineHeight: 1.7,
+              fontSize: 15,
+            }}
+          >
+            Des partenaires sélectionnés pour leur proximité avec les voyageurs
+            et leur expertise dans leur domaine.
           </p>
         </div>
 
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 340px), 1fr))",
+            gridTemplateColumns:
+              "repeat(auto-fit, minmax(min(100%, 340px), 1fr))",
             gap: 22,
             alignItems: "stretch",
           }}
@@ -513,7 +680,14 @@ export default function PartenairesPage() {
                 }}
               />
 
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 16, marginBottom: 18 }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 16,
+                  marginBottom: 18,
+                }}
+              >
                 <PartnerLogo partner={p} />
 
                 <span
@@ -532,20 +706,52 @@ export default function PartenairesPage() {
                 </span>
               </div>
 
-              <h3 style={{ fontSize: 18, fontWeight: 950, color: "#111827", letterSpacing: "-.03em", marginBottom: 8 }}>
+              <h3
+                style={{
+                  fontSize: 18,
+                  fontWeight: 950,
+                  color: "#111827",
+                  letterSpacing: "-.03em",
+                  marginBottom: 8,
+                }}
+              >
                 {p.name}
               </h3>
 
-              <div style={{ display: "flex", alignItems: "center", gap: 7, color: "#A020F0", fontSize: 13, fontWeight: 800, marginBottom: 14 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 7,
+                  color: "#A020F0",
+                  fontSize: 13,
+                  fontWeight: 800,
+                  marginBottom: 14,
+                }}
+              >
                 {p.icon}
                 {p.category}
               </div>
 
-              <p style={{ fontSize: 14, color: "#6B7280", lineHeight: 1.7, marginBottom: 18 }}>
+              <p
+                style={{
+                  fontSize: 14,
+                  color: "#6B7280",
+                  lineHeight: 1.7,
+                  marginBottom: 18,
+                }}
+              >
                 {p.description}
               </p>
 
-              <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 20 }}>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 7,
+                  flexWrap: "wrap",
+                  marginBottom: 20,
+                }}
+              >
                 {p.tags.map((tag) => (
                   <span
                     key={tag}
@@ -602,18 +808,35 @@ export default function PartenairesPage() {
         <div style={{ maxWidth: 1120, margin: "0 auto" }}>
           <div style={{ textAlign: "center", marginBottom: 42 }}>
             <div style={eyebrow}>⭐ Programme partenaire</div>
-            <h2 style={{ fontSize: "clamp(28px,4vw,40px)", fontWeight: 950, color: "#111827", letterSpacing: "-.05em", marginBottom: 12 }}>
+            <h2
+              style={{
+                fontSize: "clamp(28px,4vw,40px)",
+                fontWeight: 950,
+                color: "#111827",
+                letterSpacing: "-.05em",
+                marginBottom: 12,
+              }}
+            >
               Pourquoi rejoindre notre réseau ?
             </h2>
-            <p style={{ color: "#6B7280", maxWidth: 520, margin: "0 auto", lineHeight: 1.7 }}>
-              Un partenariat simple à mettre en place, utile pour vos clients et créateur de revenus additionnels.
+            <p
+              style={{
+                color: "#6B7280",
+                maxWidth: 520,
+                margin: "0 auto",
+                lineHeight: 1.7,
+              }}
+            >
+              Un partenariat simple à mettre en place, utile pour vos clients et
+              créateur de revenus additionnels.
             </p>
           </div>
 
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 300px), 1fr))",
+              gridTemplateColumns:
+                "repeat(auto-fit, minmax(min(100%, 300px), 1fr))",
               gap: 18,
             }}
           >
@@ -632,8 +855,25 @@ export default function PartenairesPage() {
               >
                 <div style={{ fontSize: 26 }}>{item.icon}</div>
                 <div>
-                  <div style={{ fontSize: 15, fontWeight: 900, color: "#111827", marginBottom: 6 }}>{item.title}</div>
-                  <div style={{ fontSize: 13, color: "#6B7280", lineHeight: 1.6 }}>{item.desc}</div>
+                  <div
+                    style={{
+                      fontSize: 15,
+                      fontWeight: 900,
+                      color: "#111827",
+                      marginBottom: 6,
+                    }}
+                  >
+                    {item.title}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      color: "#6B7280",
+                      lineHeight: 1.6,
+                    }}
+                  >
+                    {item.desc}
+                  </div>
                 </div>
               </div>
             ))}
@@ -641,14 +881,33 @@ export default function PartenairesPage() {
         </div>
       </section>
 
-      <section id="candidature" style={{ maxWidth: 780, margin: "0 auto", padding: "72px 24px" }}>
+      <section
+        id="candidature"
+        style={{ maxWidth: 780, margin: "0 auto", padding: "72px 24px" }}
+      >
         <div style={{ textAlign: "center", marginBottom: 34 }}>
           <div style={eyebrow}>🚀 Candidature</div>
-          <h2 style={{ fontSize: "clamp(28px,4vw,40px)", fontWeight: 950, color: "#111827", letterSpacing: "-.05em", marginBottom: 12 }}>
+          <h2
+            style={{
+              fontSize: "clamp(28px,4vw,40px)",
+              fontWeight: 950,
+              color: "#111827",
+              letterSpacing: "-.05em",
+              marginBottom: 12,
+            }}
+          >
             Devenir partenaire FENUA SIM
           </h2>
-          <p style={{ color: "#6B7280", maxWidth: 520, margin: "0 auto", lineHeight: 1.7 }}>
-            Vous accompagnez des voyageurs ? Présentez-nous votre activité et construisons un partenariat utile.
+          <p
+            style={{
+              color: "#6B7280",
+              maxWidth: 520,
+              margin: "0 auto",
+              lineHeight: 1.7,
+            }}
+          >
+            Vous accompagnez des voyageurs ? Présentez-nous votre activité et
+            construisons un partenariat utile.
           </p>
         </div>
 
@@ -672,10 +931,24 @@ export default function PartenairesPage() {
           textAlign: "center",
         }}
       >
-        <h2 style={{ color: "#fff", fontSize: 28, fontWeight: 950, letterSpacing: "-.04em", marginBottom: 12 }}>
+        <h2
+          style={{
+            color: "#fff",
+            fontSize: 28,
+            fontWeight: 950,
+            letterSpacing: "-.04em",
+            marginBottom: 12,
+          }}
+        >
           Une question sur le programme partenaire ?
         </h2>
-        <p style={{ color: "rgba(255,255,255,.65)", fontSize: 15, marginBottom: 26 }}>
+        <p
+          style={{
+            color: "rgba(255,255,255,.65)",
+            fontSize: 15,
+            marginBottom: 26,
+          }}
+        >
           Notre équipe est disponible pour échanger avec vous.
         </p>
         <a
@@ -699,43 +972,6 @@ export default function PartenairesPage() {
         </a>
       </section>
     </main>
-  );
-}
-
-function PartnerLogo({ partner, compact = false }: { partner: any; compact?: boolean }) {
-  return (
-    <div
-      style={{
-        width: compact ? 48 : 74,
-        height: compact ? 48 : 74,
-        borderRadius: compact ? 16 : 22,
-        background: partner.logo ? partner.logoBackground : partner.color,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        color: "#fff",
-        fontWeight: 950,
-        fontSize: compact ? 15 : 19,
-        border: "1px solid #E5E7EB",
-        overflow: "hidden",
-        padding: compact ? 7 : 10,
-        flexShrink: 0,
-      }}
-    >
-      {partner.logo ? (
-        <img
-          src={partner.logo}
-          alt={`Logo ${partner.name}`}
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "contain",
-          }}
-        />
-      ) : (
-        partner.initials
-      )}
-    </div>
   );
 }
 

@@ -92,8 +92,15 @@ function generateSlug(name: string): string {
     .replace(/\s+/g, "-").replace(/-+/g, "-").trim();
 }
 
+// ✅ Format prix — XPF sans décimales
+function formatPrice(price: number, currency: "EUR" | "USD" | "XPF"): string {
+  if (currency === "XPF") return `${Math.round(price).toLocaleString("fr-FR")} ₣`;
+  if (currency === "USD") return `$${price.toFixed(2)}`;
+  return `${price.toFixed(2)} €`;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
-// DESTINATION CARD — redesign conversion
+// DESTINATION CARD
 // ─────────────────────────────────────────────────────────────────────────────
 function DestinationCard({
   region, originalRegion, stats, currency, isTop = false,
@@ -102,7 +109,6 @@ function DestinationCard({
   currency: "EUR" | "USD" | "XPF"; isTop?: boolean;
 }) {
   const router = useRouter();
-  const symbol = currency === "USD" ? "$" : currency === "XPF" ? "₣" : "€";
 
   const handleClick = () => {
     router.push(`/shop/${generateSlug(originalRegion)}`);
@@ -132,7 +138,6 @@ function DestinationCard({
         (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)';
       }}
     >
-      {/* Top badge */}
       {isTop && (
         <div style={{
           position: 'absolute', top: '10px', right: '10px',
@@ -144,7 +149,6 @@ function DestinationCard({
         </div>
       )}
 
-      {/* Flag + name */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
         <img
           src={stats.countryCode}
@@ -160,16 +164,16 @@ function DestinationCard({
         </div>
       </div>
 
-      {/* Stats */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '14px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: '12px', color: '#6B7280' }}>À partir de</span>
+          {/* ✅ FIX : XPF sans décimales */}
           <span style={{
             fontWeight: 800, fontSize: '18px',
             background: 'linear-gradient(90deg,#A020F0,#FF7F11)',
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
           }}>
-            {stats.minPrice.toFixed(2)}{symbol}
+            {formatPrice(stats.minPrice, currency)}
           </span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -178,7 +182,6 @@ function DestinationCard({
         </div>
       </div>
 
-      {/* CTA button */}
       <button
         onClick={e => { e.stopPropagation(); handleClick(); }}
         style={{
@@ -211,7 +214,6 @@ export default function Shop() {
   const [typeFilter, setTypeFilter] = useState<"all" | "local" | "global">("all");
   const [margin, setMargin] = useState(0);
 
-  // ✅ Promo code & partner ref — logique inchangée
   useEffect(() => {
     if (!router.isReady) return;
     const promoCode = (router.query.code as string) || localStorage.getItem("promoCode");
@@ -220,7 +222,6 @@ export default function Shop() {
     if (partnerRef) { localStorage.setItem("partnerRef", partnerRef); localStorage.setItem("fenuasim_partner_code", partnerRef); }
   }, [router.isReady, router.query]);
 
-  // ✅ Fetch packages — logique inchangée
   useEffect(() => {
     async function fetchPackages() {
       try {
@@ -242,7 +243,6 @@ export default function Shop() {
     fetchPackages();
   }, []);
 
-  // ✅ Devise & marge — logique inchangée
   useEffect(() => {
     if (typeof window !== "undefined") {
       const cur = localStorage.getItem("currency") as "EUR" | "USD" | "XPF" | null;
@@ -341,8 +341,6 @@ export default function Shop() {
           <p style={{ fontSize: '14px', color: 'rgba(255,255,255,.65)', marginBottom: '16px' }}>
             180+ pays · Activation instantanée · Livraison par email
           </p>
-
-          {/* Search bar */}
           <div style={{
             background: '#fff', borderRadius: '12px', padding: '5px 5px 5px 14px',
             display: 'flex', alignItems: 'center', gap: '8px',
@@ -354,11 +352,7 @@ export default function Shop() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Rechercher une destination…"
-              style={{
-                flex: 1, border: 'none', outline: 'none',
-                fontSize: '14px', color: '#111827', background: 'transparent',
-                fontFamily: 'inherit',
-              }}
+              style={{ flex: 1, border: 'none', outline: 'none', fontSize: '14px', color: '#111827', background: 'transparent', fontFamily: 'inherit' }}
             />
             {searchQuery && (
               <button onClick={() => setSearchQuery("")} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', display: 'flex' }}>
@@ -379,11 +373,7 @@ export default function Shop() {
       {/* ── FILTERS + CURRENCY ── */}
       <div style={{ background: '#fff', borderBottom: '0.5px solid #E5E7EB', padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          {[
-            { val: "all", label: "Tous" },
-            { val: "local", label: "Régional" },
-            { val: "global", label: "Global" },
-          ].map(({ val, label }) => (
+          {[{ val: "all", label: "Tous" }, { val: "local", label: "Régional" }, { val: "global", label: "Global" }].map(({ val, label }) => (
             <button
               key={val}
               onClick={() => setTypeFilter(val as any)}
@@ -402,11 +392,7 @@ export default function Shop() {
         <select
           value={currency}
           onChange={(e) => { setCurrency(e.target.value as any); localStorage.setItem("currency", e.target.value); }}
-          style={{
-            border: '1.5px solid rgba(160,32,240,.3)', borderRadius: '8px',
-            padding: '6px 12px', fontSize: '13px', fontWeight: 700,
-            color: '#A020F0', background: '#F9F5FF', cursor: 'pointer', outline: 'none',
-          }}
+          style={{ border: '1.5px solid rgba(160,32,240,.3)', borderRadius: '8px', padding: '6px 12px', fontSize: '13px', fontWeight: 700, color: '#A020F0', background: '#F9F5FF', cursor: 'pointer', outline: 'none' }}
         >
           <option value="EUR">€ EUR</option>
           <option value="XPF">₣ XPF</option>
@@ -420,54 +406,29 @@ export default function Shop() {
         {topDestinations.length > 0 && (
           <div style={{ marginBottom: '40px' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <h2 style={{ fontWeight: 800, fontSize: '20px', letterSpacing: '-.04em' }}>
-                ⭐ Destinations populaires
-              </h2>
+              <h2 style={{ fontWeight: 800, fontSize: '20px', letterSpacing: '-.04em' }}>⭐ Destinations populaires</h2>
             </div>
             <p style={{ fontSize: '13px', color: '#9CA3AF', marginBottom: '18px' }}>
               {searchQuery ? `Résultats pour "${searchQuery}"` : "Les plus demandées par les voyageurs d'outre-mer"}
             </p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '14px' }}>
               {topDestinations.map((region) => (
-                <DestinationCard
-                  key={region}
-                  region={region}
-                  originalRegion={regionStats[region].originalRegion}
-                  stats={regionStats[region]}
-                  currency={currency}
-                  isTop={true}
-                />
+                <DestinationCard key={region} region={region} originalRegion={regionStats[region].originalRegion} stats={regionStats[region]} currency={currency} isTop={true} />
               ))}
             </div>
           </div>
         )}
 
         {/* ── ASSURANCE BANNER ── */}
-        <div style={{
-          marginBottom: '40px', borderRadius: '16px', overflow: 'hidden',
-          position: 'relative', boxShadow: '0 4px 20px rgba(255,127,17,.12)',
-        }}>
-          <img
-            src="https://images.unsplash.com/photo-1436491865332-7a61a109cc05?q=80&w=1200&fit=crop"
-            alt="Assurance"
-            style={{ width: '100%', height: '100px', objectFit: 'cover', display: 'block' }}
-          />
+        <div style={{ marginBottom: '40px', borderRadius: '16px', overflow: 'hidden', position: 'relative', boxShadow: '0 4px 20px rgba(255,127,17,.12)' }}>
+          <img src="https://images.unsplash.com/photo-1436491865332-7a61a109cc05?q=80&w=1200&fit=crop" alt="Assurance" style={{ width: '100%', height: '100px', objectFit: 'cover', display: 'block' }} />
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg,rgba(160,32,240,.88),rgba(255,127,17,.75))' }} />
-          <div style={{
-            position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
-            justifyContent: 'space-between', padding: '0 24px', gap: '12px',
-          }}>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', gap: '12px' }}>
             <div>
               <div style={{ fontWeight: 800, fontSize: '16px', color: '#fff', marginBottom: '3px' }}>🛡️ Assurance voyage FENUASIM</div>
               <div style={{ fontSize: '12px', color: 'rgba(255,255,255,.85)' }}>Médical · Annulation · Bagages — dès 8,90€ / personne</div>
             </div>
-            <Link href="/assurance" style={{
-              background: '#fff', color: '#7B15B8',
-              padding: '9px 16px', borderRadius: '10px',
-              fontWeight: 800, fontSize: '12px',
-              whiteSpace: 'nowrap', textDecoration: 'none',
-              boxShadow: '0 2px 8px rgba(0,0,0,.12)',
-            }}>
+            <Link href="/assurance" style={{ background: '#fff', color: '#7B15B8', padding: '9px 16px', borderRadius: '10px', fontWeight: 800, fontSize: '12px', whiteSpace: 'nowrap', textDecoration: 'none', boxShadow: '0 2px 8px rgba(0,0,0,.12)' }}>
               Découvrir →
             </Link>
           </div>
@@ -479,9 +440,7 @@ export default function Shop() {
             <h2 style={{ fontWeight: 800, fontSize: '20px', letterSpacing: '-.04em' }}>
               🌍 {otherDestinations.length > 0 ? "Toutes les destinations" : "Nos destinations"}
             </h2>
-            <span style={{ fontSize: '13px', color: '#9CA3AF', fontWeight: 600 }}>
-              {filteredRegions.length} pays
-            </span>
+            <span style={{ fontSize: '13px', color: '#9CA3AF', fontWeight: 600 }}>{filteredRegions.length} pays</span>
           </div>
           <p style={{ fontSize: '13px', color: '#9CA3AF', marginBottom: '18px' }}>
             {searchQuery ? `Résultats pour "${searchQuery}"` : `Explorez nos ${regions.length} destinations disponibles`}
@@ -498,14 +457,7 @@ export default function Shop() {
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '14px' }}>
               {(otherDestinations.length > 0 ? otherDestinations : regions).map((region) => (
-                <DestinationCard
-                  key={region}
-                  region={region}
-                  originalRegion={regionStats[region].originalRegion}
-                  stats={regionStats[region]}
-                  currency={currency}
-                  isTop={false}
-                />
+                <DestinationCard key={region} region={region} originalRegion={regionStats[region].originalRegion} stats={regionStats[region]} currency={currency} isTop={false} />
               ))}
             </div>
           )}
@@ -516,13 +468,10 @@ export default function Shop() {
           {[
             { n: filteredRegions.length, l: "Destinations", color: '#A020F0' },
             { n: Object.values(packagesByRegion).reduce((acc, pkgs) => acc + pkgs.length, 0), l: "Forfaits", color: '#FF7F11' },
-            { n: `${Math.min(...Object.values(regionStats).map((s) => s.minPrice).filter((p) => p > 0)).toFixed(0)}${symbol}`, l: "Prix min", color: '#10B981' },
+            { n: formatPrice(Math.min(...Object.values(regionStats).map((s) => s.minPrice).filter((p) => p > 0)), currency), l: "Prix min", color: '#10B981' },
             { n: Math.max(...Object.values(regionStats).map((s) => s.maxDays)), l: "Jours max", color: '#3B82F6' },
           ].map(({ n, l, color }) => (
-            <div key={l} style={{
-              background: '#fff', border: '0.5px solid #E5E7EB', borderRadius: '12px',
-              padding: '16px', textAlign: 'center',
-            }}>
+            <div key={l} style={{ background: '#fff', border: '0.5px solid #E5E7EB', borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
               <div style={{ fontWeight: 800, fontSize: '22px', color, marginBottom: '4px' }}>{n}</div>
               <div style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: 600 }}>{l}</div>
             </div>

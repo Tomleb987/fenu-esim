@@ -1,3 +1,4 @@
+
 "use client";
 import Head from "next/head";
 import { usePartnerCodes } from "@/hooks/usePartnerCodes";
@@ -16,6 +17,7 @@ type Package = Database["public"]["Tables"]["airalo_packages"]["Row"] & {
   region_description?: string;
   region_slug?: string;
   image_url?: string;
+  networks?: string | null;
 };
 
 type DataTip = { photo: string; web: string; video: string; chat: string; };
@@ -95,13 +97,10 @@ function RecommenderWidget({ packages, currency, onRecommend }: {
   if (dismissed) return null;
 
   const PER_DAY: Record<string, number> = { light: 0.3, medium: 0.8, heavy: 2.0 };
-
   const neededGo = (d: number, u: string) => Math.ceil(d * (PER_DAY[u] || 1));
 
   const compute = (d: number, u: string): Package | null => {
     const needed = neededGo(d, u);
-
-    // Pour usage intensif, chercher d'abord un forfait illimité valable assez longtemps
     if (u === "heavy") {
       const unlimited = packages.filter((p) => {
         const name = (p.name || "").toLowerCase();
@@ -111,16 +110,12 @@ function RecommenderWidget({ packages, currency, onRecommend }: {
         return isUnlimited && pkgDays >= d;
       }).sort((a, b) => (a.final_price_eur ?? 0) - (b.final_price_eur ?? 0));
       if (unlimited.length > 0) return unlimited[0];
-
-      // Pas d'illimité → proposer le plus gros forfait disponible (max Go)
       const biggest = packages.filter((p) => {
         const pkgDays = parseInt(p.validity?.toString().split(" ")[0] || "0");
         return pkgDays >= d;
       }).sort((a, b) => (b.data_amount ?? 0) - (a.data_amount ?? 0));
       return biggest[0] || null;
     }
-
-    // Léger / Modéré → forfait avec assez de Go ET validité suffisante, prix le plus bas
     const valid = packages.filter((p) => {
       const go = (p.data_unit?.toLowerCase().includes("gb") || p.data_unit?.toLowerCase().includes("go"))
         ? (p.data_amount ?? 0)
@@ -132,7 +127,6 @@ function RecommenderWidget({ packages, currency, onRecommend }: {
   };
 
   const DAY_OPTIONS = [3, 7, 10, 14, 21, 30];
-
   const handleSelect = (d: number | null, u: string | null) => {
     if (!d || !u) return;
     const rec = compute(d, u);
@@ -149,7 +143,6 @@ function RecommenderWidget({ packages, currency, onRecommend }: {
   return (
     <div style={{ background: "linear-gradient(135deg,#F9F5FF,#FFF7ED)", borderRadius: "16px", border: "1.5px solid #DDD6FE", padding: "20px", marginBottom: "16px", position: "relative" }}>
       <button onClick={() => setDismissed(true)} style={{ position: "absolute", top: "12px", right: "14px", background: "none", border: "none", cursor: "pointer", color: "#9CA3AF", fontSize: "20px", lineHeight: 1 }}>×</button>
-
       <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
         <div style={{ width: "34px", height: "34px", borderRadius: "50%", background: "linear-gradient(135deg,#A020F0,#FF7F11)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", flexShrink: 0 }}>🎯</div>
         <div>
@@ -158,7 +151,6 @@ function RecommenderWidget({ packages, currency, onRecommend }: {
         </div>
       </div>
 
-      {/* Durée — slider */}
       <div style={{ marginBottom: "14px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
           <div style={{ fontSize: "12px", fontWeight: 700, color: "#374151" }}>🗓️ Combien de jours voyagez-vous ?</div>
@@ -168,38 +160,25 @@ function RecommenderWidget({ packages, currency, onRecommend }: {
             </div>
           )}
         </div>
-
-        {/* Track + labels */}
         <div style={{ position: "relative", padding: "0 4px" }}>
           <input
-            type="range"
-            min={0}
-            max={DAY_OPTIONS.length - 1}
-            step={1}
+            type="range" min={0} max={DAY_OPTIONS.length - 1} step={1}
             value={days ? DAY_OPTIONS.indexOf(days) : 0}
-            onChange={(e) => {
-              const d = DAY_OPTIONS[parseInt(e.target.value)];
-              setDays(d);
-              handleSelect(d, usage);
-            }}
+            onChange={(e) => { const d = DAY_OPTIONS[parseInt(e.target.value)]; setDays(d); handleSelect(d, usage); }}
             style={{ width: "100%", accentColor: "#A020F0", cursor: "pointer", height: "4px" }}
           />
           <style>{`
             input[type=range]::-webkit-slider-thumb { width:20px; height:20px; border-radius:50%; background:linear-gradient(135deg,#A020F0,#FF7F11); border:2px solid #fff; box-shadow:0 1px 6px rgba(160,32,240,.3); }
             input[type=range]::-webkit-slider-runnable-track { height:4px; border-radius:2px; background:linear-gradient(90deg,#A020F0,#E5E7EB); }
           `}</style>
-          {/* Labels sous le slider */}
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: "6px" }}>
             {DAY_OPTIONS.map((d) => (
-              <span key={d} style={{ fontSize: "10px", fontWeight: days === d ? 800 : 500, color: days === d ? "#A020F0" : "#9CA3AF", transition: "all .15s" }}>
-                {d}j
-              </span>
+              <span key={d} style={{ fontSize: "10px", fontWeight: days === d ? 800 : 500, color: days === d ? "#A020F0" : "#9CA3AF", transition: "all .15s" }}>{d}j</span>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Usage */}
       <div style={{ marginBottom: "16px" }}>
         <div style={{ fontSize: "12px", fontWeight: 700, color: "#374151", marginBottom: "8px" }}>📶 Quel est votre usage prévu ?</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "8px" }}>
@@ -215,7 +194,6 @@ function RecommenderWidget({ packages, currency, onRecommend }: {
         </div>
       </div>
 
-      {/* Résultat */}
       {days && usage && (
         <div style={{ borderTop: "0.5px solid #E5E7EB", paddingTop: "14px" }}>
           {recommended ? (
@@ -224,13 +202,8 @@ function RecommenderWidget({ packages, currency, onRecommend }: {
                 <div style={{ fontSize: "11px", color: "rgba(255,255,255,.75)", fontWeight: 600, marginBottom: "3px" }}>✅ Forfait recommandé pour vous</div>
                 <div style={{ fontSize: "16px", fontWeight: 800, color: "#fff" }}>{recommended.name}</div>
                 <div style={{ fontSize: "12px", color: "rgba(255,255,255,.8)", marginTop: "2px" }}>
-                  ~{neededGo(days, usage)} Go estimés pour {days} jours · valable {
-                    recommended.validity?.toString()
-                      .replace(/\bdays\b/g, "jours")
-                      .replace(/\bday\b/g, "jour")
-                  }
+                  ~{neededGo(days, usage)} Go estimés pour {days} jours · valable {recommended.validity?.toString().replace(/\bdays\b/g, "jours").replace(/\bday\b/g, "jour")}
                 </div>
-                {/* Message recharge si usage intensif et pas illimité */}
                 {usage === "heavy" && !["illimit","unlimited","∞"].some(k => (recommended.name || "").toLowerCase().includes(k) || (recommended.description || "").toLowerCase().includes(k)) && (
                   <div style={{ marginTop: "8px", background: "rgba(255,255,255,.15)", borderRadius: "8px", padding: "7px 10px", fontSize: "11px", color: "#fff", display: "flex", alignItems: "center", gap: "6px" }}>
                     <span>🔄</span>
@@ -240,11 +213,7 @@ function RecommenderWidget({ packages, currency, onRecommend }: {
               </div>
               <div style={{ textAlign: "right", flexShrink: 0 }}>
                 <div style={{ fontSize: "22px", fontWeight: 900, color: "#fff" }}>
-                  {currency === "XPF"
-                    ? `${Math.round(recommended.final_price_xpf ?? 0).toLocaleString("fr-FR")} ₣`
-                    : currency === "USD"
-                    ? `$${recommended.final_price_usd?.toFixed(2)}`
-                    : `${recommended.final_price_eur?.toFixed(2)}€`}
+                  {currency === "XPF" ? `${Math.round(recommended.final_price_xpf ?? 0).toLocaleString("fr-FR")} ₣` : currency === "USD" ? `$${recommended.final_price_usd?.toFixed(2)}` : `${recommended.final_price_eur?.toFixed(2)}€`}
                 </div>
                 <div style={{ fontSize: "10px", color: "rgba(255,255,255,.7)" }}>meilleur rapport</div>
               </div>
@@ -254,9 +223,7 @@ function RecommenderWidget({ packages, currency, onRecommend }: {
               <span style={{ fontSize: "20px" }}>⚠️</span>
               <div>
                 <div style={{ fontWeight: 700, fontSize: "13px", color: "#991B1B" }}>Aucun forfait ne couvre ce besoin</div>
-                <div style={{ fontSize: "12px", color: "#B91C1C" }}>
-                  Vous avez besoin d'environ {neededGo(days, usage)} Go. Contactez-nous sur WhatsApp pour une solution sur-mesure.
-                </div>
+                <div style={{ fontSize: "12px", color: "#B91C1C" }}>Vous avez besoin d'environ {neededGo(days, usage)} Go. Contactez-nous sur WhatsApp pour une solution sur-mesure.</div>
               </div>
             </div>
           )}
@@ -460,10 +427,8 @@ export default function RegionPage() {
 
       <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "24px 20px" }}>
 
-        {/* ── RECOMMANDEUR ── */}
         <RecommenderWidget packages={packages} currency={currency} onRecommend={(pkg) => { setSelectedPackage(pkg); setCurrentIndex(packages.indexOf(pkg)); }} />
 
-        {/* ── TRUST + CURRENCY ── */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", marginBottom: "24px" }}>
           <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
             {["⚡ Activation instantanée", "📩 Email immédiat", "🔒 Paiement Stripe", "💬 Support 24/7"].map((t) => (
@@ -481,16 +446,14 @@ export default function RegionPage() {
         <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 340px", gap: "24px", alignItems: "start" }} className="product-grid">
           <style>{`@media(max-width:768px){.product-grid{grid-template-columns:1fr!important}}`}</style>
 
-          {/* ── LEFT ── */}
           <div>
-            {/* FORFAITS */}
             <div style={{ background: "#fff", borderRadius: "16px", border: "0.5px solid #E5E7EB", padding: "20px", marginBottom: "16px" }}>
               <h2 style={{ fontWeight: 800, fontSize: "18px", letterSpacing: "-.04em", marginBottom: "4px" }}>Forfaits disponibles</h2>
               <p style={{ fontSize: "12px", color: "#9CA3AF", marginBottom: "18px" }}>
                 {packages.length} forfait{packages.length > 1 ? "s" : ""} — sélectionnez celui adapté à votre séjour
               </p>
 
-              {/* Mobile — 1 forfait + flèches */}
+              {/* Mobile */}
               <div className="block sm:hidden">
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                   <button onClick={() => setCurrentIndex((p) => Math.max(0, p - 1))} disabled={currentIndex === 0}
@@ -526,19 +489,17 @@ export default function RegionPage() {
                 </div>
               </div>
 
-              {/* Desktop — 3 forfaits + flèches */}
+              {/* Desktop */}
               <div className="hidden sm:block">
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                   <button onClick={handlePrev} disabled={currentIndex === 0}
                     style={{ width: "36px", height: "36px", borderRadius: "50%", border: "1.5px solid #E5E7EB", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: currentIndex === 0 ? "default" : "pointer", flexShrink: 0, opacity: currentIndex === 0 ? 0.3 : 1 }}>
                     <ChevronLeft size={16} color="#374151" />
                   </button>
-
                   <div style={{ flex: 1, display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "12px" }}>
                     {packages.slice(currentIndex, currentIndex + 3).map((pkg) => {
                       const { price, symbol } = getPackagePrice(pkg);
                       const isSelected = selectedPackage?.id === pkg.id;
-                      const isRecommended = selectedPackage?.id === pkg.id && pkg.id === packages[0]?.id;
                       return (
                         <div key={pkg.id} onClick={() => setSelectedPackage(pkg)}
                           style={{ background: isSelected ? "#F9F5FF" : "#fff", borderRadius: "14px", border: isSelected ? "2px solid #A020F0" : "1px solid #E5E7EB", padding: "18px 14px", cursor: "pointer", transition: "all .2s", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", boxShadow: isSelected ? "0 4px 16px rgba(160,32,240,.12)" : "none", position: "relative" }}>
@@ -563,13 +524,11 @@ export default function RegionPage() {
                       );
                     })}
                   </div>
-
                   <button onClick={handleNext} disabled={currentIndex + 3 >= packages.length}
                     style={{ width: "36px", height: "36px", borderRadius: "50%", border: "1.5px solid #E5E7EB", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: currentIndex + 3 >= packages.length ? "default" : "pointer", flexShrink: 0, opacity: currentIndex + 3 >= packages.length ? 0.3 : 1 }}>
                     <ChevronRight size={16} color="#374151" />
                   </button>
                 </div>
-
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", marginTop: "16px" }}>
                   <span style={{ fontSize: "12px", color: "#9CA3AF", fontWeight: 600 }}>
                     {currentIndex + 1}–{Math.min(currentIndex + 3, packages.length)} sur {packages.length} forfaits
@@ -660,9 +619,12 @@ export default function RegionPage() {
                       {selectedPrice.price.toFixed(2)} {selectedPrice.symbol}
                     </span>
                   </div>
+                  {/* ✅ FIX : vrais réseaux physiques */}
                   <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span style={{ fontSize: "12px", color: "#6B7280" }}>Opérateur</span>
-                    <span style={{ fontSize: "12px", fontWeight: 600 }}>{selectedPackage.operator_name}</span>
+                    <span style={{ fontSize: "12px", color: "#6B7280" }}>Réseau</span>
+                    <span style={{ fontSize: "12px", fontWeight: 600 }}>
+                      {selectedPackage.networks || selectedPackage.operator_name}
+                    </span>
                   </div>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "16px" }}>
@@ -716,7 +678,7 @@ export default function RegionPage() {
                 {selectedPackage.operator_logo_url ? (
                   <Image src={selectedPackage.operator_logo_url} alt={selectedPackage.operator_name || ""} width={24} height={24} className="rounded-full bg-white border border-gray-100" />
                 ) : (
-                  <span className="text-xs text-gray-400">{selectedPackage.operator_name}</span>
+                  <span className="text-xs text-gray-400">{selectedPackage.networks || selectedPackage.operator_name}</span>
                 )}
               </div>
               <div className="flex gap-1 flex-wrap text-xs mb-2">

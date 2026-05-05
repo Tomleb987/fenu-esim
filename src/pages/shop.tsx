@@ -2,11 +2,11 @@
 
 import Head from "next/head";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/router"; // ✅ Pages Router
+import { useRouter } from "next/router";
 import { supabase } from "@/lib/supabaseClient";
 import type { Database } from "@/lib/supabase/config";
-import Image from "next/image";
-import { Star } from "lucide-react";
+import { ArrowRight, Search, X } from "lucide-react";
+import Link from "next/link";
 
 type Package = Database["public"]["Tables"]["airalo_packages"]["Row"];
 
@@ -17,334 +17,190 @@ interface RegionStats {
   packageCount: number;
   operatorName: string;
   countryCode: string;
-  originalRegion: string; // Store original English region name for slug generation
+  originalRegion: string;
 }
 
-interface DestinationCardProps {
-  region: string; // French display name
-  originalRegion: string; // Original English region name for slug
-  stats: RegionStats;
-  currency: "EUR" | "USD" | "XPF";
-  isTop?: boolean;
-}
+const TOP_DESTINATIONS = ["France", "Canada", "États-Unis", "Australie", "Nouvelle-Zélande"];
 
-const TOP_DESTINATIONS = [
-  "France",
-  "Canada",
-  "États-Unis",
-  "Australie",
-  "Nouvelle-Zélande",
-];
-
-// Translation mapping for English to French destination names
 const REGION_TRANSLATIONS: Record<string, string> = {
-  "Discover Global": "Monde",
-  "Asia": "Asie",
-  "Europe": "Europe",
-  "Japan": "Japon",
-  "Japon": "Japon", // Handle if already in French
-  "Canary Islands": "Îles Canaries",
-  "South Korea": "Corée du Sud",
-  "Hong Kong": "Hong Kong",
-  "United States": "États-Unis",
-  "Australia": "Australie",
-  "New Zealand": "Nouvelle-Zélande",
-  "Mexico": "Mexique",
-  "Fiji": "Fidji",
-  "Thailand": "Thaïlande",
-  "Singapore": "Singapour",
-  "Malaysia": "Malaisie",
-  "Indonesia": "Indonésie",
-  "Philippines": "Philippines",
-  "Vietnam": "Viêt Nam",
-  "India": "Inde",
-  "China": "Chine",
-  "Taiwan": "Taïwan",
-  "United Kingdom": "Royaume-Uni",
-  "Germany": "Allemagne",
-  "Spain": "Espagne",
-  "Italy": "Italie",
-  "Greece": "Grèce",
-  "Portugal": "Portugal",
-  "Netherlands": "Pays-Bas",
-  "Belgium": "Belgique",
-  "Switzerland": "Suisse",
-  "Austria": "Autriche",
-  "Poland": "Pologne",
-  "Czech Republic": "République tchèque",
-  "Turkey": "Turquie",
-  "Egypt": "Égypte",
-  "Morocco": "Maroc",
-  "South Africa": "Afrique du Sud",
-  "Brazil": "Brésil",
-  "Argentina": "Argentine",
-  "Chile": "Chili",
-  "Colombia": "Colombie",
-  "Peru": "Pérou",
-  "UAE": "Émirats arabes unis",
-  "United Arab Emirates": "Émirats arabes unis",
-  "Saudi Arabia": "Arabie saoudite",
-  "Israel": "Israël",
-  "Jordan": "Jordanie",
-  "Lebanon": "Liban",
-  "Qatar": "Qatar",
-  "Kuwait": "Koweït",
-  "Bahrain": "Bahreïn",
-  "Oman": "Oman",
-  "Azerbaijan": "Azerbaïdjan",
-  "Jamaica": "Jamaïque",
-  "Albania": "Albanie",
-  "Algeria": "Algérie",
-  "Angola": "Angola",
-  "Armenia": "Arménie",
-  "Bangladesh": "Bangladesh",
-  "Belarus": "Biélorussie",
-  "Bolivia": "Bolivie",
-  "Bosnia and Herzegovina": "Bosnie-Herzégovine",
-  "Botswana": "Botswana",
-  "Bulgaria": "Bulgarie",
-  "Cambodia": "Cambodge",
-  "Cameroon": "Cameroun",
-  "Chad": "Tchad",
-  "Croatia": "Croatie",
-  "Cuba": "Cuba",
-  "Cyprus": "Chypre",
-  "Denmark": "Danemark",
-  "Dominican Republic": "République dominicaine",
-  "Ecuador": "Équateur",
-  "Estonia": "Estonie",
-  "Ethiopia": "Éthiopie",
-  "Finland": "Finlande",
-  "France": "France",
-  "Georgia": "Géorgie",
-  "Ghana": "Ghana",
-  "Guatemala": "Guatemala",
-  "Honduras": "Honduras",
-  "Hungary": "Hongrie",
-  "Iceland": "Islande",
-  "Ireland": "Irlande",
-  "Ivory Coast": "Côte d'Ivoire",
-  "Kazakhstan": "Kazakhstan",
-  "Kenya": "Kenya",
-  "Kyrgyzstan": "Kirghizistan",
-  "Laos": "Laos",
-  "Latvia": "Lettonie",
-  "Lithuania": "Lituanie",
-  "Luxembourg": "Luxembourg",
-  "Madagascar": "Madagascar",
-  "Malawi": "Malawi",
-  "Maldives": "Maldives",
-  "Mali": "Mali",
-  "Malta": "Malte",
-  "Mauritius": "Maurice",
-  "Moldova": "Moldavie",
-  "Mongolia": "Mongolie",
-  "Montenegro": "Monténégro",
-  "Myanmar": "Myanmar",
-  "Namibia": "Namibie",
-  "Nepal": "Népal",
-  "Nicaragua": "Nicaragua",
-  "Nigeria": "Nigeria",
-  "North Macedonia": "Macédoine du Nord",
-  "Norway": "Norvège",
-  "Pakistan": "Pakistan",
-  "Panama": "Panama",
-  "Paraguay": "Paraguay",
-  "Romania": "Roumanie",
-  "Russia": "Russie",
-  "Rwanda": "Rwanda",
-  "Senegal": "Sénégal",
-  "Serbia": "Serbie",
-  "Slovakia": "Slovaquie",
-  "Slovenia": "Slovénie",
-  "Sri Lanka": "Sri Lanka",
-  "Sweden": "Suède",
-  "Tanzania": "Tanzanie",
-  "Tunisia": "Tunisie",
-  "Ukraine": "Ukraine",
-  "Uruguay": "Uruguay",
-  "Uzbekistan": "Ouzbékistan",
-  "Venezuela": "Venezuela",
-  "Zambia": "Zambie",
-  "Zimbabwe": "Zimbabwe",
-  "Faroe Islands": "Îles Féroé",
-  "Oceania": "Océanie",
-  "Northern Cyprus": "Chypre du Nord",
-  "North America": "Amérique du Nord",
+  "Discover Global": "Monde", "Asia": "Asie", "Europe": "Europe", "Japan": "Japon",
+  "Japon": "Japon", "Canary Islands": "Îles Canaries", "South Korea": "Corée du Sud",
+  "Hong Kong": "Hong Kong", "United States": "États-Unis", "Australia": "Australie",
+  "New Zealand": "Nouvelle-Zélande", "Mexico": "Mexique", "Fiji": "Fidji",
+  "Thailand": "Thaïlande", "Singapore": "Singapour", "Malaysia": "Malaisie",
+  "Indonesia": "Indonésie", "Philippines": "Philippines", "Vietnam": "Viêt Nam",
+  "India": "Inde", "China": "Chine", "Taiwan": "Taïwan", "United Kingdom": "Royaume-Uni",
+  "Germany": "Allemagne", "Spain": "Espagne", "Italy": "Italie", "Greece": "Grèce",
+  "Portugal": "Portugal", "Netherlands": "Pays-Bas", "Belgium": "Belgique",
+  "Switzerland": "Suisse", "Austria": "Autriche", "Poland": "Pologne",
+  "Czech Republic": "République tchèque", "Turkey": "Turquie", "Egypt": "Égypte",
+  "Morocco": "Maroc", "South Africa": "Afrique du Sud", "Brazil": "Brésil",
+  "Argentina": "Argentine", "Chile": "Chili", "Colombia": "Colombie", "Peru": "Pérou",
+  "UAE": "Émirats arabes unis", "United Arab Emirates": "Émirats arabes unis",
+  "Saudi Arabia": "Arabie saoudite", "Israel": "Israël", "Jordan": "Jordanie",
+  "Qatar": "Qatar", "Kuwait": "Koweït", "Bahrain": "Bahreïn", "Oman": "Oman",
+  "Azerbaijan": "Azerbaïdjan", "Jamaica": "Jamaïque", "Albania": "Albanie",
+  "Algeria": "Algérie", "Angola": "Angola", "Armenia": "Arménie",
+  "Bangladesh": "Bangladesh", "Belarus": "Biélorussie", "Bolivia": "Bolivie",
+  "Bosnia and Herzegovina": "Bosnie-Herzégovine", "Bulgaria": "Bulgarie",
+  "Cambodia": "Cambodge", "Cameroon": "Cameroun", "Chad": "Tchad", "Croatia": "Croatie",
+  "Cuba": "Cuba", "Cyprus": "Chypre", "Denmark": "Danemark",
+  "Dominican Republic": "République dominicaine", "Ecuador": "Équateur",
+  "Estonia": "Estonie", "Ethiopia": "Éthiopie", "Finland": "Finlande", "France": "France",
+  "Georgia": "Géorgie", "Ghana": "Ghana", "Guatemala": "Guatemala", "Honduras": "Honduras",
+  "Hungary": "Hongrie", "Iceland": "Islande", "Ireland": "Irlande",
+  "Ivory Coast": "Côte d'Ivoire", "Kazakhstan": "Kazakhstan", "Kenya": "Kenya",
+  "Kyrgyzstan": "Kirghizistan", "Laos": "Laos", "Latvia": "Lettonie",
+  "Lithuania": "Lituanie", "Luxembourg": "Luxembourg", "Madagascar": "Madagascar",
+  "Maldives": "Maldives", "Mali": "Mali", "Malta": "Malte", "Mauritius": "Maurice",
+  "Moldova": "Moldavie", "Mongolia": "Mongolie", "Montenegro": "Monténégro",
+  "Myanmar": "Myanmar", "Namibia": "Namibie", "Nepal": "Népal", "Nicaragua": "Nicaragua",
+  "Nigeria": "Nigeria", "North Macedonia": "Macédoine du Nord", "Norway": "Norvège",
+  "Pakistan": "Pakistan", "Panama": "Panama", "Paraguay": "Paraguay",
+  "Romania": "Roumanie", "Russia": "Russie", "Rwanda": "Rwanda", "Senegal": "Sénégal",
+  "Serbia": "Serbie", "Slovakia": "Slovaquie", "Slovenia": "Slovénie",
+  "Sri Lanka": "Sri Lanka", "Sweden": "Suède", "Tanzania": "Tanzanie",
+  "Tunisia": "Tunisie", "Ukraine": "Ukraine", "Uruguay": "Uruguay",
+  "Uzbekistan": "Ouzbékistan", "Venezuela": "Venezuela", "Zambia": "Zambie",
+  "Zimbabwe": "Zimbabwe", "Canada": "Canada", "Faroe Islands": "Îles Féroé",
+  "Oceania": "Océanie", "North America": "Amérique du Nord",
   "Middle East and North Africa": "Moyen-Orient et Afrique du Nord",
-  "MENA": "Moyen-Orient et Afrique du Nord",
 };
 
-// Function to get French name with fallback to translation
 function getFrenchRegionName(regionFr: string | null, region: string | null): string {
-  // First priority: Use region_fr from database if available and it's actually French
-  if (regionFr && regionFr.trim()) {
-    const trimmedFr = regionFr.trim();
-    // Check if region_fr is actually in English (needs translation)
-    if (REGION_TRANSLATIONS[trimmedFr]) {
-      // region_fr contains English name, translate it
-      return REGION_TRANSLATIONS[trimmedFr];
-    }
-    // region_fr is already in French, use it
-    return trimmedFr;
+  if (regionFr?.trim()) {
+    const t = regionFr.trim();
+    if (REGION_TRANSLATIONS[t]) return REGION_TRANSLATIONS[t];
+    return t;
   }
-  
-  // Second priority: Translate English region name to French
-  if (region && region.trim()) {
-    const trimmedRegion = region.trim();
-    // Try exact match first
-    if (REGION_TRANSLATIONS[trimmedRegion]) {
-      return REGION_TRANSLATIONS[trimmedRegion];
+  if (region?.trim()) {
+    const t = region.trim();
+    if (REGION_TRANSLATIONS[t]) return REGION_TRANSLATIONS[t];
+    const lower = t.toLowerCase();
+    for (const [k, v] of Object.entries(REGION_TRANSLATIONS)) {
+      if (k.toLowerCase() === lower) return v;
     }
-    // Try case-insensitive match
-    const lowerRegion = trimmedRegion.toLowerCase();
-    for (const [key, value] of Object.entries(REGION_TRANSLATIONS)) {
-      if (key.toLowerCase() === lowerRegion) {
-        return value;
-      }
-    }
+    return t;
   }
-  
-  // Fallback: return original region or "Autres"
-  return region?.trim() || "Autres";
+  return "Autres";
 }
 
 function generateSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .normalize("NFD")
+  return name.toLowerCase().normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .trim();
+    .replace(/\s+/g, "-").replace(/-+/g, "-").trim();
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// DESTINATION CARD — redesign conversion
+// ─────────────────────────────────────────────────────────────────────────────
 function DestinationCard({
-  region,
-  originalRegion,
-  stats,
-  currency,
-  isTop = false,
-}: DestinationCardProps) {
+  region, originalRegion, stats, currency, isTop = false,
+}: {
+  region: string; originalRegion: string; stats: RegionStats;
+  currency: "EUR" | "USD" | "XPF"; isTop?: boolean;
+}) {
   const router = useRouter();
+  const symbol = currency === "USD" ? "$" : currency === "XPF" ? "₣" : "€";
 
-  const handleCardClick = () => {
-    // Use original English region name to generate slug (DB uses English slugs)
-    const slug = generateSlug(originalRegion);
-    router.push(`/shop/${slug}`);
+  const handleClick = () => {
+    router.push(`/shop/${generateSlug(originalRegion)}`);
   };
-
-  const getCurrencySymbol = () => {
-    switch (currency) {
-      case "USD":
-        return "$";
-      case "XPF":
-        return "₣";
-      default:
-        return "€";
-    }
-  };
-
-  const cardClasses = isTop
-    ? "group relative bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-purple-200 hover:border-purple-400 transform hover:-translate-y-2 cursor-pointer overflow-hidden w-full"
-    : "group relative bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 border border-gray-200 hover:border-purple-300 transform hover:-translate-y-1 cursor-pointer overflow-hidden w-full";
 
   return (
-    <div className={cardClasses} onClick={handleCardClick}>
+    <div
+      onClick={handleClick}
+      style={{
+        background: '#fff',
+        borderRadius: '14px',
+        border: isTop ? '1.5px solid rgba(160,32,240,.2)' : '0.5px solid #E5E7EB',
+        padding: '16px',
+        cursor: 'pointer',
+        transition: 'all .2s',
+        position: 'relative',
+        overflow: 'hidden',
+      }}
+      onMouseEnter={e => {
+        (e.currentTarget as HTMLDivElement).style.borderColor = '#A020F0';
+        (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 20px rgba(160,32,240,.1)';
+        (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)';
+      }}
+      onMouseLeave={e => {
+        (e.currentTarget as HTMLDivElement).style.borderColor = isTop ? 'rgba(160,32,240,.2)' : '#E5E7EB';
+        (e.currentTarget as HTMLDivElement).style.boxShadow = 'none';
+        (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)';
+      }}
+    >
+      {/* Top badge */}
       {isTop && (
-        <div className="absolute top-2 right-2 z-10">
-          <div className="bg-gradient-to-r from-purple-600 to-orange-500 text-white px-2 py-1 rounded-full text-xs font-semibold flex items-center">
-            <Star className="w-3 h-3 mr-1" />
-            <span className="hidden xs:inline">TOP</span>
-          </div>
+        <div style={{
+          position: 'absolute', top: '10px', right: '10px',
+          background: 'linear-gradient(90deg,#A020F0,#FF7F11)',
+          color: '#fff', borderRadius: '50px', padding: '2px 8px',
+          fontSize: '9px', fontWeight: 800,
+        }}>
+          ⭐ TOP
         </div>
       )}
 
-      <div className="p-4 sm:p-6">
-        <div className="flex items-center mb-3 sm:mb-4">
-          <div className="relative w-8 h-6 sm:w-12 sm:h-8 mr-2 sm:mr-3 rounded overflow-hidden shadow-sm flex-shrink-0">
-            <Image
-              src={stats.countryCode.toLowerCase()}
-              alt={`Drapeau ${region}`}
-              fill
-              className="object-cover"
-              unoptimized
-            />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h3
-              className={`font-bold truncate ${
-                isTop
-                  ? "text-base sm:text-lg text-purple-800"
-                  : "text-sm sm:text-base text-gray-800"
-              }`}
-            >
-              {region}
-            </h3>
-            <p className="text-xs sm:text-sm text-gray-500">
-              {stats.packageCount} forfait{stats.packageCount > 1 ? "s" : ""}
-            </p>
+      {/* Flag + name */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+        <img
+          src={stats.countryCode}
+          alt={region}
+          style={{ width: '36px', height: '24px', objectFit: 'cover', borderRadius: '4px', flexShrink: 0 }}
+          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+        />
+        <div>
+          <div style={{ fontWeight: 700, fontSize: '14px', color: '#111827' }}>{region}</div>
+          <div style={{ fontSize: '11px', color: '#9CA3AF' }}>
+            {stats.packageCount} forfait{stats.packageCount > 1 ? 's' : ''}
           </div>
         </div>
-
-        <div className="space-y-2 sm:space-y-3 mb-4 sm:mb-6">
-          <div className="flex items-center justify-between">
-            <span className="text-xs sm:text-sm text-gray-600">
-              À partir de
-            </span>
-            <span
-              className={`font-bold ${
-                isTop
-                  ? "text-lg sm:text-2xl text-purple-600"
-                  : "text-base sm:text-xl text-purple-500"
-              }`}
-            >
-              {stats.minPrice.toFixed(2)}
-              {getCurrencySymbol()}
-            </span>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <span className="text-xs sm:text-sm text-gray-600">Jusqu'à</span>
-            <span className="text-xs sm:text-sm font-medium text-gray-800">
-              {stats.maxDays} jours
-            </span>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <span className="text-xs sm:text-sm text-gray-600">Opérateur</span>
-            <span className="text-xs sm:text-sm font-medium text-gray-800 truncate ml-2 max-w-20 sm:max-w-none">
-              {stats.operatorName}
-            </span>
-          </div>
-        </div>
-
-        <button
-          className={`w-full py-2 sm:py-3 px-3 sm:px-4 rounded-lg sm:rounded-xl font-semibold text-sm sm:text-base transition-all duration-300 ${
-            isTop
-              ? "bg-gradient-to-r from-purple-600 to-orange-500 hover:from-purple-700 hover:to-orange-600 text-white shadow-lg hover:shadow-xl"
-              : "bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white shadow-md hover:shadow-lg"
-          }`}
-          onClick={(e) => {
-            e.stopPropagation();
-            handleCardClick();
-          }}
-        >
-          <span className="hidden xs:inline">
-            {isTop ? "Découvrir" : "Voir les forfaits"}
-          </span>
-          <span className="xs:hidden">Voir</span>
-        </button>
       </div>
 
-      {isTop && (
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-50/20 to-orange-50/20 pointer-events-none" />
-      )}
+      {/* Stats */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '14px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: '12px', color: '#6B7280' }}>À partir de</span>
+          <span style={{
+            fontWeight: 800, fontSize: '18px',
+            background: 'linear-gradient(90deg,#A020F0,#FF7F11)',
+            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+          }}>
+            {stats.minPrice.toFixed(2)}{symbol}
+          </span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: '12px', color: '#6B7280' }}>Jusqu'à</span>
+          <span style={{ fontSize: '12px', fontWeight: 600, color: '#374151' }}>{stats.maxDays} jours</span>
+        </div>
+      </div>
+
+      {/* CTA button */}
+      <button
+        onClick={e => { e.stopPropagation(); handleClick(); }}
+        style={{
+          width: '100%', padding: '10px',
+          background: 'linear-gradient(90deg,#A020F0,#FF7F11)',
+          color: '#fff', border: 'none', borderRadius: '10px',
+          fontWeight: 700, fontSize: '13px', cursor: 'pointer',
+          boxShadow: '0 2px 8px rgba(160,32,240,.2)',
+          transition: 'transform .15s',
+        }}
+        onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.02)')}
+        onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
+      >
+        Voir les forfaits →
+      </button>
     </div>
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// SHOP PAGE
+// ─────────────────────────────────────────────────────────────────────────────
 export default function Shop() {
   const router = useRouter();
   const [packages, setPackages] = useState<Package[]>([]);
@@ -352,52 +208,29 @@ export default function Shop() {
   const [error, setError] = useState<string | null>(null);
   const [currency, setCurrency] = useState<"EUR" | "XPF" | "USD">("EUR");
   const [searchQuery, setSearchQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState<"all" | "local" | "global">(
-    "all"
-  );
+  const [typeFilter, setTypeFilter] = useState<"all" | "local" | "global">("all");
   const [margin, setMargin] = useState(0);
 
-// ✅ Pré-remplissage & stockage local (React state, no DOM manipulation)
+  // ✅ Promo code & partner ref — logique inchangée
   useEffect(() => {
     if (!router.isReady) return;
-
-    const promoCode =
-      (router.query.code as string) || localStorage.getItem("promoCode");
-    const partnerRef =
-      (router.query.ref as string) || localStorage.getItem("partnerRef");
-
-    if (promoCode) {
-      localStorage.setItem("promoCode", promoCode);
-      localStorage.setItem("fenuasim_promo_code", promoCode);
-    }
-
-    if (partnerRef) {
-      localStorage.setItem("partnerRef", partnerRef);
-      localStorage.setItem("fenuasim_partner_code", partnerRef);
-    }
+    const promoCode = (router.query.code as string) || localStorage.getItem("promoCode");
+    const partnerRef = (router.query.ref as string) || localStorage.getItem("partnerRef");
+    if (promoCode) { localStorage.setItem("promoCode", promoCode); localStorage.setItem("fenuasim_promo_code", promoCode); }
+    if (partnerRef) { localStorage.setItem("partnerRef", partnerRef); localStorage.setItem("fenuasim_partner_code", partnerRef); }
   }, [router.isReady, router.query]);
 
-  // ✅ Récupération des forfaits
+  // ✅ Fetch packages — logique inchangée
   useEffect(() => {
     async function fetchPackages() {
       try {
-        const { data, error } = await supabase
-          .from("airalo_packages")
-          .select("*")
-          .order("final_price_eur", { ascending: true });
-
+        const { data, error } = await supabase.from("airalo_packages").select("*").order("final_price_eur", { ascending: true });
         if (error) throw error;
-
         const validPackages = (data || []).filter((pkg) => {
-          const hasValidEur =
-            pkg.final_price_eur != null && pkg.final_price_eur > 0;
-          const hasValidUsd =
-            pkg.final_price_usd != null && pkg.final_price_usd > 0;
-          const hasValidXpf =
-            pkg.final_price_xpf != null && pkg.final_price_xpf > 0;
-          return hasValidEur || hasValidUsd || hasValidXpf;
+          return (pkg.final_price_eur != null && pkg.final_price_eur > 0)
+            || (pkg.final_price_usd != null && pkg.final_price_usd > 0)
+            || (pkg.final_price_xpf != null && pkg.final_price_xpf > 0);
         });
-
         setPackages(validPackages);
       } catch (err) {
         setError("Erreur lors du chargement des forfaits");
@@ -406,112 +239,66 @@ export default function Shop() {
         setLoading(false);
       }
     }
-
     fetchPackages();
   }, []);
 
-  // ✅ Récupération devise & marge
+  // ✅ Devise & marge — logique inchangée
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const cur = localStorage.getItem("currency") as
-        | "EUR"
-        | "USD"
-        | "XPF"
-        | null;
+      const cur = localStorage.getItem("currency") as "EUR" | "USD" | "XPF" | null;
       if (cur) setCurrency(cur);
-
-      const storedMargin = parseFloat(localStorage.getItem("global_margin") || "0");
-      setMargin(storedMargin);
+      setMargin(parseFloat(localStorage.getItem("global_margin") || "0"));
     }
   }, []);
 
-  const getPrice = (pkg: Package, currency: string): number => {
-    switch (currency) {
-      case "USD":
-        return pkg.final_price_usd || 0;
-      case "XPF":
-        return pkg.final_price_xpf || 0;
-      default:
-        return pkg.final_price_eur || 0;
-    }
+  const getPrice = (pkg: Package, cur: string): number => {
+    if (cur === "USD") return pkg.final_price_usd || 0;
+    if (cur === "XPF") return pkg.final_price_xpf || 0;
+    return pkg.final_price_eur || 0;
   };
-  // Group packages by region and calculate stats
+
   const packagesByRegion = packages.reduce((acc, pkg) => {
-    // Apply type filter
-    if (typeFilter !== "all" && pkg.type !== typeFilter) {
-      return acc;
-    }
-    
-    // Use region_fr if available, otherwise use translation mapping, then fallback to region
+    if (typeFilter !== "all" && pkg.type !== typeFilter) return acc;
     const region = getFrenchRegionName(pkg.region_fr, pkg.region);
-    if (!acc[region]) {
-      acc[region] = [];
-    }
+    if (!acc[region]) acc[region] = [];
     acc[region].push(pkg);
     return acc;
   }, {} as Record<string, Package[]>);
 
-  // Calculate statistics for each region
-  const regionStats = Object.entries(packagesByRegion).reduce(
-    (acc, [region, pkgs]) => {
-      const prices = pkgs.map((p) => getPrice(p, currency)).filter((p) => p > 0);
-      const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
-      const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
+  const regionStats = Object.entries(packagesByRegion).reduce((acc, [region, pkgs]) => {
+    const prices = pkgs.map((p) => getPrice(p, currency)).filter((p) => p > 0);
+    const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
+    const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
+    const originalRegion = pkgs[0]?.region || pkgs[0]?.region_fr || region;
+    acc[region] = {
+      minPrice: minPrice * (1 + margin),
+      maxPrice: maxPrice * (1 + margin),
+      packageCount: pkgs.length,
+      operatorName: pkgs[0]?.operator_name || "Inconnu",
+      countryCode: pkgs[0]?.flag_url || "xx",
+      maxDays: Math.max(...pkgs.map((p) => parseInt(p.validity?.toString().split(" ")[0] || "0"))),
+      originalRegion,
+    };
+    return acc;
+  }, {} as Record<string, RegionStats>);
 
-      // Get original English region name from first package
-      const originalRegion = pkgs[0]?.region || pkgs[0]?.region_fr || region;
-
-      // Apply margin here
-      acc[region] = {
-        minPrice: minPrice * (1 + margin),
-        maxPrice: maxPrice * (1 + margin),
-        packageCount: pkgs.length,
-        operatorName: pkgs[0]?.operator_name || "Inconnu",
-        countryCode: pkgs[0]?.flag_url || "xx",
-        maxDays: Math.max(
-          ...pkgs.map((p) => parseInt(p.validity?.toString().split(' ')[0] || "0"))
-        ),
-        originalRegion: originalRegion, // Store original English name for slug
-      };
-      return acc;
-    },
-    {} as Record<string, RegionStats>
-  );
-
-  // Sort regions by minimum price
-  const regions = Object.keys(packagesByRegion).sort(
-    (a, b) => regionStats[a].minPrice - regionStats[b].minPrice
-  );
-
-  // Filter regions based on search query
-  const filteredRegions = regions.filter((region) =>
-    region.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  // Update the top destinations and other destinations filtering
-  const topDestinations = filteredRegions
-    .filter((region) =>
-      TOP_DESTINATIONS.some(
-        (topDest) => topDest.toLowerCase() === region.toLowerCase()
-      )
-    )
-    .slice(0, 5);
-
-  const otherDestinations = filteredRegions.filter(
-    (region) =>
-      !TOP_DESTINATIONS.some(
-        (topDest) => topDest.toLowerCase() === region.toLowerCase()
-      )
-  );
+  const regions = Object.keys(packagesByRegion).sort((a, b) => regionStats[a].minPrice - regionStats[b].minPrice);
+  const filteredRegions = regions.filter((r) => r.toLowerCase().includes(searchQuery.toLowerCase()));
+  const topDestinations = filteredRegions.filter((r) => TOP_DESTINATIONS.some((t) => t.toLowerCase() === r.toLowerCase())).slice(0, 5);
+  const otherDestinations = filteredRegions.filter((r) => !TOP_DESTINATIONS.some((t) => t.toLowerCase() === r.toLowerCase()));
+  const symbol = currency === "USD" ? "$" : currency === "XPF" ? "₣" : "€";
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center p-4">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 sm:h-16 sm:w-16 border-b-4 border-purple-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 text-sm sm:text-base">
-            Chargement des destinations...
-          </p>
+          <div style={{
+            width: '48px', height: '48px', borderRadius: '50%',
+            border: '4px solid #F3E8FF', borderTopColor: '#A020F0',
+            animation: 'spin 1s linear infinite', margin: '0 auto 16px',
+          }} />
+          <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+          <p style={{ color: '#6B7280', fontSize: '14px' }}>Chargement des destinations...</p>
         </div>
       </div>
     );
@@ -519,15 +306,11 @@ export default function Shop() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 to-pink-50 flex items-center justify-center p-4">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <p className="text-red-600 mb-4 text-sm sm:text-base">
-            Erreur: {error}
-          </p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-4 sm:px-6 py-2 bg-red-600 text-white text-sm sm:text-base rounded-lg hover:bg-red-700"
-          >
+          <p style={{ color: '#EF4444', marginBottom: '16px' }}>Erreur: {error}</p>
+          <button onClick={() => window.location.reload()}
+            style={{ padding: '8px 20px', background: '#EF4444', color: '#fff', borderRadius: '8px', border: 'none', cursor: 'pointer' }}>
             Réessayer
           </button>
         </div>
@@ -536,108 +319,115 @@ export default function Shop() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-orange-50">
+    <div style={{ minHeight: '100vh', background: '#F9FAFB' }}>
       <Head>
         <title>Acheter une eSIM de voyage — Boutique FENUA SIM | Polynésie française</title>
-        <meta name="description" content="Choisissez votre eSIM parmi 180+ destinations. Forfaits data pour USA, Europe, Japon, Australie et plus. Livraison instantanée par email. Idéal pour les voyageurs partant de Tahiti." />
-        <meta name="keywords" content="acheter eSIM, eSIM voyage Tahiti, eSIM USA Polynésie, eSIM Europe, eSIM Japon, forfait data étranger, eSIM pas cher" />
+        <meta name="description" content="Choisissez votre eSIM parmi 180+ destinations. Forfaits data pour USA, Europe, Japon, Australie et plus. Livraison instantanée par email." />
         <link rel="canonical" href="https://www.fenuasim.com/shop" />
-        <meta property="og:title" content="Boutique eSIM — FENUA SIM | 180+ destinations depuis la Polynésie" />
-        <meta property="og:description" content="180+ destinations, activation instantanée, support 7j/7. L'eSIM pensée pour les résidents de Polynésie française." />
-        <meta property="og:url" content="https://www.fenuasim.com/shop" />
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "ItemList",
-            name: "Forfaits eSIM de voyage FENUA SIM",
-            description: "Boutique en ligne d'eSIM de voyage pour les résidents de Polynésie française",
-            url: "https://www.fenuasim.com/shop",
-            numberOfItems: 180,
-            itemListElement: [
-              { "@type": "ListItem", position: 1, name: "eSIM États-Unis", url: "https://www.fenuasim.com/shop/united-states" },
-              { "@type": "ListItem", position: 2, name: "eSIM Europe", url: "https://www.fenuasim.com/shop/europe" },
-              { "@type": "ListItem", position: 3, name: "eSIM Japon", url: "https://www.fenuasim.com/shop/japan" },
-              { "@type": "ListItem", position: 4, name: "eSIM Australie", url: "https://www.fenuasim.com/shop/australia" },
-              { "@type": "ListItem", position: 5, name: "eSIM Monde", url: "https://www.fenuasim.com/shop/discover-global" },
-            ]
-          })}}
-        />
       </Head>
 
-      {/* Hero Section */}
-      <section className="relative py-12 sm:py-16 lg:py-20 px-4">
-        <div className="max-w-7xl mx-auto text-center">
-          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-800 mb-4 sm:mb-6 leading-tight">
-            Connectez-vous partout dans le monde
+      {/* ── HERO SHOP ── */}
+      <div style={{ position: 'relative', overflow: 'hidden', minHeight: '220px' }}>
+        <img
+          src="https://images.unsplash.com/photo-1488646953014-85cb44e25828?q=80&w=1400&fit=crop"
+          alt="Shop eSIM"
+          style={{ width: '100%', height: '220px', objectFit: 'cover', display: 'block' }}
+        />
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg,rgba(10,2,30,.92),rgba(160,32,240,.65))' }} />
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '28px 24px' }}>
+          <h1 style={{ fontWeight: 800, fontSize: 'clamp(22px,4vw,36px)', color: '#fff', letterSpacing: '-.05em', marginBottom: '6px' }}>
+            Toutes les destinations
           </h1>
-          <p className="text-base sm:text-lg lg:text-xl text-gray-600 mb-6 sm:mb-8 max-w-2xl mx-auto px-4">
-            Découvrez nos forfaits eSIM pour voyager sans contraintes.
-            Activation instantanée, couverture mondiale.
+          <p style={{ fontSize: '14px', color: 'rgba(255,255,255,.65)', marginBottom: '16px' }}>
+            180+ pays · Activation instantanée · Livraison par email
           </p>
 
-          {/* Sélecteur de devise */}
-          <div className="flex justify-center">
-            <select
-              value={currency}
-              onChange={(e) => {
-                setCurrency(e.target.value as "EUR" | "XPF" | "USD");
-                localStorage.setItem("currency", e.target.value);
-              }}
-              className="border border-purple-300 text-purple-800 bg-white rounded-lg px-3 sm:px-4 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 shadow-md font-semibold text-sm sm:text-base min-w-24"
-            >
-              <option value="EUR">€ EUR</option>
-              <option value="XPF">₣ XPF</option>
-              <option value="USD">$ USD</option>
-            </select>
-          </div>
-        </div>
-      </section>
-
-      <section className="flex flex-col justify-center items-center gap-16 py-8 sm:py-12 lg:py-16 px-4">
-        <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md mb-6">
-          <div className="relative flex-1">
+          {/* Search bar */}
+          <div style={{
+            background: '#fff', borderRadius: '12px', padding: '5px 5px 5px 14px',
+            display: 'flex', alignItems: 'center', gap: '8px',
+            maxWidth: '500px', boxShadow: '0 4px 20px rgba(0,0,0,.2)',
+          }}>
+            <Search size={16} color="#9CA3AF" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Rechercher une destination..."
-              className="w-full px-4 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 shadow-md text-gray-800 placeholder-gray-400"
+              placeholder="Rechercher une destination…"
+              style={{
+                flex: 1, border: 'none', outline: 'none',
+                fontSize: '14px', color: '#111827', background: 'transparent',
+                fontFamily: 'inherit',
+              }}
             />
             {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              >
-                ✕
+              <button onClick={() => setSearchQuery("")} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', display: 'flex' }}>
+                <X size={14} />
               </button>
             )}
+            <button style={{
+              background: 'linear-gradient(90deg,#A020F0,#FF7F11)',
+              color: '#fff', border: 'none', borderRadius: '8px',
+              padding: '9px 16px', fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+            }}>
+              Rechercher
+            </button>
           </div>
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as "all" | "local" | "global")}
-            className="px-4 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 shadow-md text-gray-800 bg-white min-w-[120px]"
-          >
-            <option value="all">Tous les types</option>
-            <option value="local">Regional</option>
-            <option value="global">Global</option>
-          </select>
         </div>
-        {/* Top Destinations */}
-        {topDestinations.length > 0 && (
-          <div className="max-w-7xl mx-auto">
-            <div className="text-center mb-8 sm:mb-12">
-              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-800 mb-2 sm:mb-4">
-                🥇 Destinations populaires
-              </h2>
-              <p className="text-sm sm:text-base lg:text-lg text-gray-600 px-4">
-                {searchQuery
-                  ? `Résultats pour "${searchQuery}"`
-                  : "Nos destinations les plus demandées avec les meilleurs tarifs"}
-              </p>
-            </div>
+      </div>
 
-            <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 lg:gap-6">
+      {/* ── FILTERS + CURRENCY ── */}
+      <div style={{ background: '#fff', borderBottom: '0.5px solid #E5E7EB', padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {[
+            { val: "all", label: "Tous" },
+            { val: "local", label: "Régional" },
+            { val: "global", label: "Global" },
+          ].map(({ val, label }) => (
+            <button
+              key={val}
+              onClick={() => setTypeFilter(val as any)}
+              style={{
+                padding: '5px 14px', borderRadius: '50px', fontSize: '12px', fontWeight: 700,
+                cursor: 'pointer', transition: 'all .15s',
+                background: typeFilter === val ? 'linear-gradient(90deg,#A020F0,#FF7F11)' : '#fff',
+                color: typeFilter === val ? '#fff' : '#6B7280',
+                border: typeFilter === val ? 'none' : '1.5px solid #E5E7EB',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <select
+          value={currency}
+          onChange={(e) => { setCurrency(e.target.value as any); localStorage.setItem("currency", e.target.value); }}
+          style={{
+            border: '1.5px solid rgba(160,32,240,.3)', borderRadius: '8px',
+            padding: '6px 12px', fontSize: '13px', fontWeight: 700,
+            color: '#A020F0', background: '#F9F5FF', cursor: 'pointer', outline: 'none',
+          }}
+        >
+          <option value="EUR">€ EUR</option>
+          <option value="XPF">₣ XPF</option>
+          <option value="USD">$ USD</option>
+        </select>
+      </div>
+
+      <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '32px 24px' }}>
+
+        {/* ── TOP DESTINATIONS ── */}
+        {topDestinations.length > 0 && (
+          <div style={{ marginBottom: '40px' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <h2 style={{ fontWeight: 800, fontSize: '20px', letterSpacing: '-.04em' }}>
+                ⭐ Destinations populaires
+              </h2>
+            </div>
+            <p style={{ fontSize: '13px', color: '#9CA3AF', marginBottom: '18px' }}>
+              {searchQuery ? `Résultats pour "${searchQuery}"` : "Les plus demandées par les voyageurs d'outre-mer"}
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '14px' }}>
               {topDestinations.map((region) => (
                 <DestinationCard
                   key={region}
@@ -651,31 +441,63 @@ export default function Shop() {
             </div>
           </div>
         )}
-      </section>
 
-      {/* All Destinations */}
-      <section className="py-8 sm:py-12 lg:py-16 px-4 bg-white/50">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-8 sm:mb-12">
-            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800 mb-2 sm:mb-4">
-              🌍 {otherDestinations.length > 0 ? "Nos autres destinations" : "Toutes nos destinations"}
-            </h2>
-            <p className="text-sm sm:text-base lg:text-lg text-gray-600 px-4">
-              {searchQuery || typeFilter !== "all" ? (
-                <>
-                  {searchQuery && `Résultats pour "${searchQuery}"`}
-                  {searchQuery && typeFilter !== "all" && " - "}
-                  {typeFilter !== "all" && `Type: ${typeFilter === "local" ? "Local" : "Global"}`}
-                </>
-              ) : (
-                `Explorez toutes nos destinations disponibles (${regions.length} pays)`
-              )}
-            </p>
+        {/* ── ASSURANCE BANNER ── */}
+        <div style={{
+          marginBottom: '40px', borderRadius: '16px', overflow: 'hidden',
+          position: 'relative', boxShadow: '0 4px 20px rgba(255,127,17,.12)',
+        }}>
+          <img
+            src="https://images.unsplash.com/photo-1436491865332-7a61a109cc05?q=80&w=1200&fit=crop"
+            alt="Assurance"
+            style={{ width: '100%', height: '100px', objectFit: 'cover', display: 'block' }}
+          />
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg,rgba(160,32,240,.88),rgba(255,127,17,.75))' }} />
+          <div style={{
+            position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
+            justifyContent: 'space-between', padding: '0 24px', gap: '12px',
+          }}>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: '16px', color: '#fff', marginBottom: '3px' }}>🛡️ Assurance voyage FENUASIM</div>
+              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,.85)' }}>Médical · Annulation · Bagages — dès 8,90€ / personne</div>
+            </div>
+            <Link href="/assurance" style={{
+              background: '#fff', color: '#7B15B8',
+              padding: '9px 16px', borderRadius: '10px',
+              fontWeight: 800, fontSize: '12px',
+              whiteSpace: 'nowrap', textDecoration: 'none',
+              boxShadow: '0 2px 8px rgba(0,0,0,.12)',
+            }}>
+              Découvrir →
+            </Link>
           </div>
+        </div>
 
-          <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-            {(otherDestinations.length > 0 ? otherDestinations : regions).map(
-              (region) => (
+        {/* ── ALL DESTINATIONS ── */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '6px' }}>
+            <h2 style={{ fontWeight: 800, fontSize: '20px', letterSpacing: '-.04em' }}>
+              🌍 {otherDestinations.length > 0 ? "Toutes les destinations" : "Nos destinations"}
+            </h2>
+            <span style={{ fontSize: '13px', color: '#9CA3AF', fontWeight: 600 }}>
+              {filteredRegions.length} pays
+            </span>
+          </div>
+          <p style={{ fontSize: '13px', color: '#9CA3AF', marginBottom: '18px' }}>
+            {searchQuery ? `Résultats pour "${searchQuery}"` : `Explorez nos ${regions.length} destinations disponibles`}
+          </p>
+
+          {filteredRegions.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px', color: '#9CA3AF' }}>
+              <div style={{ fontSize: '32px', marginBottom: '12px' }}>🔍</div>
+              <div style={{ fontWeight: 600, marginBottom: '6px' }}>Aucune destination trouvée</div>
+              <button onClick={() => setSearchQuery("")} style={{ color: '#A020F0', background: 'none', border: 'none', fontWeight: 700, cursor: 'pointer', fontSize: '13px' }}>
+                Effacer la recherche
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '14px' }}>
+              {(otherDestinations.length > 0 ? otherDestinations : regions).map((region) => (
                 <DestinationCard
                   key={region}
                   region={region}
@@ -684,80 +506,30 @@ export default function Shop() {
                   currency={currency}
                   isTop={false}
                 />
-              )
-            )}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
-      </section>
 
-      {/* Statistics Section */}
-      <section className="py-8 sm:py-12 lg:py-16 px-4">
-        <div className="max-w-4xl mx-auto">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 text-center">
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 shadow-lg">
-              <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-purple-600 mb-1 sm:mb-2">
-                {filteredRegions.length}
-              </div>
-              <div className="text-xs sm:text-sm lg:text-base text-gray-600">
-                Destinations
-              </div>
+        {/* ── STATS ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '12px', marginTop: '40px' }}>
+          {[
+            { n: filteredRegions.length, l: "Destinations", color: '#A020F0' },
+            { n: Object.values(packagesByRegion).reduce((acc, pkgs) => acc + pkgs.length, 0), l: "Forfaits", color: '#FF7F11' },
+            { n: `${Math.min(...Object.values(regionStats).map((s) => s.minPrice).filter((p) => p > 0)).toFixed(0)}${symbol}`, l: "Prix min", color: '#10B981' },
+            { n: Math.max(...Object.values(regionStats).map((s) => s.maxDays)), l: "Jours max", color: '#3B82F6' },
+          ].map(({ n, l, color }) => (
+            <div key={l} style={{
+              background: '#fff', border: '0.5px solid #E5E7EB', borderRadius: '12px',
+              padding: '16px', textAlign: 'center',
+            }}>
+              <div style={{ fontWeight: 800, fontSize: '22px', color, marginBottom: '4px' }}>{n}</div>
+              <div style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: 600 }}>{l}</div>
             </div>
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 shadow-lg">
-              <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-orange-600 mb-1 sm:mb-2">
-                {Object.values(packagesByRegion).reduce((acc, pkgs) => acc + pkgs.length, 0)}
-              </div>
-              <div className="text-xs sm:text-sm lg:text-base text-gray-600">
-                Forfaits
-              </div>
-            </div>
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 shadow-lg">
-              <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-green-600 mb-1 sm:mb-2">
-                {Math.min(
-                  ...Object.values(regionStats)
-                    .map((s) => s.minPrice)
-                    .filter((p) => p > 0)
-                )}
-                {currency === "USD" ? "$" : currency === "XPF" ? "₣" : "€"}
-              </div>
-              <div className="text-xs sm:text-sm lg:text-base text-gray-600">
-                Prix minimum
-              </div>
-            </div>
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 shadow-lg">
-              <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-blue-600 mb-1 sm:mb-2">
-                {Math.max(...Object.values(regionStats).map((s) => s.maxDays))}
-              </div>
-              <div className="text-xs sm:text-sm lg:text-base text-gray-600">
-                Jours max
-              </div>
-            </div>
-          </div>
+          ))}
         </div>
-      </section>
 
-      {/* Call to Action */}
-      <section className="py-12 sm:py-16 lg:py-20 px-4">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-4 sm:mb-6">
-            Prêt à voyager connecté ?
-          </h2>
-          <p className="text-sm sm:text-base lg:text-lg text-gray-600 mb-6 sm:mb-8 px-4">
-            Choisissez votre destination et activez votre eSIM en quelques
-            secondes
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4">
-            <button
-              onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-              className="px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-purple-600 to-orange-500 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 text-sm sm:text-base"
-            >
-              Voir toutes les destinations
-            </button>
-            <button className="px-6 sm:px-8 py-3 sm:py-4 border-2 border-purple-600 text-purple-600 font-semibold rounded-xl hover:bg-purple-600 hover:text-white transition-all duration-300 text-sm sm:text-base">
-              Comment ça marche ?
-            </button>
-          </div>
-        </div>
-      </section>
+      </div>
     </div>
   );
 }

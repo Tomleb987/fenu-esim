@@ -101,6 +101,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const orderData = orderResult.data;
 
     const sim = orderData.data.sims?.[0];
+
+    // FIX : prenom = premier mot, nom = reste (évite "Thomas Thomas lebeau" dans les emails)
+    const prenomClean = customerFirstname || customerName?.split(" ")[0] || null;
+    const nomClean = customerName?.split(" ").slice(1).join(" ") || null;
+
     const { data: order, error } = await supabase.from('airalo_orders').insert({
       order_id: orderData.data.id.toString(),
       email: customerEmail,
@@ -111,8 +116,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       status: orderData.meta?.message || "success",
       data_balance: orderData.data.data || null,
       created_at: new Date().toISOString(),
-      nom: customerName,
-      prenom: customerFirstname
+      prenom: prenomClean,
+      nom: nomClean,
     }).select().single();
 
     if (error) throw error;

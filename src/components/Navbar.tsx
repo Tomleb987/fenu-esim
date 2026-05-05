@@ -2,85 +2,218 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { User, ShoppingCart } from 'lucide-react'
+import { User, Menu, LogOut, ShoppingBag } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
+import { useRouter } from 'next/router'
+import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase'
+import MobileMenu from '@/components/layout/MobileMenu'
 
 export default function Navbar() {
-  const { items } = useCart();
-  const cartCount = items.reduce((sum, i) => sum + i.quantity, 0)
+  const { items } = useCart()
+  const cartCount = items.reduce((sum, i) => sum + (i.quantity || 1), 0)
+  const router = useRouter()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [user, setUser] = useState<any>(null)
+  const [scrolled, setScrolled] = useState(false)
+
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      setUser(session?.user || null)
+    }
+    checkUser()
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user || null)
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 10)
+    window.addEventListener('scroll', onScroll)
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    setUserMenuOpen(false)
+    router.push('/')
+    router.reload()
+  }
+
+  const userName = user?.user_metadata?.full_name?.split(' ')[0]
+    || user?.user_metadata?.first_name
+    || user?.email?.split('@')[0]
+    || 'Mon espace'
 
   return (
-    <header className="w-full bg-white/80 backdrop-blur border-b border-gray-100 shadow-sm sticky top-0 z-50">
-      <nav className="container mx-auto flex items-center justify-between px-4" style={{ height: '56px' }}>
-        {/* Logo */}
-        <Link href="/" className="flex items-center" style={{ height: '48px' }}>
-          <div style={{ height: '48px', width: '48px', overflow: 'visible', display: 'flex', alignItems: 'center' }}>
+    <>
+      {/* Urgency bar */}
+      <div style={{
+        background: 'linear-gradient(90deg, #A020F0, #FF7F11)',
+        padding: '7px 16px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '8px',
+      }}>
+        <span style={{
+          display: 'inline-block',
+          width: '6px',
+          height: '6px',
+          borderRadius: '50%',
+          background: '#fff',
+          animation: 'blink 1.2s infinite',
+        }} />
+        <span style={{ fontSize: '11px', color: '#fff', fontWeight: 700, letterSpacing: '.02em' }}>
+          ⚡ Activation instantanée · Livraison immédiate par email · Support WhatsApp 24/7
+        </span>
+        <style>{`@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}`}</style>
+      </div>
+
+      <header
+        className="w-full sticky top-0 z-50 transition-all duration-200"
+        style={{
+          background: 'rgba(255,255,255,0.97)',
+          backdropFilter: 'blur(12px)',
+          borderBottom: scrolled ? '0.5px solid #E5E7EB' : '0.5px solid #F3F4F6',
+          boxShadow: scrolled ? '0 2px 16px rgba(0,0,0,0.06)' : 'none',
+        }}
+      >
+        <nav className="container mx-auto flex items-center justify-between px-4" style={{ height: '60px' }}>
+
+          {/* Logo */}
+          <Link href="/" className="flex items-center" style={{ height: '56px' }}>
             <Image
-              src="https://hptbhujyrhjsquckzckc.supabase.co/storage/v1/object/public/logo//logo%201.PNG"
+              src="/logo.png"
               alt="FENUA SIM"
-              width={80}
-              height={80}
+              width={100}
+              height={100}
               style={{ transform: 'scale(1.3)', objectFit: 'contain' }}
               priority
             />
-          </div>
-        </Link>
+          </Link>
 
-        {/* Liens */}
-        <ul className="hidden md:flex items-center gap-6 font-medium text-gray-700">
-          <li>
-            <Link href="/" className="nav-link">Accueil</Link>
-          </li>
-          <li>
-            <Link href="/shop" className="nav-link">Nos eSIM</Link>
-          </li>
+          {/* Nav links — desktop, épuré à l'essentiel */}
+          <ul className="hidden md:flex items-center gap-6">
+            <li>
+              <Link
+                href="/shop"
+                className="text-sm font-semibold transition-colors"
+                style={{ color: router.pathname.startsWith('/shop') ? '#A020F0' : '#4B5563' }}
+              >
+                Nos eSIM
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/assurance"
+                className="text-sm font-semibold transition-colors"
+                style={{ color: router.pathname === '/assurance' ? '#A020F0' : '#4B5563' }}
+              >
+                Assurance
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/fenuasimbox"
+                className="text-sm font-semibold"
+                style={{ background: 'linear-gradient(90deg,#A020F0,#FF7F11)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}
+              >
+                FENUASIMBOX
+              </Link>
+            </li>
+          </ul>
 
-          {/* ✅ Nouveau lien Blog */}
-          <li>
-            <Link href="/blog" className="nav-link">Blog</Link>
-          </li>
-
-          <li>
-            <Link href="/recharge" className="nav-link">Recharger votre eSIM</Link>
-          </li>
-          <li>
-            <Link href="/contact" className="nav-link">Contactez-nous</Link>
-          </li>
-          <li>
-            <Link href="/about" className="nav-link">À propos</Link>
-          </li>
-          <li>
-            <Link href="/cart" className="relative group nav-link">
-              <ShoppingCart className="inline-block" size={22} />
-              {cartCount > 0 && (
-                <span className="absolute -top-2 -right-2 bg-gradient-to-br from-fenua-purple to-fenua-orange text-white text-xs font-bold rounded-full px-2 py-0.5 shadow-lg border-2 border-white animate-bounce">
+          {/* Right side */}
+          <div className="hidden md:flex items-center gap-3">
+            {/* Panier */}
+            {cartCount > 0 && (
+              <Link href="/checkout" style={{ position: 'relative', display: 'inline-flex' }}>
+                <div style={{
+                  width: '36px', height: '36px', borderRadius: '50%',
+                  border: '1.5px solid #E5E7EB', display: 'flex',
+                  alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer',
+                }}>
+                  <ShoppingBag size={16} color="#4B5563" />
+                </div>
+                <div style={{
+                  position: 'absolute', top: '-3px', right: '-3px',
+                  width: '16px', height: '16px', borderRadius: '50%',
+                  background: 'linear-gradient(90deg,#A020F0,#FF7F11)',
+                  border: '2px solid #fff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '8px', color: '#fff', fontWeight: 800,
+                }}>
                   {cartCount}
-                </span>
-              )}
-            </Link>
-          </li>
-          <li>
-            <Link
-              href="/partner/login"
-              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold transition-all"
-              style={{ background: 'linear-gradient(135deg, #A020F0, #FF7F11)', color: '#fff', boxShadow: '0 2px 8px rgba(160,32,240,0.25)' }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-              Espace partenaire
-            </Link>
-          </li>
-          <li>
-            <Link href="/dashboard" className="nav-link">
-              <User className="inline-block" size={22} />
-            </Link>
-          </li>
-        </ul>
+                </div>
+              </Link>
+            )}
 
-        {/* Menu mobile (à améliorer plus tard) */}
-        <div className="md:hidden">
-          {/* À implémenter : menu burger */}
-        </div>
-      </nav>
-    </header>
+            {/* User / Connexion */}
+            {user ? (
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    background: 'linear-gradient(90deg,rgba(160,32,240,.08),rgba(255,127,17,.08))',
+                    border: '1px solid rgba(160,32,240,.2)',
+                    borderRadius: '50px', padding: '6px 14px',
+                    fontSize: '12px', fontWeight: 700, color: '#A020F0',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <User size={14} />
+                  <span className="max-w-[100px] truncate">{userName}</span>
+                </button>
+                {userMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)} />
+                    <div className="absolute right-0 mt-2 w-44 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50">
+                      <Link href="/dashboard" onClick={() => setUserMenuOpen(false)} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+                        <User size={14} /> Mon dashboard
+                      </Link>
+                      <hr className="my-1 border-gray-100" />
+                      <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-50 flex items-center gap-2">
+                        <LogOut size={14} /> Déconnexion
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : (
+              <Link
+                href="/shop"
+                style={{
+                  background: 'linear-gradient(90deg,#A020F0,#FF7F11)',
+                  color: '#fff', padding: '8px 18px',
+                  borderRadius: '50px', fontSize: '13px',
+                  fontWeight: 700, boxShadow: '0 2px 10px rgba(160,32,240,.3)',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Trouver mon eSIM →
+              </Link>
+            )}
+          </div>
+
+          {/* Mobile burger */}
+          <button onClick={() => setMenuOpen(true)} className="md:hidden p-2">
+            <Menu size={24} color="#111827" />
+          </button>
+        </nav>
+      </header>
+
+      <MobileMenu
+        isOpen={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        user={user}
+        onLogout={handleLogout}
+      />
+    </>
   )
 }

@@ -140,28 +140,19 @@ const REGION_TRANSLATIONS: Record<string, string> = {
   "Zimbabwe": "Zimbabwe",
 };
 
-// Function to get French name with fallback to translation
 function getFrenchRegionName(regionFr: string | null, region: string | null): string {
-  // First priority: Use region_fr from database if available and it's actually French
   if (regionFr && regionFr.trim()) {
     const trimmedFr = regionFr.trim();
-    // Check if region_fr is actually in English (needs translation)
     if (REGION_TRANSLATIONS[trimmedFr]) {
-      // region_fr contains English name, translate it
       return REGION_TRANSLATIONS[trimmedFr];
     }
-    // region_fr is already in French, use it
     return trimmedFr;
   }
-  
-  // Second priority: Translate English region name to French
   if (region && region.trim()) {
     const trimmedRegion = region.trim();
-    // Try exact match first
     if (REGION_TRANSLATIONS[trimmedRegion]) {
       return REGION_TRANSLATIONS[trimmedRegion];
     }
-    // Try case-insensitive match
     const lowerRegion = trimmedRegion.toLowerCase();
     for (const [key, value] of Object.entries(REGION_TRANSLATIONS)) {
       if (key.toLowerCase() === lowerRegion) {
@@ -169,12 +160,9 @@ function getFrenchRegionName(regionFr: string | null, region: string | null): st
       }
     }
   }
-  
-  // Fallback: return original region or "Autres"
   return region?.trim() || "Autres";
 }
 
-// Mapping manuel pour les cas particuliers ou noms non standards
 const COUNTRY_CODES: Record<string, string> = {
   "États-Unis": "us",
   "Royaume-Uni": "gb",
@@ -189,14 +177,11 @@ const COUNTRY_CODES: Record<string, string> = {
   France: "fr",
   "Nouvelle-Calédonie": "nc",
   "Polynésie française": "pf",
-  // Ajoute ici d'autres cas si besoin
 };
 
-// Fonction pour obtenir le code ISO à partir du nom du pays
 function getCountryCode(regionFr: string | null): string | undefined {
   if (!regionFr) return undefined;
   if (COUNTRY_CODES[regionFr]) return COUNTRY_CODES[regionFr];
-  // Fallback : prend les 2 premières lettres (ex: "France" => "fr")
   return regionFr
     .normalize("NFD")
     .replace(/[^a-zA-Z]/g, "")
@@ -208,11 +193,11 @@ function regionFrToSlug(regionFr: string | null): string {
   if (!regionFr) return "";
   return regionFr
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // retire les accents
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
-    .replace(/[^a-z0-9 ]/g, "") // retire caractères spéciaux
+    .replace(/[^a-z0-9 ]/g, "")
     .trim()
-    .replace(/\s+/g, "-"); // espaces en tirets
+    .replace(/\s+/g, "-");
 }
 
 interface PackageCardProps {
@@ -252,9 +237,6 @@ export default function PackageCard({
     }
   };
 
-  // console.log('pkggg',pkg)
-
-  // Prix dynamique selon la devise
   let margin = parseFloat(localStorage.getItem('global_margin')!);
   let price = minPrice;
   let symbol = "€";
@@ -269,13 +251,15 @@ export default function PackageCard({
 
   const countryCode = getCountryCode(pkg.country || null);
 
+  // Affiche les vrais réseaux physiques si disponibles, sinon le nom opérateur
+  const networkDisplay = (pkg as any).networks || pkg.operator_name;
+
   const cardClasses = isTop
     ? "group relative bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-purple-200 hover:border-purple-400 transform hover:-translate-y-2 cursor-pointer overflow-hidden w-full"
     : "group relative bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 border border-gray-200 hover:border-purple-300 transform hover:-translate-y-1 cursor-pointer overflow-hidden w-full";
 
   return (
     <div className={cardClasses} onClick={handleClick}>
-      {/* Premium Badge pour les top destinations */}
       {isTop && (
         <div className="absolute top-2 right-2 z-10">
           <div className="bg-gradient-to-r from-purple-600 to-orange-500 text-white px-2 py-1 rounded-full text-xs font-semibold flex items-center">
@@ -289,11 +273,11 @@ export default function PackageCard({
         {/* Header avec drapeau et nom */}
         <div className="flex items-center mb-3 sm:mb-4">
           <div className="relative w-8 h-6 sm:w-12 sm:h-8 mr-2 sm:mr-3 rounded overflow-hidden shadow-sm flex-shrink-0">
-              <img
-                src={pkg.flag_url || ""}
-                alt={pkg.region_fr || ""}
-                className="object-cover"
-              />
+            <img
+              src={pkg.flag_url || ""}
+              alt={pkg.region_fr || ""}
+              className="object-cover"
+            />
           </div>
           <div className="min-w-0 flex-1">
             <h3
@@ -303,19 +287,18 @@ export default function PackageCard({
             </h3>
           </div>
         </div>
+
         {/* Informations principales */}
         <div className="space-y-2 sm:space-y-3 mb-4 sm:mb-6">
           {/* Prix minimum */}
           <div className="flex items-center justify-between">
-            <span className="text-xs sm:text-sm text-gray-600">
-              À partir de
-            </span>
+            <span className="text-xs sm:text-sm text-gray-600">À partir de</span>
             <span className={`font-bold ${isTop ? "text-lg sm:text-2xl text-purple-600" : "text-base sm:text-xl text-purple-500"}`}>
               {priceWithMargin.toFixed(2)}{symbol}
             </span>
           </div>
 
-          {/* Durée maximum */}
+          {/* Durée */}
           <div className="flex items-center justify-between">
             <span className="text-xs sm:text-sm text-gray-600">Jusqu'à</span>
             <span className="text-xs sm:text-sm font-medium text-gray-800">
@@ -323,11 +306,11 @@ export default function PackageCard({
             </span>
           </div>
 
-          {/* Opérateur */}
+          {/* Réseau — affiche Orange (4G) au lieu de Élan */}
           <div className="flex items-center justify-between">
-            <span className="text-xs sm:text-sm text-gray-600">Opérateur</span>
-            <span className="text-xs sm:text-sm font-medium text-gray-800 truncate ml-2 max-w-20 sm:max-w-none">
-              {pkg.operator_name}
+            <span className="text-xs sm:text-sm text-gray-600">Réseau</span>
+            <span className="text-xs sm:text-sm font-medium text-gray-800 truncate ml-2 max-w-32 sm:max-w-none text-right">
+              {networkDisplay}
             </span>
           </div>
         </div>
@@ -350,7 +333,7 @@ export default function PackageCard({
           <span className="xs:hidden">Voir</span>
         </button>
       </div>
-      {/* Effet de gradient en overlay pour les top destinations */}
+
       {isTop && (
         <div className="absolute inset-0 bg-gradient-to-br from-purple-50/20 to-orange-50/20 pointer-events-none" />
       )}

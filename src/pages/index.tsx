@@ -158,9 +158,9 @@ function ReviewsSection() {
               <div className="flex items-center gap-3 mb-3">
                 <div style={{
                   width: '40px', height: '40px', borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #A020F0, #FF7F11)',
+                  background: '#F3F4F6',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: '#fff', fontWeight: 700, fontSize: '16px', flexShrink: 0,
+                  color: '#A020F0', fontWeight: 700, fontSize: '16px', flexShrink: 0,
                 }}>
                   {review.author[0]}
                 </div>

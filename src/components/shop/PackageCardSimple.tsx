@@ -3,7 +3,6 @@ import { useRouter } from 'next/navigation'
 
 type Package = Database['public']['Tables']['airalo_packages']['Row']
 
-// Translation mapping for English to French destination names
 const REGION_TRANSLATIONS: Record<string, string> = {
   "Discover Global": "Monde",
   "Asia": "Asie",
@@ -135,37 +134,20 @@ const REGION_TRANSLATIONS: Record<string, string> = {
   "Zimbabwe": "Zimbabwe",
 };
 
-// Function to get French name with fallback to translation
 function getFrenchRegionName(regionFr: string | null, region: string | null): string {
-  // First priority: Use region_fr from database if available and it's actually French
   if (regionFr && regionFr.trim()) {
     const trimmedFr = regionFr.trim();
-    // Check if region_fr is actually in English (needs translation)
-    if (REGION_TRANSLATIONS[trimmedFr]) {
-      // region_fr contains English name, translate it
-      return REGION_TRANSLATIONS[trimmedFr];
-    }
-    // region_fr is already in French, use it
+    if (REGION_TRANSLATIONS[trimmedFr]) return REGION_TRANSLATIONS[trimmedFr];
     return trimmedFr;
   }
-  
-  // Second priority: Translate English region name to French
   if (region && region.trim()) {
     const trimmedRegion = region.trim();
-    // Try exact match first
-    if (REGION_TRANSLATIONS[trimmedRegion]) {
-      return REGION_TRANSLATIONS[trimmedRegion];
-    }
-    // Try case-insensitive match
+    if (REGION_TRANSLATIONS[trimmedRegion]) return REGION_TRANSLATIONS[trimmedRegion];
     const lowerRegion = trimmedRegion.toLowerCase();
     for (const [key, value] of Object.entries(REGION_TRANSLATIONS)) {
-      if (key.toLowerCase() === lowerRegion) {
-        return value;
-      }
+      if (key.toLowerCase() === lowerRegion) return value;
     }
   }
-  
-  // Fallback: return original region or "Autres"
   return region?.trim() || "Autres";
 }
 
@@ -233,21 +215,19 @@ export default function PackageCardSimple({
   const router = useRouter()
 
   let symbol = '€'
-  if (currency === 'XPF') {
-    symbol = '₣'
-  } else if (currency === 'USD') {
-    symbol = '$'
-  }
+  if (currency === 'XPF') symbol = '₣'
+  else if (currency === 'USD') symbol = '$'
 
   const translatedRegion = getFrenchRegionName(pkg.region_fr, pkg.region);
   const countryCode = getCountryCode(translatedRegion || null)
   const margin = parseFloat(localStorage.getItem('global_margin')!);
   const minPriceWithMargin = minPrice * (1 + margin);
 
+  // Affiche les vrais réseaux physiques si disponibles, sinon fallback sur operator_name
+  const networkDisplay = (pkg as any).networks || pkg.operator_name;
+
   return (
-    <div
-      className="bg-white border-2 border-purple-100 rounded-2xl shadow-lg p-4 cursor-pointer transition-all duration-200 hover:shadow-xl hover:border-purple-400 relative"
-    >
+    <div className="bg-white border-2 border-purple-100 rounded-2xl shadow-lg p-4 cursor-pointer transition-all duration-200 hover:shadow-xl hover:border-purple-400 relative">
       <div className="mb-2">
         <div className="flex items-center gap-2 text-sm font-bold text-purple-700 mb-1">
           {countryCode && (
@@ -284,13 +264,16 @@ export default function PackageCardSimple({
           )}
         </div>
       </div>
+
       <div className="space-y-2 mb-4">
         <div className="flex items-center gap-2">
-          <span className="text-sm text-purple-700">
-            {pkg.operator_name}
+          <span className="text-xs text-gray-500">Réseau :</span>
+          <span className="text-sm text-purple-700 font-medium">
+            {networkDisplay}
           </span>
         </div>
       </div>
+
       <div className="flex items-center justify-between text-sm text-purple-700 mt-4">
         <span>{packageCount} forfait{packageCount > 1 ? 's' : ''} disponible{packageCount > 1 ? 's' : ''}</span>
         <button
@@ -299,9 +282,7 @@ export default function PackageCardSimple({
           onClick={e => {
             e.stopPropagation();
             const slug = regionFrToSlug(pkg.region_fr || '')
-            if (slug) {
-              router.push(`/shop/${slug}`)
-            }
+            if (slug) router.push(`/shop/${slug}`)
           }}
         >
           Voir les forfaits →

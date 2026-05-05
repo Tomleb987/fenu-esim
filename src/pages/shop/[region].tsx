@@ -1,4 +1,3 @@
-
 "use client";
 import Head from "next/head";
 import { usePartnerCodes } from "@/hooks/usePartnerCodes";
@@ -333,6 +332,13 @@ export default function RegionPage() {
     return { price: (price ?? 0) * (1 + margin), symbol };
   };
 
+  // ✅ FIX : XPF = entier sans décimales, EUR/USD = 2 décimales
+  function formatPrice(price: number, sym: string): string {
+    if (sym === "₣") return `${Math.round(price).toLocaleString("fr-FR")} ₣`;
+    if (sym === "$") return `$${price.toFixed(2)}`;
+    return `${price.toFixed(2)} €`;
+  }
+
   const selectedPrice = selectedPackage ? getPackagePrice(selectedPackage) : null;
   const seoTitle = regionName ? `eSIM ${regionName} — Connexion instantanée | FENUA SIM` : "Forfait eSIM — FENUA SIM";
   const minPrice = packages.length > 0 ? Math.min(...packages.map((p) => p.final_price_eur || 999)).toFixed(2) : null;
@@ -468,7 +474,7 @@ export default function RegionPage() {
                         <div style={{ fontWeight: 800, fontSize: "18px", marginBottom: "4px" }}>{pkg.name}</div>
                         <div style={{ fontSize: "12px", color: "#6B7280", marginBottom: "12px" }}>{pkg.description}</div>
                         <div style={{ fontWeight: 900, fontSize: "24px", background: "linear-gradient(90deg,#A020F0,#FF7F11)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", marginBottom: "14px" }}>
-                          {price.toFixed(2)} {symbol}
+                          {formatPrice(price, symbol)}
                         </div>
                         <button onClick={() => handleAcheter(pkg)} style={{ width: "100%", background: "linear-gradient(90deg,#A020F0,#FF7F11)", color: "#fff", border: "none", borderRadius: "10px", padding: "12px", fontWeight: 700, fontSize: "14px", cursor: "pointer" }}>
                           Acheter — Paiement sécurisé
@@ -514,7 +520,7 @@ export default function RegionPage() {
                             </span>
                           </div>
                           <div style={{ fontWeight: 900, fontSize: "22px", background: "linear-gradient(90deg,#A020F0,#FF7F11)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", marginBottom: "14px" }}>
-                            {price > 0 ? `${price.toFixed(2)} ${symbol}` : "N/A"}
+                            {price > 0 ? formatPrice(price, symbol) : "N/A"}
                           </div>
                           <button onClick={(e) => { e.stopPropagation(); handleAcheter(pkg); }}
                             style={{ width: "100%", background: "linear-gradient(90deg,#A020F0,#FF7F11)", color: "#fff", border: "none", borderRadius: "10px", padding: "11px", fontWeight: 700, fontSize: "13px", cursor: "pointer", boxShadow: "0 2px 8px rgba(160,32,240,.2)" }}>
@@ -616,7 +622,7 @@ export default function RegionPage() {
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
                     <span style={{ fontSize: "12px", color: "#6B7280" }}>Prix</span>
                     <span style={{ fontWeight: 800, fontSize: "20px", background: "linear-gradient(90deg,#A020F0,#FF7F11)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-                      {selectedPrice.price.toFixed(2)} {selectedPrice.symbol}
+                      {formatPrice(selectedPrice.price, selectedPrice.symbol)}
                     </span>
                   </div>
                   {/* ✅ FIX : vrais réseaux physiques */}
@@ -686,7 +692,7 @@ export default function RegionPage() {
                 <span className={`px-2 py-0.5 rounded-full font-semibold ${selectedPackage.includes_voice ? "bg-blue-50 text-blue-700" : "bg-gray-100 text-gray-400"}`}>Appels {selectedPackage.includes_voice ? "Oui" : "Non"}</span>
               </div>
               <div className="text-xl font-bold text-gray-900 mb-2">
-                {(() => { const { price, symbol } = getPackagePrice(selectedPackage); return `${price.toFixed(2)} ${symbol}`; })()}
+                {(() => { const { price, symbol } = getPackagePrice(selectedPackage); return formatPrice(price, symbol); })()}
               </div>
             </div>
             <form onSubmit={handleRecapSubmit} className="space-y-3">

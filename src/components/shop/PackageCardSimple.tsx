@@ -1,137 +1,46 @@
 import { Database } from '@/lib/supabase/config'
 import { useRouter } from 'next/navigation'
+import { useState } from 'react'
 
 type Package = Database['public']['Tables']['airalo_packages']['Row']
 
 const REGION_TRANSLATIONS: Record<string, string> = {
-  "Discover Global": "Monde",
-  "Asia": "Asie",
-  "Europe": "Europe",
-  "Japan": "Japon",
-  "Canary Islands": "Îles Canaries",
-  "South Korea": "Corée du Sud",
-  "Hong Kong": "Hong Kong",
-  "United States": "États-Unis",
-  "Australia": "Australie",
-  "New Zealand": "Nouvelle-Zélande",
-  "Mexico": "Mexique",
-  "Fiji": "Fidji",
-  "Thailand": "Thaïlande",
-  "Singapore": "Singapour",
-  "Malaysia": "Malaisie",
-  "Indonesia": "Indonésie",
-  "Philippines": "Philippines",
-  "Vietnam": "Viêt Nam",
-  "India": "Inde",
-  "China": "Chine",
-  "Taiwan": "Taïwan",
-  "United Kingdom": "Royaume-Uni",
-  "Germany": "Allemagne",
-  "Spain": "Espagne",
-  "Italy": "Italie",
-  "Greece": "Grèce",
-  "Portugal": "Portugal",
-  "Netherlands": "Pays-Bas",
-  "Belgium": "Belgique",
-  "Switzerland": "Suisse",
-  "Austria": "Autriche",
-  "Poland": "Pologne",
-  "Czech Republic": "République tchèque",
-  "Turkey": "Turquie",
-  "Egypt": "Égypte",
-  "Morocco": "Maroc",
-  "South Africa": "Afrique du Sud",
-  "Brazil": "Brésil",
-  "Argentina": "Argentine",
-  "Chile": "Chili",
-  "Colombia": "Colombie",
-  "Peru": "Pérou",
-  "UAE": "Émirats arabes unis",
-  "United Arab Emirates": "Émirats arabes unis",
-  "Saudi Arabia": "Arabie saoudite",
-  "Israel": "Israël",
-  "Jordan": "Jordanie",
-  "Lebanon": "Liban",
-  "Qatar": "Qatar",
-  "Kuwait": "Koweït",
-  "Bahrain": "Bahreïn",
-  "Oman": "Oman",
-  "Azerbaijan": "Azerbaïdjan",
-  "Jamaica": "Jamaïque",
-  "Canada": "Canada",
-  "Albania": "Albanie",
-  "Algeria": "Algérie",
-  "Angola": "Angola",
-  "Armenia": "Arménie",
-  "Bangladesh": "Bangladesh",
-  "Belarus": "Biélorussie",
-  "Bolivia": "Bolivie",
-  "Bosnia and Herzegovina": "Bosnie-Herzégovine",
-  "Botswana": "Botswana",
-  "Bulgaria": "Bulgarie",
-  "Cambodia": "Cambodge",
-  "Cameroon": "Cameroun",
-  "Chad": "Tchad",
-  "Croatia": "Croatie",
-  "Cuba": "Cuba",
-  "Cyprus": "Chypre",
-  "Denmark": "Danemark",
-  "Dominican Republic": "République dominicaine",
-  "Ecuador": "Équateur",
-  "Estonia": "Estonie",
-  "Ethiopia": "Éthiopie",
-  "Finland": "Finlande",
-  "Georgia": "Géorgie",
-  "Ghana": "Ghana",
-  "Guatemala": "Guatemala",
-  "Honduras": "Honduras",
-  "Hungary": "Hongrie",
-  "Iceland": "Islande",
-  "Ireland": "Irlande",
-  "Ivory Coast": "Côte d'Ivoire",
-  "Kazakhstan": "Kazakhstan",
-  "Kenya": "Kenya",
-  "Kyrgyzstan": "Kirghizistan",
-  "Laos": "Laos",
-  "Latvia": "Lettonie",
-  "Lithuania": "Lituanie",
-  "Luxembourg": "Luxembourg",
-  "Madagascar": "Madagascar",
-  "Malawi": "Malawi",
-  "Maldives": "Maldives",
-  "Mali": "Mali",
-  "Malta": "Malte",
-  "Mauritius": "Maurice",
-  "Moldova": "Moldavie",
-  "Mongolia": "Mongolie",
-  "Montenegro": "Monténégro",
-  "Myanmar": "Myanmar",
-  "Namibia": "Namibie",
-  "Nepal": "Népal",
-  "Nicaragua": "Nicaragua",
-  "Nigeria": "Nigeria",
-  "North Macedonia": "Macédoine du Nord",
-  "Norway": "Norvège",
-  "Pakistan": "Pakistan",
-  "Panama": "Panama",
-  "Paraguay": "Paraguay",
-  "Romania": "Roumanie",
-  "Russia": "Russie",
-  "Rwanda": "Rwanda",
-  "Senegal": "Sénégal",
-  "Serbia": "Serbie",
-  "Slovakia": "Slovaquie",
-  "Slovenia": "Slovénie",
-  "Sri Lanka": "Sri Lanka",
-  "Sweden": "Suède",
-  "Tanzania": "Tanzanie",
-  "Tunisia": "Tunisie",
-  "Ukraine": "Ukraine",
-  "Uruguay": "Uruguay",
-  "Uzbekistan": "Ouzbékistan",
-  "Venezuela": "Venezuela",
-  "Zambia": "Zambie",
-  "Zimbabwe": "Zimbabwe",
+  "Discover Global": "Monde", "Asia": "Asie", "Europe": "Europe", "Japan": "Japon",
+  "Canary Islands": "Îles Canaries", "South Korea": "Corée du Sud", "Hong Kong": "Hong Kong",
+  "United States": "États-Unis", "Australia": "Australie", "New Zealand": "Nouvelle-Zélande",
+  "Mexico": "Mexique", "Fiji": "Fidji", "Thailand": "Thaïlande", "Singapore": "Singapour",
+  "Malaysia": "Malaisie", "Indonesia": "Indonésie", "Philippines": "Philippines",
+  "Vietnam": "Viêt Nam", "India": "Inde", "China": "Chine", "Taiwan": "Taïwan",
+  "United Kingdom": "Royaume-Uni", "Germany": "Allemagne", "Spain": "Espagne",
+  "Italy": "Italie", "Greece": "Grèce", "Portugal": "Portugal", "Netherlands": "Pays-Bas",
+  "Belgium": "Belgique", "Switzerland": "Suisse", "Austria": "Autriche", "Poland": "Pologne",
+  "Czech Republic": "République tchèque", "Turkey": "Turquie", "Egypt": "Égypte",
+  "Morocco": "Maroc", "South Africa": "Afrique du Sud", "Brazil": "Brésil",
+  "Argentina": "Argentine", "Chile": "Chili", "Colombia": "Colombie", "Peru": "Pérou",
+  "UAE": "Émirats arabes unis", "United Arab Emirates": "Émirats arabes unis",
+  "Saudi Arabia": "Arabie saoudite", "Israel": "Israël", "Jordan": "Jordanie",
+  "Lebanon": "Liban", "Qatar": "Qatar", "Kuwait": "Koweït", "Bahrain": "Bahreïn",
+  "Oman": "Oman", "Azerbaijan": "Azerbaïdjan", "Jamaica": "Jamaïque", "Canada": "Canada",
+  "Albania": "Albanie", "Algeria": "Algérie", "Angola": "Angola", "Armenia": "Arménie",
+  "Bangladesh": "Bangladesh", "Belarus": "Biélorussie", "Bolivia": "Bolivie",
+  "Bosnia and Herzegovina": "Bosnie-Herzégovine", "Botswana": "Botswana",
+  "Bulgaria": "Bulgarie", "Cambodia": "Cambodge", "Cameroon": "Cameroun", "Chad": "Tchad",
+  "Croatia": "Croatie", "Cuba": "Cuba", "Cyprus": "Chypre", "Denmark": "Danemark",
+  "Dominican Republic": "République dominicaine", "Ecuador": "Équateur", "Estonia": "Estonie",
+  "Ethiopia": "Éthiopie", "Finland": "Finlande", "Georgia": "Géorgie", "Ghana": "Ghana",
+  "Guatemala": "Guatemala", "Honduras": "Honduras", "Hungary": "Hongrie", "Iceland": "Islande",
+  "Ireland": "Irlande", "Ivory Coast": "Côte d'Ivoire", "Kazakhstan": "Kazakhstan",
+  "Kenya": "Kenya", "Kyrgyzstan": "Kirghizistan", "Laos": "Laos", "Latvia": "Lettonie",
+  "Lithuania": "Lituanie", "Luxembourg": "Luxembourg", "Madagascar": "Madagascar",
+  "Maldives": "Maldives", "Mali": "Mali", "Malta": "Malte", "Mauritius": "Maurice",
+  "Moldova": "Moldavie", "Mongolia": "Mongolie", "Montenegro": "Monténégro",
+  "Myanmar": "Myanmar", "Namibia": "Namibie", "Nepal": "Népal", "Nicaragua": "Nicaragua",
+  "Nigeria": "Nigeria", "North Macedonia": "Macédoine du Nord", "Norway": "Norvège",
+  "Pakistan": "Pakistan", "Panama": "Panama", "Paraguay": "Paraguay", "Romania": "Roumanie",
+  "Russia": "Russie", "Rwanda": "Rwanda", "Senegal": "Sénégal", "Serbia": "Serbie",
+  "Slovakia": "Slovaquie", "Slovenia": "Slovénie", "Sri Lanka": "Sri Lanka", "Sweden": "Suède",
+  "Tanzania": "Tanzanie", "Tunisia": "Tunisie", "Ukraine": "Ukraine", "Uruguay": "Uruguay",
+  "Uzbekistan": "Ouzbékistan", "Venezuela": "Venezuela", "Zambia": "Zambie", "Zimbabwe": "Zimbabwe",
 };
 
 function getFrenchRegionName(regionFr: string | null, region: string | null): string {
@@ -153,38 +62,27 @@ function getFrenchRegionName(regionFr: string | null, region: string | null): st
 
 function regionFrToSlug(regionFr: string | null): string {
   if (!regionFr) return '';
-  return regionFr
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9 ]/g, '')
-    .trim()
-    .replace(/\s+/g, '-');
+  return regionFr.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    .replace(/[^a-z0-9 ]/g, '').trim().replace(/\s+/g, '-');
 }
 
 function getCountryCode(regionFr: string | null): string | undefined {
   if (!regionFr) return undefined;
   const COUNTRY_CODES: Record<string, string> = {
-    'États-Unis': 'us',
-    'Royaume-Uni': 'gb',
-    'Corée du Sud': 'kr',
-    'Émirats arabes unis': 'ae',
-    'République tchèque': 'cz',
-    'Hong Kong': 'hk',
-    'Taïwan': 'tw',
-    'Japon': 'jp',
-    'Australie': 'au',
-    'Canada': 'ca',
-    'France': 'fr',
-    'Nouvelle-Calédonie': 'nc',
-    'Polynésie française': 'pf',
+    'États-Unis': 'us', 'Royaume-Uni': 'gb', 'Corée du Sud': 'kr',
+    'Émirats arabes unis': 'ae', 'République tchèque': 'cz', 'Hong Kong': 'hk',
+    'Taïwan': 'tw', 'Japon': 'jp', 'Australie': 'au', 'Canada': 'ca',
+    'France': 'fr', 'Nouvelle-Calédonie': 'nc', 'Polynésie française': 'pf',
   };
   if (COUNTRY_CODES[regionFr]) return COUNTRY_CODES[regionFr];
-  return regionFr
-    .normalize('NFD')
-    .replace(/[^a-zA-Z]/g, '')
-    .toLowerCase()
-    .slice(0, 2);
+  return regionFr.normalize('NFD').replace(/[^a-zA-Z]/g, '').toLowerCase().slice(0, 2);
+}
+
+// ✅ Format prix — XPF sans décimales
+function formatPrice(price: number, currency: 'EUR' | 'XPF' | 'USD'): string {
+  if (currency === 'XPF') return `${Math.round(price).toLocaleString('fr-FR')} ₣`;
+  if (currency === 'USD') return `$${price.toFixed(2)}`;
+  return `${price.toFixed(2)} €`;
 }
 
 interface PackageCardProps {
@@ -201,30 +99,24 @@ interface PackageCardProps {
 }
 
 export default function PackageCardSimple({
-  pkg,
-  minData,
-  maxData,
-  minDays,
-  maxDays,
-  minPrice,
-  packageCount,
-  isPopular = false,
-  currency,
-  isRechargeable
+  pkg, minData, maxData, minDays, maxDays, minPrice, packageCount,
+  isPopular = false, currency, isRechargeable
 }: PackageCardProps) {
   const router = useRouter()
-
-  let symbol = '€'
-  if (currency === 'XPF') symbol = '₣'
-  else if (currency === 'USD') symbol = '$'
+  const [showAllNetworks, setShowAllNetworks] = useState(false)
 
   const translatedRegion = getFrenchRegionName(pkg.region_fr, pkg.region);
   const countryCode = getCountryCode(translatedRegion || null)
   const margin = parseFloat(localStorage.getItem('global_margin')!);
   const minPriceWithMargin = minPrice * (1 + margin);
 
-  // Affiche les vrais réseaux physiques si disponibles, sinon fallback sur operator_name
-  const networkDisplay = (pkg as any).networks || pkg.operator_name;
+  // Réseau avec expand
+  const rawNetwork = (pkg as any).networks || pkg.operator_name || '';
+  const networkParts = rawNetwork.split(' · ');
+  const hasMore = networkParts.length > 2;
+  const networkDisplay = showAllNetworks
+    ? rawNetwork
+    : hasMore ? networkParts.slice(0, 2).join(' · ') : rawNetwork;
 
   return (
     <div className="bg-white border-2 border-purple-100 rounded-2xl shadow-lg p-4 cursor-pointer transition-all duration-200 hover:shadow-xl hover:border-purple-400 relative">
@@ -234,8 +126,7 @@ export default function PackageCardSimple({
             <img
               src={`https://flagcdn.com/w20/${countryCode}.png`}
               alt={translatedRegion || ''}
-              width={20}
-              height={15}
+              width={20} height={15}
               className="rounded border border-gray-200 shadow-sm"
               style={{ minWidth: 20 }}
             />
@@ -246,30 +137,51 @@ export default function PackageCardSimple({
           <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full font-semibold">
             À partir de {minData} Go
           </span>
+          {/* ✅ Prix sans décimales en XPF */}
           <span className="text-xs bg-orange-50 text-orange-700 px-2 py-0.5 rounded-full font-semibold">
-            {minPriceWithMargin.toFixed(2)} {currency}
+            {formatPrice(minPriceWithMargin, currency)}
           </span>
+          {/* ✅ jours en français */}
           <span className="text-xs bg-orange-50 text-orange-700 px-2 py-0.5 rounded-full font-semibold">
-            de {minDays} à {maxDays} jours
+            de {minDays} à {maxDays} jour{maxDays > 1 ? 's' : ''}
           </span>
           {pkg.includes_voice && (
-            <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-semibold border border-blue-200">
-              Voix
-            </span>
+            <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-semibold border border-blue-200">Voix</span>
           )}
           {pkg.includes_sms && (
-            <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full font-semibold border border-green-200">
-              SMS
-            </span>
+            <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full font-semibold border border-green-200">SMS</span>
           )}
         </div>
       </div>
 
+      {/* ✅ Réseau avec expand */}
       <div className="space-y-2 mb-4">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500">Réseau :</span>
-          <span className="text-sm text-purple-700 font-medium">
+        <div className="flex items-start gap-2">
+          <span className="text-xs text-gray-500 flex-shrink-0 mt-0.5">Réseau :</span>
+          <span className="text-sm text-purple-700 font-medium leading-relaxed">
             {networkDisplay}
+            {hasMore && !showAllNetworks && (
+              <>
+                {' '}
+                <button
+                  onClick={e => { e.stopPropagation(); setShowAllNetworks(true); }}
+                  style={{ color: '#A020F0', fontWeight: 700, fontSize: '11px', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                >
+                  +{networkParts.length - 2} voir tout
+                </button>
+              </>
+            )}
+            {showAllNetworks && (
+              <>
+                {' '}
+                <button
+                  onClick={e => { e.stopPropagation(); setShowAllNetworks(false); }}
+                  style={{ color: '#A020F0', fontWeight: 700, fontSize: '11px', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                >
+                  réduire
+                </button>
+              </>
+            )}
           </span>
         </div>
       </div>

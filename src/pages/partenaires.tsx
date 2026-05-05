@@ -81,7 +81,7 @@ const PARTNERS = [
     color: "linear-gradient(135deg, #2563EB, #1E40AF)",
     name: "GO FRENCHIES",
     category: "Voyage & accompagnement",
-    territory: "Australie",
+    territory: "Monde",
     icon: <Plane size={17} />,
     description:
       "Go Frenchies accompagne les francophones dans leur projet de départ, d’installation ou de voyage en Australie. FENUA SIM permet de rester connecté dès l’arrivée.",

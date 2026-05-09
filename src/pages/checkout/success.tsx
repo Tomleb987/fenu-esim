@@ -125,7 +125,7 @@ export default function SuccessPage() {
         dataUnit: isUnlimited ? "" : (orderDetails.data_unit || packageData?.data_unit || "GB"),
         validityDays: orderDetails.validity,
         qrCodeUrl: orderDetails.esim.qr_code_url,
-        sharingLink,
+        sharingLink,       // présent si getEsimData a réussi, undefined sinon — les deux cas sont gérés
         sharingLinkCode,
       };
 
@@ -147,12 +147,20 @@ export default function SuccessPage() {
     }
   };
 
+  // ✅ FIX : on n'attend plus sharingLink/sharingLinkCode pour envoyer l'email
+  // On attend juste que isLoading soit false (getEsimData terminé, succès ou échec)
+  // L'email part avec les liens s'ils sont disponibles, sans eux sinon
   useEffect(() => {
-    if (orderStatus === "success" && orderDetails?.esim?.qr_code_url && emailStatus === "pending" && sharingLink && sharingLinkCode) {
+    if (
+      orderStatus === "success" &&
+      orderDetails?.esim?.qr_code_url &&
+      emailStatus === "pending" &&
+      !isLoading
+    ) {
       const timer = setTimeout(() => { sendEmail(); }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [orderStatus, orderDetails, emailStatus, sharingLink, sharingLinkCode]);
+  }, [orderStatus, orderDetails, emailStatus, isLoading]);
 
   const resendEmail = async () => {
     setEmailStatus("pending");

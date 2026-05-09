@@ -386,6 +386,24 @@ export default function SuccessPage() {
                 </div>
               </div>
 
+              {/* ─── QR Code ─── */}
+              {hasEsimData && orderDetails.esim.qr_code_url && (
+                <div className="bg-white/50 backdrop-blur-sm rounded-2xl p-6 border border-white/20 flex flex-col items-center">
+                  <h2 className="text-xl font-bold text-gray-800 mb-4">Votre QR Code eSIM</h2>
+                  <img
+                    src={orderDetails.esim.qr_code_url}
+                    alt="QR Code eSIM"
+                    className="w-52 h-52 rounded-xl border border-gray-200 shadow-sm mb-3"
+                  />
+                  <p className="text-sm text-gray-500">Scannez ce QR code pour installer votre eSIM</p>
+                  {orderDetails.esim.sim_iccid && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      ICCID : <span className="font-mono">{orderDetails.esim.sim_iccid}</span>
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* ─── Boutons navigation ─── */}
               <div className="flex flex-col sm:flex-row gap-3 pt-2">
                 {hasEsimData && (

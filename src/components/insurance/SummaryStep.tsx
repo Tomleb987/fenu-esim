@@ -55,7 +55,11 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
     opt,
     ...(opt.subOptions?.map(sub => ({ ...sub, type: "select" as const })) || [])
   ]);
-  const getOptionLabel = (id: string) => allOptions.find(o => o.id === id)?.label ?? `Option ${id}`;
+  const SUB_OPTION_FALLBACK: Record<string, string> = {
+    "338": "Extension Garantie Annulation",
+  };
+  const getOptionLabel = (id: string) =>
+    allOptions.find(o => o.id === id)?.label ?? SUB_OPTION_FALLBACK[id] ?? `Option ${id}`;
 
   const downloadDevis = async () => {
     const { jsPDF } = await import("jspdf");
@@ -120,7 +124,7 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
     if (logoBase64) {
       const natW = (window as any)._logoNaturalW || 260;
       const natH = (window as any)._logoNaturalH || 80;
-      const logoH = 14;
+      const logoH = 22;
       const logoW = (natW / natH) * logoH;
       doc.addImage(logoBase64, "PNG", margin, y, logoW, logoH);
     } else {

@@ -13,13 +13,7 @@ export interface AvaOption {
 // OPTIONS AVA TOURIST CARD
 // =============================================
 export const AVA_TOURIST_OPTIONS: AvaOption[] = [
-  {
-    id: "335",
-    label: "Extension Garantie Annulation",
-    type: "boolean",
-    description: "Couverture dès l'inscription (Tous motifs)",
-    defaultSubOptionId: "338"
-  },
+
   {
     id: "339",
     label: "Augmenter Plafond Annulation",

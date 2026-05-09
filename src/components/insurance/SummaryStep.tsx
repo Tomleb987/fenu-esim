@@ -2,7 +2,7 @@ import { InsuranceFormData } from "@/types/insurance";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { AVA_TOURIST_OPTIONS } from "@/lib/ava_options";
-import { Download, FileText } from "lucide-react";
+import { Download } from "lucide-react";
 
 interface SummaryStepProps {
   formData: InsuranceFormData;
@@ -13,7 +13,6 @@ interface SummaryStepProps {
   productType?: string;
 }
 
-// ── Mapping centralisé des libellés produit ──────────────────────────────────
 const PRODUCT_LABELS: Record<string, string> = {
   ava_tourist_card: "AVA Tourist Card",
   ava_carte_sante:  "AVA Carte Sante",
@@ -27,6 +26,7 @@ const getProductLabel = (productType: string) =>
 export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: SummaryStepProps) => {
 
   const EUR_TO_XPF = 119.33;
+  const FRAIS_DISTRIB_EUR = 10;
   const toXPF = (eur: number) => Math.round(eur * EUR_TO_XPF).toLocaleString('fr-FR');
 
   const getDestinationLabel = (code: string | number) => {
@@ -66,6 +66,7 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
     const grayDk:  [number,number,number] = [55,  65,  81];
     const grayMd:  [number,number,number] = [107, 114, 128];
     const grayLt:  [number,number,number] = [243, 244, 246];
+    const purpleLt:[number,number,number] = [240, 232, 255];
     const white:   [number,number,number] = [255, 255, 255];
 
     const pageW = 210;
@@ -73,10 +74,16 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
     const margin = 15;
     const colW = pageW - margin * 2;
 
-    // ── Label produit dynamique ──────────────────────────────────────────────
-    console.log("[devis] productType:", productType ?? formData.productType);
+    const EUR_TO_XPF_LOCAL = 119.33;
+    const FRAIS = 10;
+    const premiumEur = quote ? quote.premium : 0;
+    const totalEur = premiumEur + FRAIS;
+    const fmtEur = (v: number) => v.toFixed(2) + " EUR";
+    const fmtXpf = (v: number) => Math.round(v * EUR_TO_XPF_LOCAL).toLocaleString("fr-FR") + " XPF";
+
     const productLabelPdf = getProductLabel(productType ?? formData.productType);
 
+    // Logo
     let logoBase64: string | null = null;
     try {
       const logoRes = await fetch("/logo.png");
@@ -101,7 +108,7 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
       }
     } catch {}
 
-    // FILIGRANE
+    // Filigrane
     if (logoBase64) {
       doc.saveGraphicsState();
       // @ts-ignore
@@ -110,246 +117,235 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
       const natHf = (window as any)._logoNaturalH || 80;
       const filH = 40;
       const filW = (natWf / natHf) * filH;
-      doc.addImage(logoBase64, "PNG", (pageW - filW) / 2, 100, filW, filH);
+      doc.addImage(logoBase64, "PNG", (pageW - filW) / 2, 110, filW, filH);
       doc.restoreGraphicsState();
     }
 
-    // EN-TÊTE
+    // En-tête
     doc.setFillColor(...purple1);
-    doc.rect(0, 0, pageW * 0.6, 48, "F");
+    doc.rect(0, 0, pageW * 0.55, 52, "F");
     doc.setFillColor(...purple2);
-    doc.rect(pageW * 0.6, 0, pageW * 0.4, 48, "F");
+    doc.rect(pageW * 0.55, 0, pageW * 0.45, 52, "F");
     doc.setFillColor(...orange);
-    doc.rect(0, 46, pageW, 2, "F");
+    doc.rect(0, 50, pageW, 2.5, "F");
 
     if (logoBase64) {
       const natW = (window as any)._logoNaturalW || 260;
       const natH = (window as any)._logoNaturalH || 80;
-      const logoH = 22;
+      const logoH = 20;
       const logoW = (natW / natH) * logoH;
-      doc.addImage(logoBase64, "PNG", margin, (48 - logoH) / 2, logoW, logoH);
+      doc.addImage(logoBase64, "PNG", margin, (52 - logoH) / 2, logoW, logoH);
     } else {
       doc.setTextColor(...white);
-      doc.setFontSize(22);
+      doc.setFontSize(20);
       doc.setFont("helvetica", "bold");
-      doc.text("FENUASIM", margin, 22);
+      doc.text("FENUA SIM", margin, 28);
     }
 
     doc.setTextColor(...white);
-    doc.setFontSize(10);
+    doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
-    doc.text("ASSURANCE VOYAGE", pageW - margin, 16, { align: "right" });
+    doc.text("DEVIS ASSURANCE VOYAGE", pageW - margin, 18, { align: "right" });
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
-    doc.text("Devis personnalise", pageW - margin, 23, { align: "right" });
-    doc.text("Emis le " + format(new Date(), "dd/MM/yyyy", { locale: fr }), pageW - margin, 30, { align: "right" });
-    doc.text("Valable 30 jours", pageW - margin, 37, { align: "right" });
+    doc.text("Emis le " + format(new Date(), "dd/MM/yyyy", { locale: fr }), pageW - margin, 27, { align: "right" });
+    doc.text("Valable 30 jours", pageW - margin, 34, { align: "right" });
+    doc.text("Partenaire AVA Assurances", pageW - margin, 41, { align: "right" });
 
-    let y = 58;
+    let y = 62;
 
-    // BANDEAU FORMULE — ✅ dynamique
-    doc.setFillColor(...grayLt);
-    doc.roundedRect(margin, y, colW, 14, 3, 3, "F");
+    // Bandeau produit
+    doc.setFillColor(...purpleLt);
+    doc.roundedRect(margin, y, colW, 13, 2, 2, "F");
+    doc.setDrawColor(...purple2);
+    doc.setLineWidth(0.4);
+    doc.roundedRect(margin, y, colW, 13, 2, 2, "S");
     doc.setTextColor(...purple1);
-    doc.setFontSize(13);
+    doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
-    doc.text(productLabelPdf, margin + 5, y + 9);
+    doc.text(productLabelPdf, margin + 5, y + 8.5);
     doc.setTextColor(...grayMd);
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
-    doc.text("Assurance voyage tout risques — Polynesie francaise", pageW - margin - 3, y + 9, { align: "right" });
-    y += 20;
+    doc.text("Assurance voyage — Polynesie francaise", pageW - margin - 4, y + 8.5, { align: "right" });
+    y += 18;
 
-    const sectionHeader = (title: string) => {
-      doc.setFillColor(...purple1);
-      doc.rect(margin, y, 3, 7, "F");
+    // Helpers
+    const sectionTitle = (title: string) => {
       doc.setTextColor(...purple1);
-      doc.setFontSize(8);
+      doc.setFontSize(7.5);
       doc.setFont("helvetica", "bold");
-      doc.text(title, margin + 6, y + 5.5);
-      doc.setDrawColor(...purple2);
-      doc.setLineWidth(0.2);
-      doc.line(margin + 6, y + 7, margin + colW, y + 7);
-      y += 11;
-    };
-
-    const row = (label: string, value: string, highlight = false) => {
-      if (highlight) {
-        doc.setFillColor(248, 245, 255);
-        doc.rect(margin, y - 4, colW, 8, "F");
-      }
-      doc.setTextColor(...grayMd);
-      doc.setFontSize(8);
-      doc.setFont("helvetica", "normal");
-      doc.text(label, margin + 3, y);
-      doc.setTextColor(...grayDk);
-      doc.setFont("helvetica", "bold");
-      doc.text(value, margin + 58, y);
+      doc.text(title, margin, y);
+      doc.setDrawColor(...purple1);
+      doc.setLineWidth(0.3);
+      doc.line(margin, y + 1.5, margin + colW, y + 1.5);
       y += 7;
     };
 
-    const chip = (text: string) => {
-      const w = doc.getTextWidth(text) + 6;
-      doc.setFillColor(...purple2);
-      doc.roundedRect(margin + 3, y - 4, w, 6, 1.5, 1.5, "F");
-      doc.setTextColor(...white);
-      doc.setFontSize(7);
-      doc.setFont("helvetica", "bold");
-      doc.text(text, margin + 6, y);
-      y += 8;
-    };
-
+    // Bloc 2 colonnes
     const col1X = margin;
-    const col2X = margin + colW / 2 + 3;
-    const colHalf = colW / 2 - 3;
+    const col2X = margin + colW / 2 + 2;
+    const colHalf = colW / 2 - 2;
+    const boxH = formData.phone ? 42 : 38;
 
-    // Encart gauche — Voyage
     doc.setFillColor(...grayLt);
-    doc.roundedRect(col1X, y, colHalf, 38, 2, 2, "F");
+    doc.roundedRect(col1X, y, colHalf, boxH, 2, 2, "F");
     doc.setTextColor(...purple1);
-    doc.setFontSize(7.5);
+    doc.setFontSize(7);
     doc.setFont("helvetica", "bold");
-    doc.text("DETAILS DU VOYAGE", col1X + 4, y + 6);
+    doc.text("DETAILS DU VOYAGE", col1X + 4, y + 5.5);
+    doc.setDrawColor(...purple1);
+    doc.setLineWidth(0.2);
+    doc.line(col1X + 4, y + 6.5, col1X + colHalf - 4, y + 6.5);
     doc.setTextColor(...grayDk);
-    doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
-    doc.text("Destination :", col1X + 4, y + 13);
     doc.setFont("helvetica", "bold");
-    doc.text(destinationName, col1X + 4, y + 19);
+    doc.text(destinationName, col1X + 4, y + 14);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...grayMd);
-    doc.text("Du " + formatDate(formData.departureDate) + " au " + formatDate(formData.returnDate), col1X + 4, y + 26);
-    doc.text("Cout voyage : " + formData.tripPrice + " EUR", col1X + 4, y + 32);
-
-    // Encart droit — Assuré
-    doc.setFillColor(240, 232, 255);
-    doc.roundedRect(col2X, y, colHalf, 38, 2, 2, "F");
-    doc.setTextColor(...purple1);
     doc.setFontSize(7.5);
+    doc.text("Du " + formatDate(formData.departureDate), col1X + 4, y + 21);
+    doc.text("au " + formatDate(formData.returnDate), col1X + 4, y + 27);
+    doc.text("Cout voyage : " + formData.tripPrice + " EUR", col1X + 4, y + 34);
+    if (formData.tripPrice) {
+      doc.text("(" + fmtXpf(Number(formData.tripPrice)) + ")", col1X + 4, y + 40);
+    }
+
+    doc.setFillColor(...purpleLt);
+    doc.roundedRect(col2X, y, colHalf, boxH, 2, 2, "F");
+    doc.setTextColor(...purple1);
+    doc.setFontSize(7);
     doc.setFont("helvetica", "bold");
-    doc.text("ASSURE PRINCIPAL", col2X + 4, y + 6);
+    doc.text("ASSURE PRINCIPAL", col2X + 4, y + 5.5);
+    doc.setDrawColor(...purple1);
+    doc.setLineWidth(0.2);
+    doc.line(col2X + 4, y + 6.5, col2X + colHalf - 4, y + 6.5);
     doc.setTextColor(...grayDk);
-    doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
     doc.text(formData.firstName + " " + formData.lastName, col2X + 4, y + 14);
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
+    doc.setFontSize(7.5);
     doc.setTextColor(...grayMd);
     doc.text("Ne(e) le " + formatDate(formData.birthDate), col2X + 4, y + 21);
     doc.text(formData.email, col2X + 4, y + 27);
     if (formData.phone) doc.text(formData.phone, col2X + 4, y + 33);
 
-    y += 44;
+    y += boxH + 8;
 
-    // VOYAGEURS SUPPLÉMENTAIRES
+    // Voyageurs supplémentaires
     if (formData.additionalTravelers.length > 0) {
-      sectionHeader("VOYAGEURS SUPPLEMENTAIRES (" + formData.additionalTravelers.length + ")");
+      sectionTitle("VOYAGEURS SUPPLEMENTAIRES (" + formData.additionalTravelers.length + ")");
       formData.additionalTravelers.forEach((t, i) => {
-        row("Voyageur " + (i + 1), t.firstName + " " + t.lastName + "  —  ne(e) le " + formatDate(t.birthDate), i % 2 === 0);
+        if (i % 2 === 0) { doc.setFillColor(...grayLt); doc.rect(margin, y - 4, colW, 7, "F"); }
+        doc.setTextColor(...grayMd); doc.setFontSize(8); doc.setFont("helvetica", "normal");
+        doc.text("Voyageur " + (i + 1) + " — ne(e) le " + formatDate(t.birthDate), margin + 2, y);
+        doc.setTextColor(...grayDk); doc.setFont("helvetica", "bold");
+        doc.text(t.firstName + " " + t.lastName, pageW - margin - 2, y, { align: "right" });
+        y += 7;
       });
-      y += 3;
+      y += 4;
     }
 
-    // OPTIONS
-    sectionHeader("OPTIONS SOUSCRITES");
+    // Options
+    sectionTitle("OPTIONS SOUSCRITES");
     if (formData.selectedOptions.length > 0) {
-      formData.selectedOptions.forEach(id => {
-        chip(getOptionLabel(id));
+      formData.selectedOptions.forEach((id, i) => {
+        if (i % 2 === 0) { doc.setFillColor(...grayLt); doc.rect(margin, y - 4, colW, 7, "F"); }
+        doc.setTextColor(...purple1); doc.setFontSize(8); doc.setFont("helvetica", "bold");
+        doc.text("✓  " + getOptionLabel(id), margin + 2, y);
+        y += 7;
       });
     } else {
-      doc.setTextColor(...grayMd);
-      doc.setFontSize(8);
-      doc.setFont("helvetica", "italic");
-      doc.text("Aucune option selectionnee", margin + 3, y);
-      y += 8;
+      doc.setTextColor(...grayMd); doc.setFontSize(8); doc.setFont("helvetica", "italic");
+      doc.text("Aucune option selectionnee", margin + 2, y);
+      y += 7;
     }
-    y += 4;
+    y += 6;
 
-    // TOTAL
+    // Tableau des montants
+    sectionTitle("DETAIL DES MONTANTS");
+
+    // En-têtes
     doc.setFillColor(...purple1);
-    doc.roundedRect(margin, y, colW, 22, 3, 3, "F");
-    doc.setFillColor(...orange);
-    doc.roundedRect(margin + colW - 40, y, 40, 22, 3, 3, "F");
-    doc.setFillColor(...orange);
-    doc.rect(margin + colW - 43, y, 6, 22, "F");
-
+    doc.rect(margin, y - 4, colW, 8, "F");
     doc.setTextColor(...white);
-    doc.setFontSize(9);
+    doc.setFontSize(7.5);
     doc.setFont("helvetica", "bold");
-    doc.text("TOTAL ESTIME TTC", margin + 5, y + 8);
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.text("Cotisation annuelle tout compris", margin + 5, y + 15);
+    doc.text("Description", margin + 3, y + 0.5);
+    doc.text("Montant EUR", margin + colW * 0.55, y + 0.5);
+    doc.text("Montant XPF", margin + colW * 0.77, y + 0.5);
+    y += 10;
 
-    const EUR_TO_XPF_LOCAL = 119.33;
-    const FRAIS_DISTRIB_EUR = 10;
-    const premiumEur = quote ? quote.premium : 0;
-    const totalEur = premiumEur + FRAIS_DISTRIB_EUR;
-    const totalXpf = Math.round(totalEur * EUR_TO_XPF_LOCAL);
-    const totalXpfStr = totalXpf.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(...white);
-    doc.text("Prime d'assurance AVA", margin + 5, y + 10);
-    doc.text(premiumEur.toFixed(2) + " EUR", pageW - margin - 5, y + 10, { align: "right" });
-
-    doc.text("Frais de distribution FENUASIM", margin + 5, y + 18);
-    doc.text(FRAIS_DISTRIB_EUR.toFixed(2) + " EUR", pageW - margin - 5, y + 18, { align: "right" });
-
-    doc.setDrawColor(...orange);
-    doc.setLineWidth(0.4);
-    doc.line(margin + 5, y + 21, pageW - margin - 5, y + 21);
-
-    doc.setFontSize(13);
-    doc.setFont("helvetica", "bold");
-    doc.text("TOTAL TTC", margin + 5, y + 28);
-    doc.text(totalEur.toFixed(2) + " EUR", pageW - margin - 5, y + 28, { align: "right" });
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "normal");
-    doc.text("~ " + totalXpfStr + " XPF", pageW - margin - 5, y + 35, { align: "right" });
-    y += 45;
-
-    // MENTIONS LÉGALES — ✅ productLabel dynamique
+    // Ligne 1 : Prime AVA
     doc.setFillColor(...grayLt);
-    doc.roundedRect(margin, y, colW, 34, 2, 2, "F");
-    doc.setTextColor(...purple1);
-    doc.setFontSize(7);
+    doc.rect(margin, y - 4, colW, 8, "F");
+    doc.setTextColor(...grayDk); doc.setFontSize(8); doc.setFont("helvetica", "normal");
+    doc.text("Prime d'assurance AVA (" + productLabelPdf + ")", margin + 3, y + 0.5);
     doc.setFont("helvetica", "bold");
+    doc.text(fmtEur(premiumEur), pageW - margin - 42, y + 0.5, { align: "right" });
+    doc.setFont("helvetica", "normal"); doc.setTextColor(...grayMd);
+    doc.text(fmtXpf(premiumEur), pageW - margin - 2, y + 0.5, { align: "right" });
+    y += 10;
+
+    // Ligne 2 : Frais
+    doc.setFillColor(...white);
+    doc.rect(margin, y - 4, colW, 8, "F");
+    doc.setTextColor(...grayDk); doc.setFontSize(8); doc.setFont("helvetica", "normal");
+    doc.text("Frais de distribution FENUASIM", margin + 3, y + 0.5);
+    doc.setFont("helvetica", "bold");
+    doc.text(fmtEur(FRAIS), pageW - margin - 42, y + 0.5, { align: "right" });
+    doc.setFont("helvetica", "normal"); doc.setTextColor(...grayMd);
+    doc.text(fmtXpf(FRAIS), pageW - margin - 2, y + 0.5, { align: "right" });
+    y += 10;
+
+    // Ligne Total
+    doc.setFillColor(...purple1);
+    doc.rect(margin, y - 4, colW - 42, 10, "F");
+    doc.setFillColor(...orange);
+    doc.rect(margin + colW - 42, y - 4, 42, 10, "F");
+    doc.setTextColor(...white); doc.setFontSize(9); doc.setFont("helvetica", "bold");
+    doc.text("TOTAL TTC", margin + 3, y + 2);
+    doc.setFontSize(8); doc.setFont("helvetica", "normal");
+    doc.text(fmtXpf(totalEur), pageW - margin - 2, y + 2, { align: "right" });
+    doc.setFontSize(10); doc.setFont("helvetica", "bold");
+    doc.text(fmtEur(totalEur), pageW - margin - 44, y + 2, { align: "right" });
+    y += 16;
+
+    // Mentions légales
+    doc.setFillColor(...grayLt);
+    doc.roundedRect(margin, y, colW, 32, 2, 2, "F");
+    doc.setTextColor(...purple1); doc.setFontSize(7); doc.setFont("helvetica", "bold");
     doc.text("MENTIONS LEGALES", margin + 4, y + 6);
-    doc.setTextColor(...grayMd);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(6.5);
+    doc.setTextColor(...grayMd); doc.setFont("helvetica", "normal"); doc.setFontSize(6.5);
     const mentions = [
       "Ce document est un devis non contractuel etabli sur la base des informations fournies.",
       `L'assurance ${productLabelPdf} est distribuee par FENUASIM, mandataire d'ANSET ASSURANCES.`,
       "ANSET ASSURANCES - 5 avenue du Prince Hinoi, 98713 Papeete - Polynesie francaise.",
-      "ANSET ASSURANCES - N° RUIA PF 26 010.",
-      "FENUASIM - N° RUIA PF 26 012 - Mandataire d'intermediaire d'assurance.",
+      "ANSET ASSURANCES - N° RUIA PF 26 010.   FENUASIM - N° RUIA PF 26 012 - Mandataire d'intermediaire d'assurance.",
+      "Taux de conversion EUR/XPF applique : 1 EUR = 119,33 XPF (taux fixe).",
       "La souscription definitive est conditionnee au paiement et a la validation du contrat.",
     ];
-    mentions.forEach((line, i) => {
-      doc.text(line, margin + 4, y + 12 + i * 4.5);
-    });
-    y += 40;
+    mentions.forEach((line, i) => { doc.text(line, margin + 4, y + 12 + i * 4); });
+    y += 38;
 
-    // PIED DE PAGE
+    // Pied de page
     doc.setFillColor(...purple1);
-    doc.rect(0, pageH - 12, pageW, 12, "F");
+    doc.rect(0, pageH - 14, pageW, 14, "F");
     doc.setFillColor(...orange);
-    doc.rect(0, pageH - 13, pageW, 1, "F");
-    doc.setTextColor(...white);
-    doc.setFontSize(7.5);
+    doc.rect(0, pageH - 15, pageW, 1.5, "F");
+    doc.setTextColor(...white); doc.setFontSize(7.5); doc.setFont("helvetica", "bold");
+    doc.text("FENUA SIM", margin, pageH - 7);
     doc.setFont("helvetica", "normal");
-    doc.text("www.fenuasim.com", margin, pageH - 5);
+    doc.text("www.fenuasim.com", margin, pageH - 3);
     doc.text("contact@fenuasim.com", pageW / 2, pageH - 5, { align: "center" });
+    doc.text("SASU — Capital 500€ — 943 713 875 RCS Paris", pageW - margin, pageH - 7, { align: "right" });
+    doc.text("58 rue Monceau, 75008 Paris", pageW - margin, pageH - 3, { align: "right" });
 
     doc.save("Devis-Assurance-FENUASIM-" + format(new Date(), "ddMMyyyy") + ".pdf");
   };
 
-  // ─── Documents dynamiques selon produit ─────────────────────────────────
   const isCarteSante = (productType ?? formData.productType) === "ava_carte_sante";
-
   const docs = isCarteSante
     ? [
         { name: "IPID – Carte Santé", file: "/documents/IPID-CARTE-SANTE.pdf", icon: "📄" },
@@ -360,16 +356,15 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
         { name: "Conditions Générales (CG)", file: "/documents/CG-AVA-TOURIST-CARD.pdf", icon: "📄" },
       ];
 
-  // Label produit pour l'UI
   const productLabelUI = getProductLabel(productType ?? formData.productType);
+  const premiumEur = quote ? quote.premium : 0;
+  const totalEur = premiumEur + FRAIS_DISTRIB_EUR;
 
   return (
     <div className="space-y-6 animate-in fade-in">
       <div className="text-center mb-6">
         <h2 className="text-2xl font-bold mb-2">Récapitulatif</h2>
-        <p className="text-muted-foreground text-sm">
-          Vérifiez vos informations avant de payer.
-        </p>
+        <p className="text-muted-foreground text-sm">Vérifiez vos informations avant de payer.</p>
         <span className="inline-block mt-2 bg-primary/10 text-primary text-sm font-semibold px-4 py-1 rounded-full">
           {productLabelUI}
         </span>
@@ -377,7 +372,6 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
 
       <div className="bg-gray-50 p-6 rounded-lg border border-gray-200 space-y-4">
 
-        {/* LIGNE 1 : VOYAGE */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4 border-b border-gray-200">
           <div>
             <span className="block text-xs text-gray-500 uppercase font-semibold">Destination</span>
@@ -391,7 +385,6 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
           </div>
         </div>
 
-        {/* LIGNE 2 : ASSURÉ & VOYAGEURS */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4 border-b border-gray-200">
           <div>
             <span className="block text-xs text-gray-500 uppercase font-semibold mb-1">Assuré principal</span>
@@ -418,7 +411,6 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
           </div>
         </div>
 
-        {/* LIGNE 3 : OPTIONS */}
         <div className="pb-4 border-b border-gray-200">
           <span className="block text-xs text-gray-500 uppercase font-semibold mb-1">Options choisies</span>
           {formData.selectedOptions && formData.selectedOptions.length > 0 ? (
@@ -434,18 +426,12 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
           )}
         </div>
 
-        {/* LIGNE 4 : DOCUMENTS CONTRACTUELS */}
         <div className="pb-4 border-b border-gray-200">
           <span className="block text-xs text-gray-500 uppercase font-semibold mb-2">Documents contractuels</span>
           <div className="flex flex-col gap-2">
             {docs.map((doc, idx) => (
-              <a
-                key={idx}
-                href={doc.file}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center text-sm text-blue-600 hover:text-blue-800 hover:underline transition-colors"
-              >
+              <a key={idx} href={doc.file} target="_blank" rel="noopener noreferrer"
+                className="flex items-center text-sm text-blue-600 hover:text-blue-800 hover:underline transition-colors">
                 <span className="mr-2 text-lg">{doc.icon}</span>
                 {doc.name}
                 <span className="ml-1 text-xs text-gray-400">(PDF)</span>
@@ -454,47 +440,59 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
           </div>
         </div>
 
-        {/* TOTAL */}
-        <div className="pt-4 mt-2 border-t border-gray-200 bg-white p-4 rounded-lg shadow-sm space-y-2">
-          {isLoadingQuote ? (
-            <span className="text-sm italic text-primary animate-pulse">Calcul en cours...</span>
-          ) : (
-            <>
-              <div className="flex justify-between items-center text-sm text-gray-600">
-                <span>Prime d&apos;assurance AVA</span>
-                <span>{quote ? `${quote.premium.toFixed(2)} €` : "-- €"}</span>
-              </div>
-              <div className="flex justify-between items-center text-sm text-gray-600">
-                <span>Frais de distribution FENUASIM</span>
-                <span>10.00 €</span>
-              </div>
-              <div className="border-t border-orange-300 pt-2">
-                <div className="flex justify-between items-center">
-                  <span className="font-bold text-lg text-gray-900">Total TTC</span>
-                  <div className="text-right">
-                    <span className="font-bold text-3xl text-primary block">
-                      {quote ? `${(quote.premium + 10).toFixed(2)} €` : "-- €"}
-                    </span>
-                    {quote && (
-                      <span className="text-sm text-gray-400 font-normal">
-                        ≈ {toXPF(quote.premium + 10)} XPF
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
+        {/* Tableau montants */}
+        <div className="rounded-lg overflow-hidden border border-gray-200">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-primary text-white">
+                <th className="text-left px-3 py-2 font-semibold">Description</th>
+                <th className="text-right px-3 py-2 font-semibold">EUR</th>
+                <th className="text-right px-3 py-2 font-semibold">XPF</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoadingQuote ? (
+                <tr>
+                  <td colSpan={3} className="px-3 py-4 text-center text-primary italic animate-pulse">
+                    Calcul en cours...
+                  </td>
+                </tr>
+              ) : (
+                <>
+                  <tr className="bg-gray-50">
+                    <td className="px-3 py-2 text-gray-700">Prime d&apos;assurance AVA</td>
+                    <td className="px-3 py-2 text-right text-gray-900 font-medium">
+                      {quote ? `${quote.premium.toFixed(2)} €` : "-- €"}
+                    </td>
+                    <td className="px-3 py-2 text-right text-gray-500 text-xs">
+                      {quote ? `${toXPF(quote.premium)} XPF` : "--"}
+                    </td>
+                  </tr>
+                  <tr className="bg-white">
+                    <td className="px-3 py-2 text-gray-700">Frais de distribution FENUASIM</td>
+                    <td className="px-3 py-2 text-right text-gray-900 font-medium">10.00 €</td>
+                    <td className="px-3 py-2 text-right text-gray-500 text-xs">{toXPF(10)} XPF</td>
+                  </tr>
+                  <tr className="bg-primary text-white">
+                    <td className="px-3 py-3 font-bold text-base">Total TTC</td>
+                    <td className="px-3 py-3 text-right font-bold text-lg">
+                      {quote ? `${totalEur.toFixed(2)} €` : "-- €"}
+                    </td>
+                    <td className="px-3 py-3 text-right font-medium text-sm">
+                      {quote ? `${toXPF(totalEur)} XPF` : "--"}
+                    </td>
+                  </tr>
+                </>
+              )}
+            </tbody>
+          </table>
         </div>
 
       </div>
 
-      {/* BOUTON TÉLÉCHARGER DEVIS */}
       {quote && (
-        <button
-          onClick={downloadDevis}
-          className="w-full flex items-center justify-center gap-2 border border-primary text-primary hover:bg-primary/5 font-medium py-3 px-4 rounded-lg transition-colors"
-        >
+        <button onClick={downloadDevis}
+          className="w-full flex items-center justify-center gap-2 border border-primary text-primary hover:bg-primary/5 font-medium py-3 px-4 rounded-lg transition-colors">
           <Download className="w-4 h-4" />
           Télécharger mon devis (PDF)
         </button>

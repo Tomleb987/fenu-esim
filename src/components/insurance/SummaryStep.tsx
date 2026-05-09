@@ -27,7 +27,8 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
 
   const EUR_TO_XPF = 119.33;
   const FRAIS_DISTRIB_EUR = 10;
-  const toXPF = (eur: number) => Math.round(eur * EUR_TO_XPF).toLocaleString('fr-FR');
+  const toXPF = (eur: number) =>
+    Math.round(eur * EUR_TO_XPF).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 
   const getDestinationLabel = (code: string | number) => {
     const codeStr = String(code).trim();
@@ -46,13 +47,13 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
     try {
       const [year, month, day] = d.split("T")[0].split("-").map(Number);
       const date = new Date(year, month - 1, day);
-      return format(date, 'dd MMM yyyy', { locale: fr });
+      return format(date, "dd MMM yyyy", { locale: fr });
     } catch { return d; }
   };
 
   const allOptions = AVA_TOURIST_OPTIONS.flatMap(opt => [
     opt,
-    ...(opt.subOptions?.map(sub => ({ ...sub, type: 'select' as const })) || [])
+    ...(opt.subOptions?.map(sub => ({ ...sub, type: "select" as const })) || [])
   ]);
   const getOptionLabel = (id: string) => allOptions.find(o => o.id === id)?.label ?? `Option ${id}`;
 
@@ -60,26 +61,27 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
     const { jsPDF } = await import("jspdf");
     const doc = new jsPDF({ unit: "mm", format: "a4", compress: true });
 
-    const purple1: [number,number,number] = [108, 43, 217];
-    const purple2: [number,number,number] = [168, 85, 247];
-    const orange:  [number,number,number] = [249, 115, 22];
-    const grayDk:  [number,number,number] = [55,  65,  81];
-    const grayMd:  [number,number,number] = [107, 114, 128];
-    const grayLt:  [number,number,number] = [243, 244, 246];
-    const purpleLt:[number,number,number] = [240, 232, 255];
+    const purple:  [number,number,number] = [108, 43, 217];
+    const grayDk:  [number,number,number] = [30,  30,  30];
+    const grayMd:  [number,number,number] = [100, 100, 110];
+    const grayLt:  [number,number,number] = [245, 245, 248];
+    const grayBrd: [number,number,number] = [210, 210, 220];
     const white:   [number,number,number] = [255, 255, 255];
 
     const pageW = 210;
     const pageH = 297;
-    const margin = 15;
+    const margin = 20;
     const colW = pageW - margin * 2;
+    const xR = pageW - margin;
 
     const EUR_TO_XPF_LOCAL = 119.33;
     const FRAIS = 10;
     const premiumEur = quote ? quote.premium : 0;
     const totalEur = premiumEur + FRAIS;
+    const sepXpf = (v: number) =>
+      Math.round(v * EUR_TO_XPF_LOCAL).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
     const fmtEur = (v: number) => v.toFixed(2) + " EUR";
-    const fmtXpf = (v: number) => Math.round(v * EUR_TO_XPF_LOCAL).toLocaleString("fr-FR") + " XPF";
+    const fmtXpf = (v: number) => sepXpf(v) + " XPF";
 
     const productLabelPdf = getProductLabel(productType ?? formData.productType);
 
@@ -108,239 +110,268 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
       }
     } catch {}
 
-    // Filigrane
-    if (logoBase64) {
-      doc.saveGraphicsState();
-      // @ts-ignore
-      doc.setGState(new doc.GState({ opacity: 0.04 }));
-      const natWf = (window as any)._logoNaturalW || 260;
-      const natHf = (window as any)._logoNaturalH || 80;
-      const filH = 40;
-      const filW = (natWf / natHf) * filH;
-      doc.addImage(logoBase64, "PNG", (pageW - filW) / 2, 110, filW, filH);
-      doc.restoreGraphicsState();
-    }
+    // Fond blanc
+    doc.setFillColor(...white);
+    doc.rect(0, 0, pageW, pageH, "F");
+
+    let y = margin;
 
     // En-tête
-    doc.setFillColor(...purple1);
-    doc.rect(0, 0, pageW * 0.55, 52, "F");
-    doc.setFillColor(...purple2);
-    doc.rect(pageW * 0.55, 0, pageW * 0.45, 52, "F");
-    doc.setFillColor(...orange);
-    doc.rect(0, 50, pageW, 2.5, "F");
-
     if (logoBase64) {
       const natW = (window as any)._logoNaturalW || 260;
       const natH = (window as any)._logoNaturalH || 80;
-      const logoH = 20;
+      const logoH = 14;
       const logoW = (natW / natH) * logoH;
-      doc.addImage(logoBase64, "PNG", margin, (52 - logoH) / 2, logoW, logoH);
+      doc.addImage(logoBase64, "PNG", margin, y, logoW, logoH);
     } else {
-      doc.setTextColor(...white);
-      doc.setFontSize(20);
+      doc.setTextColor(...purple);
+      doc.setFontSize(16);
       doc.setFont("helvetica", "bold");
-      doc.text("FENUA SIM", margin, 28);
+      doc.text("FENUA SIM", margin, y + 10);
     }
 
-    doc.setTextColor(...white);
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
-    doc.text("DEVIS ASSURANCE VOYAGE", pageW - margin, 18, { align: "right" });
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.text("Emis le " + format(new Date(), "dd/MM/yyyy", { locale: fr }), pageW - margin, 27, { align: "right" });
-    doc.text("Valable 30 jours", pageW - margin, 34, { align: "right" });
-    doc.text("Partenaire ANSET ASSURANCES", pageW - margin, 41, { align: "right" });
-
-    let y = 62;
-
-    // Bandeau produit
-    doc.setFillColor(...purpleLt);
-    doc.roundedRect(margin, y, colW, 13, 2, 2, "F");
-    doc.setDrawColor(...purple2);
-    doc.setLineWidth(0.4);
-    doc.roundedRect(margin, y, colW, 13, 2, 2, "S");
-    doc.setTextColor(...purple1);
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.text(productLabelPdf, margin + 5, y + 8.5);
-    doc.setTextColor(...grayMd);
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.text("Assurance voyage — Polynesie francaise", pageW - margin - 4, y + 8.5, { align: "right" });
-    y += 18;
-
-    // Helpers
-    const sectionTitle = (title: string) => {
-      doc.setTextColor(...purple1);
-      doc.setFontSize(7.5);
-      doc.setFont("helvetica", "bold");
-      doc.text(title, margin, y);
-      doc.setDrawColor(...purple1);
-      doc.setLineWidth(0.3);
-      doc.line(margin, y + 1.5, margin + colW, y + 1.5);
-      y += 7;
-    };
-
-    // Bloc 2 colonnes
-    const col1X = margin;
-    const col2X = margin + colW / 2 + 2;
-    const colHalf = colW / 2 - 2;
-    const boxH = formData.phone ? 42 : 38;
-
-    doc.setFillColor(...grayLt);
-    doc.roundedRect(col1X, y, colHalf, boxH, 2, 2, "F");
-    doc.setTextColor(...purple1);
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "bold");
-    doc.text("DETAILS DU VOYAGE", col1X + 4, y + 5.5);
-    doc.setDrawColor(...purple1);
-    doc.setLineWidth(0.2);
-    doc.line(col1X + 4, y + 6.5, col1X + colHalf - 4, y + 6.5);
-    doc.setTextColor(...grayDk);
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "bold");
-    doc.text(destinationName, col1X + 4, y + 14);
-    doc.setFont("helvetica", "normal");
     doc.setTextColor(...grayMd);
     doc.setFontSize(7.5);
-    doc.text("Du " + formatDate(formData.departureDate), col1X + 4, y + 21);
-    doc.text("au " + formatDate(formData.returnDate), col1X + 4, y + 27);
-    doc.text("Cout voyage : " + formData.tripPrice + " EUR", col1X + 4, y + 34);
-    if (formData.tripPrice) {
-      doc.text("(" + fmtXpf(Number(formData.tripPrice)) + ")", col1X + 4, y + 40);
-    }
+    doc.setFont("helvetica", "normal");
+    doc.text("FENUA SIM — 58 rue Monceau, 75008 Paris", xR, y + 4, { align: "right" });
+    doc.text("contact@fenuasim.com — www.fenuasim.com", xR, y + 9, { align: "right" });
+    doc.text("SASU — 943 713 875 RCS Paris", xR, y + 14, { align: "right" });
 
-    doc.setFillColor(...purpleLt);
-    doc.roundedRect(col2X, y, colHalf, boxH, 2, 2, "F");
-    doc.setTextColor(...purple1);
+    y += 22;
+
+    doc.setDrawColor(...grayBrd);
+    doc.setLineWidth(0.3);
+    doc.line(margin, y, xR, y);
+    y += 8;
+
+    // Titre
+    doc.setTextColor(...purple);
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.text("Devis Assurance Voyage", xR, y, { align: "right" });
+    y += 7;
+    doc.setTextColor(...grayMd);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.text(
+      "Emis le " + format(new Date(), "dd/MM/yyyy", { locale: fr }) +
+      "  |  Valable 30 jours  |  Partenaire ANSET ASSURANCES",
+      xR, y, { align: "right" }
+    );
+    y += 10;
+
+    // Produit
+    doc.setTextColor(...grayDk);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text(productLabelPdf, margin, y);
+    doc.setTextColor(...grayMd);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.text("Assurance voyage — Polynesie francaise", margin, y + 5);
+    y += 12;
+
+    doc.setDrawColor(...grayBrd);
+    doc.setLineWidth(0.3);
+    doc.line(margin, y, xR, y);
+    y += 8;
+
+    // 2 colonnes : Voyage + Assuré
+    const col2X = margin + colW / 2 + 3;
+
+    doc.setTextColor(...purple);
     doc.setFontSize(7);
     doc.setFont("helvetica", "bold");
-    doc.text("ASSURE PRINCIPAL", col2X + 4, y + 5.5);
-    doc.setDrawColor(...purple1);
-    doc.setLineWidth(0.2);
-    doc.line(col2X + 4, y + 6.5, col2X + colHalf - 4, y + 6.5);
+    doc.text("DETAILS DU VOYAGE", margin, y);
+    doc.text("ASSURE PRINCIPAL", col2X, y);
+    y += 5;
+
     doc.setTextColor(...grayDk);
     doc.setFontSize(9);
     doc.setFont("helvetica", "bold");
-    doc.text(formData.firstName + " " + formData.lastName, col2X + 4, y + 14);
+    doc.text(destinationName, margin, y);
+    doc.text(formData.firstName + " " + formData.lastName, col2X, y);
+    y += 5;
+
+    doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.5);
     doc.setTextColor(...grayMd);
-    doc.text("Ne(e) le " + formatDate(formData.birthDate), col2X + 4, y + 21);
-    doc.text(formData.email, col2X + 4, y + 27);
-    if (formData.phone) doc.text(formData.phone, col2X + 4, y + 33);
-
-    y += boxH + 8;
-
-    // Voyageurs supplémentaires
-    if (formData.additionalTravelers.length > 0) {
-      sectionTitle("VOYAGEURS SUPPLEMENTAIRES (" + formData.additionalTravelers.length + ")");
-      formData.additionalTravelers.forEach((t, i) => {
-        if (i % 2 === 0) { doc.setFillColor(...grayLt); doc.rect(margin, y - 4, colW, 7, "F"); }
-        doc.setTextColor(...grayMd); doc.setFontSize(8); doc.setFont("helvetica", "normal");
-        doc.text("Voyageur " + (i + 1) + " — ne(e) le " + formatDate(t.birthDate), margin + 2, y);
-        doc.setTextColor(...grayDk); doc.setFont("helvetica", "bold");
-        doc.text(t.firstName + " " + t.lastName, pageW - margin - 2, y, { align: "right" });
-        y += 7;
-      });
-      y += 4;
-    }
-
-    // Options
-    sectionTitle("OPTIONS SOUSCRITES");
-    if (formData.selectedOptions.length > 0) {
-      formData.selectedOptions.forEach((id, i) => {
-        if (i % 2 === 0) { doc.setFillColor(...grayLt); doc.rect(margin, y - 4, colW, 7, "F"); }
-        doc.setTextColor(...purple1); doc.setFontSize(8); doc.setFont("helvetica", "bold");
-        doc.text("✓  " + getOptionLabel(id), margin + 2, y);
-        y += 7;
-      });
-    } else {
-      doc.setTextColor(...grayMd); doc.setFontSize(8); doc.setFont("helvetica", "italic");
-      doc.text("Aucune option selectionnee", margin + 2, y);
-      y += 7;
+    doc.text("Du " + formatDate(formData.departureDate) + " au " + formatDate(formData.returnDate), margin, y);
+    doc.text("Ne(e) le " + formatDate(formData.birthDate), col2X, y);
+    y += 5;
+    doc.text("Cout voyage : " + formData.tripPrice + " EUR  (" + fmtXpf(Number(formData.tripPrice || 0)) + ")", margin, y);
+    doc.text(formData.email, col2X, y);
+    y += 5;
+    if (formData.phone) {
+      doc.text(formData.phone, col2X, y);
+      y += 5;
     }
     y += 6;
 
-    // Tableau des montants
-    sectionTitle("DETAIL DES MONTANTS");
+    doc.setDrawColor(...grayBrd);
+    doc.setLineWidth(0.3);
+    doc.line(margin, y, xR, y);
+    y += 8;
 
-    // En-têtes
-    doc.setFillColor(...purple1);
-    doc.rect(margin, y - 4, colW, 8, "F");
-    doc.setTextColor(...white);
+    // Voyageurs supplémentaires
+    if (formData.additionalTravelers.length > 0) {
+      doc.setTextColor(...purple);
+      doc.setFontSize(7);
+      doc.setFont("helvetica", "bold");
+      doc.text("VOYAGEURS SUPPLEMENTAIRES", margin, y);
+      y += 5;
+      formData.additionalTravelers.forEach((t, i) => {
+        doc.setTextColor(...grayDk);
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        doc.text((i + 1) + ".  " + t.firstName + " " + t.lastName + "  —  ne(e) le " + formatDate(t.birthDate), margin, y);
+        y += 5;
+      });
+      y += 4;
+      doc.setDrawColor(...grayBrd);
+      doc.setLineWidth(0.3);
+      doc.line(margin, y, xR, y);
+      y += 8;
+    }
+
+    // Options
+    doc.setTextColor(...purple);
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.text("OPTIONS SOUSCRITES", margin, y);
+    y += 5;
+    if (formData.selectedOptions.length > 0) {
+      formData.selectedOptions.forEach((id) => {
+        doc.setTextColor(...grayDk);
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        doc.text("•  " + getOptionLabel(id), margin, y);
+        y += 5;
+      });
+    } else {
+      doc.setTextColor(...grayMd);
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "italic");
+      doc.text("Aucune option selectionnee", margin, y);
+      y += 5;
+    }
+    y += 6;
+
+    doc.setDrawColor(...grayBrd);
+    doc.setLineWidth(0.3);
+    doc.line(margin, y, xR, y);
+    y += 8;
+
+    // Tableau montants
+    doc.setTextColor(...purple);
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.text("DETAIL DES MONTANTS", margin, y);
+    y += 6;
+
+    const colEur = xR - 52;
+    const colXpf = xR - 2;
+
+    // En-tête tableau
+    doc.setFillColor(...grayLt);
+    doc.rect(margin, y, colW, 7, "F");
+    doc.setDrawColor(...grayBrd);
+    doc.setLineWidth(0.2);
+    doc.rect(margin, y, colW, 7, "S");
+    doc.setTextColor(...grayMd);
     doc.setFontSize(7.5);
     doc.setFont("helvetica", "bold");
-    doc.text("Description", margin + 3, y + 0.5);
-    doc.text("Montant EUR", margin + colW * 0.55, y + 0.5);
-    doc.text("Montant XPF", margin + colW * 0.77, y + 0.5);
-    y += 10;
+    doc.text("Description", margin + 3, y + 4.5);
+    doc.text("Montant EUR", colEur, y + 4.5, { align: "right" });
+    doc.text("Montant XPF", colXpf, y + 4.5, { align: "right" });
+    y += 7;
 
     // Ligne 1 : Prime AVA
-    doc.setFillColor(...grayLt);
-    doc.rect(margin, y - 4, colW, 8, "F");
-    doc.setTextColor(...grayDk); doc.setFontSize(8); doc.setFont("helvetica", "normal");
-    doc.text("Prime d'assurance AVA (" + productLabelPdf + ")", margin + 3, y + 0.5);
+    doc.setDrawColor(...grayBrd);
+    doc.setLineWidth(0.2);
+    doc.rect(margin, y, colW, 7, "S");
+    doc.setTextColor(...grayDk);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.text("Prime d'assurance AVA (" + productLabelPdf + ")", margin + 3, y + 4.5);
     doc.setFont("helvetica", "bold");
-    doc.text(fmtEur(premiumEur), pageW - margin - 42, y + 0.5, { align: "right" });
-    doc.setFont("helvetica", "normal"); doc.setTextColor(...grayMd);
-    doc.text(fmtXpf(premiumEur), pageW - margin - 2, y + 0.5, { align: "right" });
-    y += 10;
+    doc.text(fmtEur(premiumEur), colEur, y + 4.5, { align: "right" });
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...grayMd);
+    doc.text(fmtXpf(premiumEur), colXpf, y + 4.5, { align: "right" });
+    y += 7;
 
     // Ligne 2 : Frais
-    doc.setFillColor(...white);
-    doc.rect(margin, y - 4, colW, 8, "F");
-    doc.setTextColor(...grayDk); doc.setFontSize(8); doc.setFont("helvetica", "normal");
-    doc.text("Frais de distribution FENUASIM", margin + 3, y + 0.5);
+    doc.setDrawColor(...grayBrd);
+    doc.setLineWidth(0.2);
+    doc.rect(margin, y, colW, 7, "S");
+    doc.setTextColor(...grayDk);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.text("Frais de distribution FENUASIM", margin + 3, y + 4.5);
     doc.setFont("helvetica", "bold");
-    doc.text(fmtEur(FRAIS), pageW - margin - 42, y + 0.5, { align: "right" });
-    doc.setFont("helvetica", "normal"); doc.setTextColor(...grayMd);
-    doc.text(fmtXpf(FRAIS), pageW - margin - 2, y + 0.5, { align: "right" });
-    y += 10;
+    doc.text(fmtEur(FRAIS), colEur, y + 4.5, { align: "right" });
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...grayMd);
+    doc.text(fmtXpf(FRAIS), colXpf, y + 4.5, { align: "right" });
+    y += 7;
 
     // Ligne Total
-    doc.setFillColor(...purple1);
-    doc.rect(margin, y - 4, colW - 42, 10, "F");
-    doc.setFillColor(...orange);
-    doc.rect(margin + colW - 42, y - 4, 42, 10, "F");
-    doc.setTextColor(...white); doc.setFontSize(9); doc.setFont("helvetica", "bold");
-    doc.text("TOTAL TTC", margin + 3, y + 2);
-    doc.setFontSize(8); doc.setFont("helvetica", "normal");
-    doc.text(fmtXpf(totalEur), pageW - margin - 2, y + 2, { align: "right" });
-    doc.setFontSize(10); doc.setFont("helvetica", "bold");
-    doc.text(fmtEur(totalEur), pageW - margin - 44, y + 2, { align: "right" });
-    y += 16;
+    doc.setDrawColor(...grayBrd);
+    doc.setLineWidth(0.2);
+    doc.rect(margin, y, colW, 9, "S");
+    doc.setTextColor(...purple);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.text("Total TTC", margin + 3, y + 5.5);
+    doc.text(fmtEur(totalEur), colEur, y + 5.5, { align: "right" });
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...grayMd);
+    doc.text(fmtXpf(totalEur), colXpf, y + 5.5, { align: "right" });
+    y += 14;
+
+    doc.setTextColor(...grayMd);
+    doc.setFontSize(6.5);
+    doc.setFont("helvetica", "italic");
+    doc.text("Taux de conversion : 1 EUR = 119,33 XPF (taux fixe Institut d'emission d'Outre-Mer)", margin, y);
+    y += 10;
 
     // Mentions légales
-    doc.setFillColor(...grayLt);
-    doc.roundedRect(margin, y, colW, 32, 2, 2, "F");
-    doc.setTextColor(...purple1); doc.setFontSize(7); doc.setFont("helvetica", "bold");
-    doc.text("MENTIONS LEGALES", margin + 4, y + 6);
-    doc.setTextColor(...grayMd); doc.setFont("helvetica", "normal"); doc.setFontSize(6.5);
+    doc.setDrawColor(...grayBrd);
+    doc.setLineWidth(0.3);
+    doc.line(margin, y, xR, y);
+    y += 6;
+
+    doc.setTextColor(...purple);
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.text("MENTIONS LEGALES", margin, y);
+    y += 5;
+    doc.setTextColor(...grayMd);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6.5);
     const mentions = [
       "Ce document est un devis non contractuel etabli sur la base des informations fournies.",
       `L'assurance ${productLabelPdf} est distribuee par FENUASIM, mandataire d'ANSET ASSURANCES.`,
-      "ANSET ASSURANCES - 5 avenue du Prince Hinoi, 98713 Papeete - Polynesie francaise.",
-      "ANSET ASSURANCES - N° RUIA PF 26 010.   FENUASIM - N° RUIA PF 26 012 - Mandataire d'intermediaire d'assurance.",
-      "Taux de conversion EUR/XPF applique : 1 EUR = 119,33 XPF (taux fixe).",
+      "ANSET ASSURANCES - 5 avenue du Prince Hinoi, 98713 Papeete - Polynesie francaise — N° RUIA PF 26 010.",
+      "FENUASIM - N° RUIA PF 26 012 - Mandataire d'intermediaire d'assurance.",
       "La souscription definitive est conditionnee au paiement et a la validation du contrat.",
     ];
-    mentions.forEach((line, i) => { doc.text(line, margin + 4, y + 12 + i * 4); });
-    y += 38;
+    mentions.forEach((line) => { doc.text(line, margin, y); y += 4; });
 
     // Pied de page
-    doc.setFillColor(...purple1);
-    doc.rect(0, pageH - 14, pageW, 14, "F");
-    doc.setFillColor(...orange);
-    doc.rect(0, pageH - 15, pageW, 1.5, "F");
-    doc.setTextColor(...white); doc.setFontSize(7.5); doc.setFont("helvetica", "bold");
-    doc.text("FENUA SIM", margin, pageH - 7);
+    doc.setDrawColor(...grayBrd);
+    doc.setLineWidth(0.3);
+    doc.line(margin, pageH - 16, xR, pageH - 16);
+    doc.setTextColor(...grayMd);
+    doc.setFontSize(7);
     doc.setFont("helvetica", "normal");
-    doc.text("www.fenuasim.com", margin, pageH - 3);
-    doc.text("contact@fenuasim.com", pageW / 2, pageH - 5, { align: "center" });
-    doc.text("SASU — Capital 500€ — 943 713 875 RCS Paris", pageW - margin, pageH - 7, { align: "right" });
-    doc.text("58 rue Monceau, 75008 Paris", pageW - margin, pageH - 3, { align: "right" });
+    doc.text("FENUA SIM — SASU — Capital social 500 EUR — 943 713 875 RCS Paris", margin, pageH - 10);
+    doc.text("www.fenuasim.com  |  contact@fenuasim.com", margin, pageH - 6);
+    doc.setTextColor(...purple);
+    doc.setFont("helvetica", "bold");
+    doc.text("Page 1 / 1", xR, pageH - 8, { align: "right" });
 
     doc.save("Devis-Assurance-FENUASIM-" + format(new Date(), "ddMMyyyy") + ".pdf");
   };
@@ -440,7 +471,6 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
           </div>
         </div>
 
-        {/* Tableau montants */}
         <div className="rounded-lg overflow-hidden border border-gray-200">
           <table className="w-full text-sm">
             <thead>

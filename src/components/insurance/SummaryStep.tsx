@@ -74,8 +74,8 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
     const colW = pageW - margin * 2;
 
     // ── Label produit dynamique ──────────────────────────────────────────────
-    console.log("[devis] productType:", formData.productType);
-    const productLabelPdf = getProductLabel(formData.productType);
+    console.log("[devis] productType:", productType ?? formData.productType);
+    const productLabelPdf = getProductLabel(productType ?? formData.productType);
 
     let logoBase64: string | null = null;
     try {

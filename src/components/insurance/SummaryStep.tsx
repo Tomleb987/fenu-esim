@@ -4,6 +4,17 @@ import { fr } from "date-fns/locale";
 import { AVA_TOURIST_OPTIONS } from "@/lib/ava_options";
 import { Download, FileText } from "lucide-react";
 
+// ── Mapping centralisé des libellés produit ──────────────────────────────────
+const PRODUCT_LABELS: Record<string, string> = {
+  ava_tourist_card: "AVA Tourist Card",
+  ava_carte_sante:  "AVA Carte Sante",
+  avantages_pom:    "AVAntages POM",
+  avantages_360:    "AVAntages 360",
+};
+
+const getProductLabel = (productType: string) =>
+  PRODUCT_LABELS[productType] ?? "AVA Tourist Card";
+
 interface SummaryStepProps {
   formData: InsuranceFormData;
   updateFormData: (data: Partial<InsuranceFormData>) => void;
@@ -154,7 +165,8 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
     doc.setTextColor(...purple1);
     doc.setFontSize(13);
     doc.setFont("helvetica", "bold");
-    doc.text(formData.productType === "ava_carte_sante" ? "AVA Carte Sante" : "AVA Tourist Card", margin + 5, y + 9);
+    const productLabelPdf = getProductLabel(formData.productType);
+    doc.text(productLabelPdf, margin + 5, y + 9);
     doc.setTextColor(...grayMd);
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
@@ -341,7 +353,7 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
     doc.setTextColor(...grayMd);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(6.5);
-    const productLabel = formData.productType === "ava_carte_sante" ? "AVA Carte Sante" : "AVA Tourist Card";
+    const productLabel = getProductLabel(formData.productType);
     const mentions = [
       "Ce document est un devis non contractuel etabli sur la base des informations fournies.",
       `L'assurance ${productLabel} est distribuee par FENUASIM, mandataire d'ANSET ASSURANCES.`,

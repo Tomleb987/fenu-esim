@@ -4,6 +4,15 @@ import { fr } from "date-fns/locale";
 import { AVA_TOURIST_OPTIONS } from "@/lib/ava_options";
 import { Download, FileText } from "lucide-react";
 
+interface SummaryStepProps {
+  formData: InsuranceFormData;
+  updateFormData: (data: Partial<InsuranceFormData>) => void;
+  errors: Record<string, string>;
+  quote: { premium: number } | null;
+  isLoadingQuote: boolean;
+  productType?: string;
+}
+
 // ── Mapping centralisé des libellés produit ──────────────────────────────────
 const PRODUCT_LABELS: Record<string, string> = {
   ava_tourist_card: "AVA Tourist Card",
@@ -14,15 +23,6 @@ const PRODUCT_LABELS: Record<string, string> = {
 
 const getProductLabel = (productType: string) =>
   PRODUCT_LABELS[productType] ?? "AVA Tourist Card";
-
-interface SummaryStepProps {
-  formData: InsuranceFormData;
-  updateFormData: (data: Partial<InsuranceFormData>) => void;
-  errors: Record<string, string>;
-  quote: { premium: number } | null;
-  isLoadingQuote: boolean;
-  productType?: string;
-}
 
 export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: SummaryStepProps) => {
 
@@ -44,29 +44,25 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
   const formatDate = (d: string) => {
     if (!d) return "--";
     try {
-      // Eviter le décalage timezone UTC → PF : parser manuellement YYYY-MM-DD
       const [year, month, day] = d.split("T")[0].split("-").map(Number);
       const date = new Date(year, month - 1, day);
       return format(date, 'dd MMM yyyy', { locale: fr });
     } catch { return d; }
   };
 
-  // Résolution des noms d'options
   const allOptions = AVA_TOURIST_OPTIONS.flatMap(opt => [
     opt,
     ...(opt.subOptions?.map(sub => ({ ...sub, type: 'select' as const })) || [])
   ]);
   const getOptionLabel = (id: string) => allOptions.find(o => o.id === id)?.label ?? `Option ${id}`;
 
-  // Génération du devis PDF côté client avec jsPDF
   const downloadDevis = async () => {
     const { jsPDF } = await import("jspdf");
     const doc = new jsPDF({ unit: "mm", format: "a4", compress: true });
 
-    // --- PALETTE ---
-    const purple1: [number,number,number] = [108, 43, 217];  // violet foncé
-    const purple2: [number,number,number] = [168, 85, 247];  // violet clair
-    const orange:  [number,number,number] = [249, 115, 22];  // orange
+    const purple1: [number,number,number] = [108, 43, 217];
+    const purple2: [number,number,number] = [168, 85, 247];
+    const orange:  [number,number,number] = [249, 115, 22];
     const grayDk:  [number,number,number] = [55,  65,  81];
     const grayMd:  [number,number,number] = [107, 114, 128];
     const grayLt:  [number,number,number] = [243, 244, 246];
@@ -77,13 +73,14 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
     const margin = 15;
     const colW = pageW - margin * 2;
 
-    // Charger logo une seule fois
+    // ── Label produit dynamique ──────────────────────────────────────────────
+    const productLabelPdf = getProductLabel(formData.productType);
+
     let logoBase64: string | null = null;
     try {
       const logoRes = await fetch("/logo.png");
       if (logoRes.ok) {
         const blob = await logoRes.blob();
-        // Charger dimensions réelles pour respecter le ratio
         const blobUrl = URL.createObjectURL(blob);
         await new Promise<void>((res) => {
           const img = new Image();
@@ -103,9 +100,7 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
       }
     } catch {}
 
-    // =============================================
-    // FILIGRANE (logo centré, très transparent)
-    // =============================================
+    // FILIGRANE
     if (logoBase64) {
       doc.saveGraphicsState();
       // @ts-ignore
@@ -118,23 +113,18 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
       doc.restoreGraphicsState();
     }
 
-    // =============================================
-    // EN-TÊTE : bande dégradée simulée (2 rects)
-    // =============================================
+    // EN-TÊTE
     doc.setFillColor(...purple1);
     doc.rect(0, 0, pageW * 0.6, 48, "F");
     doc.setFillColor(...purple2);
     doc.rect(pageW * 0.6, 0, pageW * 0.4, 48, "F");
-    // Bande orange fine en bas de l'entête
     doc.setFillColor(...orange);
     doc.rect(0, 46, pageW, 2, "F");
 
-    // Logo ou texte
     if (logoBase64) {
-      // Calcul ratio réel du logo
       const natW = (window as any)._logoNaturalW || 260;
       const natH = (window as any)._logoNaturalH || 80;
-      const logoH = 22; // hauteur cible dans l'entête
+      const logoH = 22;
       const logoW = (natW / natH) * logoH;
       doc.addImage(logoBase64, "PNG", margin, (48 - logoH) / 2, logoW, logoH);
     } else {
@@ -144,7 +134,6 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
       doc.text("FENUASIM", margin, 22);
     }
 
-    // Titre + date à droite
     doc.setTextColor(...white);
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
@@ -157,15 +146,12 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
 
     let y = 58;
 
-    // =============================================
-    // BANDEAU FORMULE
-    // =============================================
+    // BANDEAU FORMULE — ✅ dynamique
     doc.setFillColor(...grayLt);
     doc.roundedRect(margin, y, colW, 14, 3, 3, "F");
     doc.setTextColor(...purple1);
     doc.setFontSize(13);
     doc.setFont("helvetica", "bold");
-    const productLabelPdf = getProductLabel(formData.productType);
     doc.text(productLabelPdf, margin + 5, y + 9);
     doc.setTextColor(...grayMd);
     doc.setFontSize(8);
@@ -173,9 +159,6 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
     doc.text("Assurance voyage tout risques — Polynesie francaise", pageW - margin - 3, y + 9, { align: "right" });
     y += 20;
 
-    // =============================================
-    // HELPERS
-    // =============================================
     const sectionHeader = (title: string) => {
       doc.setFillColor(...purple1);
       doc.rect(margin, y, 3, 7, "F");
@@ -183,7 +166,6 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
       doc.setFontSize(8);
       doc.setFont("helvetica", "bold");
       doc.text(title, margin + 6, y + 5.5);
-      // ligne séparatrice
       doc.setDrawColor(...purple2);
       doc.setLineWidth(0.2);
       doc.line(margin + 6, y + 7, margin + colW, y + 7);
@@ -216,9 +198,6 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
       y += 8;
     };
 
-    // =============================================
-    // COLONNE GAUCHE + DROITE (2 colonnes)
-    // =============================================
     const col1X = margin;
     const col2X = margin + colW / 2 + 3;
     const colHalf = colW / 2 - 3;
@@ -261,9 +240,7 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
 
     y += 44;
 
-    // =============================================
     // VOYAGEURS SUPPLÉMENTAIRES
-    // =============================================
     if (formData.additionalTravelers.length > 0) {
       sectionHeader("VOYAGEURS SUPPLEMENTAIRES (" + formData.additionalTravelers.length + ")");
       formData.additionalTravelers.forEach((t, i) => {
@@ -272,9 +249,7 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
       y += 3;
     }
 
-    // =============================================
     // OPTIONS
-    // =============================================
     sectionHeader("OPTIONS SOUSCRITES");
     if (formData.selectedOptions.length > 0) {
       formData.selectedOptions.forEach(id => {
@@ -289,12 +264,9 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
     }
     y += 4;
 
-    // =============================================
-    // TOTAL — carte dégradée
-    // =============================================
+    // TOTAL
     doc.setFillColor(...purple1);
     doc.roundedRect(margin, y, colW, 22, 3, 3, "F");
-    // accent orange à droite
     doc.setFillColor(...orange);
     doc.roundedRect(margin + colW - 40, y, 40, 22, 3, 3, "F");
     doc.setFillColor(...orange);
@@ -315,23 +287,19 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
     const totalXpf = Math.round(totalEur * EUR_TO_XPF_LOCAL);
     const totalXpfStr = totalXpf.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 
-    // Ligne 1 : Prime AVA
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...white);
     doc.text("Prime d'assurance AVA", margin + 5, y + 10);
     doc.text(premiumEur.toFixed(2) + " EUR", pageW - margin - 5, y + 10, { align: "right" });
 
-    // Ligne 2 : Frais de distribution
     doc.text("Frais de distribution FENUASIM", margin + 5, y + 18);
     doc.text(FRAIS_DISTRIB_EUR.toFixed(2) + " EUR", pageW - margin - 5, y + 18, { align: "right" });
 
-    // Séparateur
     doc.setDrawColor(...orange);
     doc.setLineWidth(0.4);
     doc.line(margin + 5, y + 21, pageW - margin - 5, y + 21);
 
-    // Ligne 3 : Total
     doc.setFontSize(13);
     doc.setFont("helvetica", "bold");
     doc.text("TOTAL TTC", margin + 5, y + 28);
@@ -341,9 +309,7 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
     doc.text("~ " + totalXpfStr + " XPF", pageW - margin - 5, y + 35, { align: "right" });
     y += 45;
 
-    // =============================================
-    // MENTIONS LÉGALES — encart gris
-    // =============================================
+    // MENTIONS LÉGALES — ✅ productLabel dynamique
     doc.setFillColor(...grayLt);
     doc.roundedRect(margin, y, colW, 34, 2, 2, "F");
     doc.setTextColor(...purple1);
@@ -353,10 +319,9 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
     doc.setTextColor(...grayMd);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(6.5);
-    const productLabel = getProductLabel(formData.productType);
     const mentions = [
       "Ce document est un devis non contractuel etabli sur la base des informations fournies.",
-      `L'assurance ${productLabel} est distribuee par FENUASIM, mandataire d'ANSET ASSURANCES.`,
+      `L'assurance ${productLabelPdf} est distribuee par FENUASIM, mandataire d'ANSET ASSURANCES.`,
       "ANSET ASSURANCES - 5 avenue du Prince Hinoi, 98713 Papeete - Polynesie francaise.",
       "ANSET ASSURANCES - N° RUIA PF 26 010.",
       "FENUASIM - N° RUIA PF 26 012 - Mandataire d'intermediaire d'assurance.",
@@ -367,9 +332,7 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
     });
     y += 40;
 
-    // =============================================
     // PIED DE PAGE
-    // =============================================
     doc.setFillColor(...purple1);
     doc.rect(0, pageH - 12, pageW, 12, "F");
     doc.setFillColor(...orange);
@@ -379,15 +342,13 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
     doc.setFont("helvetica", "normal");
     doc.text("www.fenuasim.com", margin, pageH - 5);
     doc.text("contact@fenuasim.com", pageW / 2, pageH - 5, { align: "center" });
-    
 
     doc.save("Devis-Assurance-FENUASIM-" + format(new Date(), "ddMMyyyy") + ".pdf");
   };
 
-  // ─── Documents dynamiques selon produit et options ───────────────────────
+  // ─── Documents dynamiques selon produit ─────────────────────────────────
   const isCarteSante = (productType ?? formData.productType) === "ava_carte_sante";
 
-  // Documents contractuels : IPID + CG selon le produit
   const docs = isCarteSante
     ? [
         { name: "IPID – Carte Santé", file: "/documents/IPID-CARTE-SANTE.pdf", icon: "📄" },
@@ -398,6 +359,9 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
         { name: "Conditions Générales (CG)", file: "/documents/CG-AVA-TOURIST-CARD.pdf", icon: "📄" },
       ];
 
+  // Label produit pour l'UI
+  const productLabelUI = getProductLabel(productType ?? formData.productType);
+
   return (
     <div className="space-y-6 animate-in fade-in">
       <div className="text-center mb-6">
@@ -406,7 +370,7 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
           Vérifiez vos informations avant de payer.
         </p>
         <span className="inline-block mt-2 bg-primary/10 text-primary text-sm font-semibold px-4 py-1 rounded-full">
-          {isCarteSante ? "AVA Carte Santé" : "AVA Tourist Card"}
+          {productLabelUI}
         </span>
       </div>
 
@@ -495,17 +459,14 @@ export const SummaryStep = ({ formData, quote, isLoadingQuote, productType }: Su
             <span className="text-sm italic text-primary animate-pulse">Calcul en cours...</span>
           ) : (
             <>
-              {/* Ligne prime */}
               <div className="flex justify-between items-center text-sm text-gray-600">
                 <span>Prime d&apos;assurance AVA</span>
                 <span>{quote ? `${quote.premium.toFixed(2)} €` : "-- €"}</span>
               </div>
-              {/* Ligne frais */}
               <div className="flex justify-between items-center text-sm text-gray-600">
                 <span>Frais de distribution FENUASIM</span>
                 <span>10.00 €</span>
               </div>
-              {/* Séparateur */}
               <div className="border-t border-orange-300 pt-2">
                 <div className="flex justify-between items-center">
                   <span className="font-bold text-lg text-gray-900">Total TTC</span>

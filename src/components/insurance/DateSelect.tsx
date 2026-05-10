@@ -15,7 +15,10 @@ export function DateSelect({
   minYear = 1920,
   maxYear = new Date().getFullYear(),
 }: DateSelectProps) {
-  const [year, month, day] = value ? value.split("-") : ["", "", ""];
+  const parts = value ? value.split("-") : ["", "", ""];
+  const year  = parts[0] || "";
+  const month = parts[1] || "";
+  const day   = parts[2] || "";
 
   const days = useMemo(() => Array.from({ length: 31 }, (_, i) => i + 1), []);
   const months = useMemo(
@@ -40,23 +43,23 @@ export function DateSelect({
     [minYear, maxYear]
   );
 
-  const update = (d: string, m: string, y: string) => {
-    if (d && m && y) {
-      onChange(`${y}-${m}-${d.padStart(2, "0")}`);
-    } else {
-      onChange("");
+  const update = (newDay: string, newMonth: string, newYear: string) => {
+    // N'émettre une valeur complète que si les 3 champs sont remplis
+    if (newDay && newMonth && newYear) {
+      onChange(`${newYear}-${newMonth}-${newDay.padStart(2, "0")}`);
     }
+    // Sinon ne rien émettre — garder l'état local via les selects contrôlés
   };
 
-  const selectClass = `border border-gray-300 rounded-md px-2 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent ${className}`;
+  const hasError = !!className && className.includes("border-red");
+  const baseSelect = `border rounded-md px-2 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent ${hasError ? "border-red-400" : "border-gray-300"}`;
 
   return (
     <div className="flex gap-2">
-      {/* Jour */}
       <select
-        value={day || ""}
+        value={day}
         onChange={(e) => update(e.target.value, month, year)}
-        className={`${selectClass} w-20`}
+        className={`${baseSelect} w-20`}
       >
         <option value="">Jour</option>
         {days.map((d) => (
@@ -66,11 +69,10 @@ export function DateSelect({
         ))}
       </select>
 
-      {/* Mois */}
       <select
-        value={month || ""}
+        value={month}
         onChange={(e) => update(day, e.target.value, year)}
-        className={`${selectClass} flex-1`}
+        className={`${baseSelect} flex-1`}
       >
         <option value="">Mois</option>
         {months.map((m) => (
@@ -80,11 +82,10 @@ export function DateSelect({
         ))}
       </select>
 
-      {/* Année */}
       <select
-        value={year || ""}
+        value={year}
         onChange={(e) => update(day, month, e.target.value)}
-        className={`${selectClass} w-24`}
+        className={`${baseSelect} w-24`}
       >
         <option value="">Année</option>
         {years.map((y) => (

@@ -110,19 +110,18 @@ function buildTarificationPayload(data: any): URLSearchParams {
     }
   }
 
+  const childCompanions = companions.filter((c: any) => {
+    const birth = new Date(c.birthDate);
+    const age = new Date().getFullYear() - birth.getFullYear();
+    return age < 20;
+  });
+  const adultCompanions = companions.length - childCompanions.length;
   if (!isPOM) {
-    params.append('numberAdultCompanions', String(companions.length));
+    params.append('numberAdultCompanions', String(adultCompanions));
   }
 
-  if (productType === 'ava_carte_sante') {
-    const childCount = companions.filter((c: any) => {
-      const birth = new Date(c.birthDate);
-      const age = (new Date().getFullYear() - birth.getFullYear());
-      return age < 20;
-    }).length;
-    params.append('numberChildrenCompanions', String(childCount));
-  } else if (!isPOM) {
-    params.append('numberChildrenCompanions', "0");
+  if (!isPOM) {
+    params.append('numberChildrenCompanions', String(childCompanions.length));
   }
 
   // numberCompanions : requis pour ava_pass et avantages_360 uniquement

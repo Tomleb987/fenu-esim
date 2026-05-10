@@ -1,6 +1,7 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { InsuranceFormData } from "@/types/insurance";
+import { DateSelect } from "./DateSelect";
 
 interface Props {
   formData: InsuranceFormData;
@@ -9,7 +10,6 @@ interface Props {
   productType?: string;
 }
 
-// Calcule l'âge à partir d'une date ISO (YYYY-MM-DD)
 function getAge(birthDateStr: string): number | null {
   if (!birthDateStr) return null;
   const birth = new Date(birthDateStr);
@@ -64,7 +64,7 @@ export const PersonalInfoStep = ({ formData, updateFormData, errors, productType
             />
             {errors.lastName && <p className="text-red-500 text-xs mt-1">{errors.lastName}</p>}
           </div>
-          <div>
+          <div className="md:col-span-2">
             <Label>
               Date de naissance <span className="text-red-500">*</span>
               {AGE_MAX && (
@@ -78,20 +78,18 @@ export const PersonalInfoStep = ({ formData, updateFormData, errors, productType
                 </span>
               )}
             </Label>
-            <Input
-              type="date"
+            <DateSelect
               value={formData.birthDate}
-              onChange={e => updateFormData({ birthDate: e.target.value })}
+              onChange={(val) => updateFormData({ birthDate: val })}
+              maxYear={new Date().getFullYear() - 18}
               className={errors.birthDate || ageWarning ? "border-red-400" : ""}
             />
             {errors.birthDate && <p className="text-red-500 text-xs mt-1">{errors.birthDate}</p>}
-            {/* Alerte âge en temps réel */}
             {ageWarning && (
               <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
                 {ageWarning}
               </div>
             )}
-            {/* Confirmation âge valide */}
             {age !== null && !ageWarning && (
               <p className="text-green-600 text-xs mt-1">✓ {age} ans — éligible</p>
             )}

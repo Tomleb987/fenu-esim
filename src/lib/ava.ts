@@ -76,6 +76,7 @@ const toFrDate = (d: string | undefined | null) => {
 
 function buildTarificationPayload(data: any): URLSearchParams {
   const companions = data.companions || data.additionalTravelers || [];
+  console.log('👥 companions brut:', JSON.stringify(companions));
   const totalTravelers = 1 + companions.length;
   
   const totalTripCost = Number(data.tripCost) || 0;
@@ -156,6 +157,8 @@ function buildTarificationPayload(data: any): URLSearchParams {
       birthdate: toFrDate(c.birthDate) || "",
       parental_link: c.parental_link || "13"
   }));
+  console.log("👥 companionsInfos envoyé à AVA:", JSON.stringify(companionsInfos));
+  console.log('👥 companionsInfos envoyé à AVA:', JSON.stringify(companionsInfos));
   params.append('companionsInfos', JSON.stringify(companionsInfos));
 
   const optionsJson: any = {};

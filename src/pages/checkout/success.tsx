@@ -80,23 +80,24 @@ export default function SuccessPage() {
           .from("airalo_orders")
           .select("*")
           .eq("package_id", orderData.package_id)
-          .eq("email", orderData.email)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
 
-        if (esimError) console.error("airalo_orders fetch error:", esimError);
-
-        const { data: packageData, error: packageError } = await supabase
-          .from("airalo_packages")
-          .select("*")
-          .eq("id", esimData.package_id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        // Protection contre esimData null
+        let packageData = null;
+        if (esimData?.package_id) {
+          const { data: pkgData } = await supabase
+            .from("airalo_packages")
+            .select("*")
+            .eq("id", esimData.package_id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          packageData = pkgData;
+        }
 
         setPackageData(packageData);
-        if (packageError) throw packageError;
         setOrderDetails({ ...orderData, esim: esimData || null });
         setOrderStatus("success");
       } catch (error) {
@@ -128,7 +129,7 @@ export default function SuccessPage() {
         dataUnit: isUnlimited ? "" : (orderDetails.data_unit || packageData?.data_unit || "GB"),
         validityDays: orderDetails.validity,
         qrCodeUrl: orderDetails.esim.qr_code_url,
-        sharingLink,       // présent si getEsimData a réussi, undefined sinon — les deux cas sont gérés
+        sharingLink,
         sharingLinkCode,
       };
 
@@ -150,9 +151,7 @@ export default function SuccessPage() {
     }
   };
 
-  // ✅ FIX : on n'attend plus sharingLink/sharingLinkCode pour envoyer l'email
-  // On attend juste que isLoading soit false (getEsimData terminé, succès ou échec)
-  // L'email part avec les liens s'ils sont disponibles, sans eux sinon
+  // ✅ FIX email : part dès que isLoading=false, avec ou sans sharingLink
   useEffect(() => {
     if (
       orderStatus === "success" &&

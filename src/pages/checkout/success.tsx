@@ -64,8 +64,7 @@ export default function SuccessPage() {
           body: JSON.stringify({ session_id })
         });
         const stripeData = await stripeResponse.json();
-        console.log("[success] stripeData:", JSON.stringify(stripeData));
-        if (!stripeData.paid) { console.log("[success] NOT PAID"); return setOrderStatus("error"); }
+        if (!stripeData.paid) return setOrderStatus("error");
 
         const { data: orderData, error: orderError } = await supabase
           .from("orders")
@@ -77,21 +76,15 @@ export default function SuccessPage() {
 
         if (orderError || !orderData) return setOrderStatus("error");
 
-        // Retry jusqu'à 5x avec délai de 2s — le webhook peut être plus lent que la redirection
-        let esimData = null;
-        for (let attempt = 0; attempt < 5; attempt++) {
-          const { data, error: esimError } = await supabase
-            .from("airalo_orders")
-            .select("*")
-            .eq("package_id", orderData.package_id)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          if (esimError) console.error("airalo_orders fetch error:", esimError);
-          if (data) { esimData = data; break; }
-          if (attempt < 4) await new Promise(r => setTimeout(r, 2000));
-        }
+        const { data: esimData, error: esimError } = await supabase
+          .from("airalo_orders")
+          .select("*")
+          .eq("package_id", orderData.package_id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
+        // Protection contre esimData null
         let packageData = null;
         if (esimData?.package_id) {
           const { data: pkgData } = await supabase
@@ -136,7 +129,7 @@ export default function SuccessPage() {
         dataUnit: isUnlimited ? "" : (orderDetails.data_unit || packageData?.data_unit || "GB"),
         validityDays: orderDetails.validity,
         qrCodeUrl: orderDetails.esim.qr_code_url,
-        sharingLink,       // présent si getEsimData a réussi, undefined sinon — les deux cas sont gérés
+        sharingLink,
         sharingLinkCode,
       };
 
@@ -158,9 +151,7 @@ export default function SuccessPage() {
     }
   };
 
-  // ✅ FIX : on n'attend plus sharingLink/sharingLinkCode pour envoyer l'email
-  // On attend juste que isLoading soit false (getEsimData terminé, succès ou échec)
-  // L'email part avec les liens s'ils sont disponibles, sans eux sinon
+  // ✅ FIX email : part dès que isLoading=false, avec ou sans sharingLink
   useEffect(() => {
     if (
       orderStatus === "success" &&

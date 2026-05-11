@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { InsuranceFormData } from "@/types/insurance";
+import { DateSelect } from "./DateSelect";
 
 interface Props {
   formData: InsuranceFormData;
@@ -10,7 +11,6 @@ interface Props {
 }
 
 export const TravelersStep = ({ formData, updateFormData }: Props) => {
-  // Ajouter un voyageur avec des champs vides
   const addTraveler = () => {
     updateFormData({
       additionalTravelers: [
@@ -20,15 +20,11 @@ export const TravelersStep = ({ formData, updateFormData }: Props) => {
     });
   };
 
-  // Supprimer un voyageur spécifique
   const removeTraveler = (index: number) => {
-    const newTravelers = formData.additionalTravelers.filter(
-      (_, i) => i !== index
-    );
+    const newTravelers = formData.additionalTravelers.filter((_, i) => i !== index);
     updateFormData({ additionalTravelers: newTravelers });
   };
 
-  // Mettre à jour un champ spécifique d'un voyageur
   const updateTraveler = (
     index: number,
     field: "firstName" | "lastName" | "birthDate" | "parental_link",
@@ -54,10 +50,8 @@ export const TravelersStep = ({ formData, updateFormData }: Props) => {
             key={index}
             className="p-4 border rounded-lg bg-gray-50/50 space-y-4 relative transition-all hover:border-primary/30"
           >
-            {/* En-tête de la carte Voyageur */}
             <div className="flex justify-between items-center mb-2 pb-2 border-b border-gray-200">
               <span className="text-sm font-bold flex items-center text-primary">
-                {/* Petit avatar texte à la place de l'icône */}
                 <span className="inline-flex items-center justify-center w-6 h-6 rounded-full border mr-2 text-xs">
                   {index + 1}
                 </span>
@@ -73,8 +67,8 @@ export const TravelersStep = ({ formData, updateFormData }: Props) => {
               </Button>
             </div>
 
-            {/* Ligne 1 : Prénom + Nom + Date de naissance */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Prénom + Nom */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="text-xs uppercase font-semibold text-muted-foreground">
                   Prénom *
@@ -86,7 +80,6 @@ export const TravelersStep = ({ formData, updateFormData }: Props) => {
                   className="bg-white"
                 />
               </div>
-
               <div className="space-y-2">
                 <Label className="text-xs uppercase font-semibold text-muted-foreground">
                   Nom *
@@ -98,22 +91,23 @@ export const TravelersStep = ({ formData, updateFormData }: Props) => {
                   className="bg-white"
                 />
               </div>
-
-              <div className="space-y-2">
-                <Label className="text-xs uppercase font-semibold text-muted-foreground">
-                  Date de naissance *
-                </Label>
-                <Input
-                  type="date"
-                  value={traveler.birthDate}
-                  onChange={(e) => updateTraveler(index, "birthDate", e.target.value)}
-                  className="bg-white"
-                />
-              </div>
             </div>
 
-            {/* Ligne 2 : Lien de parenté */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+            {/* Date de naissance */}
+            <div className="space-y-2">
+              <Label className="text-xs uppercase font-semibold text-muted-foreground">
+                Date de naissance *
+              </Label>
+              <DateSelect
+                value={traveler.birthDate}
+                onChange={(val) => updateTraveler(index, "birthDate", val)}
+                maxYear={new Date().getFullYear()}
+                minYear={1920}
+              />
+            </div>
+
+            {/* Lien de parenté */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="text-xs uppercase font-semibold text-muted-foreground">
                   Lien avec l'assuré principal *
@@ -136,7 +130,6 @@ export const TravelersStep = ({ formData, updateFormData }: Props) => {
           </div>
         ))}
 
-        {/* Message si aucun voyageur */}
         {formData.additionalTravelers.length === 0 && (
           <div className="text-center py-8 border-2 border-dashed rounded-lg text-muted-foreground bg-muted/10">
             <p>Vous voyagez seul ? Cliquez sur &quot;Continuer&quot;.</p>
@@ -146,7 +139,6 @@ export const TravelersStep = ({ formData, updateFormData }: Props) => {
           </div>
         )}
 
-        {/* Bouton d'ajout */}
         <Button
           variant="outline"
           onClick={addTraveler}

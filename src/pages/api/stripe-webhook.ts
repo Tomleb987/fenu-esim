@@ -412,6 +412,32 @@ export default async function handler(
           throw new Error(`Failed to save user esim to database: ${userEsimsError.message}`);
         }
         console.log("User Esims: ", userEsims);
+
+        // ── Email QR code client — non bloquant
+        try {
+          const qrCodeUrl = airaloOrderData.order?.qr_code_url || "";
+          if (qrCodeUrl && customerEmail) {
+            await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/send-esim-email`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                email: customerEmail,
+                customerName: session.customer_details?.name || "Client",
+                packageName: packageData.name,
+                destinationName: packageData.region_fr || packageData.region || packageData.name,
+                dataAmount: String(packageData.data_amount),
+                dataUnit: packageData.data_unit,
+                validityDays: parseInt(packageData.validity.toString(), 10),
+                qrCodeUrl,
+                sharingLink: null,
+                sharingLinkCode: null,
+              }),
+            });
+            console.log("[webhook] Email QR code envoye a " + customerEmail);
+          }
+        } catch (emailErr) {
+          console.error("[webhook] Email client non envoye (non bloquant):", emailErr);
+        }
       }
 
       if (promo_code) {

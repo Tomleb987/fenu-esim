@@ -76,15 +76,20 @@ export default function SuccessPage() {
 
         if (orderError || !orderData) return setOrderStatus("error");
 
-        const { data: esimData, error: esimError } = await supabase
-          .from("airalo_orders")
-          .select("*")
-          .eq("package_id", orderData.package_id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (esimError) console.error("airalo_orders fetch error:", esimError);
+        // Retry jusqu'à 5x avec délai de 2s — le webhook peut être plus lent que la redirection
+        let esimData = null;
+        for (let attempt = 0; attempt < 5; attempt++) {
+          const { data, error: esimError } = await supabase
+            .from("airalo_orders")
+            .select("*")
+            .eq("package_id", orderData.package_id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (esimError) console.error("airalo_orders fetch error:", esimError);
+          if (data) { esimData = data; break; }
+          if (attempt < 4) await new Promise(r => setTimeout(r, 2000));
+        }
 
         let packageData = null;
         if (esimData?.package_id) {

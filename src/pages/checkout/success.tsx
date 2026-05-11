@@ -64,7 +64,8 @@ export default function SuccessPage() {
           body: JSON.stringify({ session_id })
         });
         const stripeData = await stripeResponse.json();
-        if (!stripeData.paid) return setOrderStatus("error");
+        console.log("[success] stripeData:", JSON.stringify(stripeData));
+        if (!stripeData.paid) { console.log("[success] NOT PAID"); return setOrderStatus("error"); }
 
         const { data: orderData, error: orderError } = await supabase
           .from("orders")

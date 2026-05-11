@@ -80,7 +80,6 @@ export default function SuccessPage() {
           .from("airalo_orders")
           .select("*")
           .eq("package_id", orderData.package_id)
-          .eq("email", orderData.email)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();

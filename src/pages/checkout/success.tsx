@@ -67,14 +67,6 @@ export default function SuccessPage() {
         console.log("[success] stripeData.paid:", stripeData.paid);
         if (!stripeData.paid) return setOrderStatus("error");
 
-        const { data: orderData, error: orderError } = await supabase
-          .from("orders")
-          .select("*")
-          .eq("stripe_session_id", session_id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
         // Retry jusqu'à 5x — race condition entre webhook et page success
         let orderData = null;
         let orderError = null;
@@ -88,7 +80,7 @@ export default function SuccessPage() {
             .maybeSingle();
           orderData = data;
           orderError = error;
-          console.log("[success] attempt", attempt, "orderData:", data, "orderError:", error);
+          console.log("[success] attempt", attempt, "orderData:", !!data, "orderError:", error);
           if (data) break;
           if (attempt < 4) await new Promise(r => setTimeout(r, 2000));
         }

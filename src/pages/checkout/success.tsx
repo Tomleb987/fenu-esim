@@ -64,6 +64,7 @@ export default function SuccessPage() {
           body: JSON.stringify({ session_id })
         });
         const stripeData = await stripeResponse.json();
+        console.log("[success] stripeData.paid:", stripeData.paid);
         if (!stripeData.paid) return setOrderStatus("error");
 
         const { data: orderData, error: orderError } = await supabase
@@ -74,6 +75,7 @@ export default function SuccessPage() {
           .limit(1)
           .maybeSingle();
 
+        console.log("[success] orderData:", orderData, "orderError:", orderError);
         if (orderError || !orderData) return setOrderStatus("error");
 
         const { data: esimData, error: esimError } = await supabase
@@ -97,6 +99,7 @@ export default function SuccessPage() {
           packageData = pkgData;
         }
 
+        console.log("[success] esimData:", esimData, "packageData:", packageData);
         setPackageData(packageData);
         setOrderDetails({ ...orderData, esim: esimData || null });
         setOrderStatus("success");

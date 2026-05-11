@@ -86,16 +86,19 @@ export default function SuccessPage() {
 
         if (esimError) console.error("airalo_orders fetch error:", esimError);
 
-        const { data: packageData, error: packageError } = await supabase
-          .from("airalo_packages")
-          .select("*")
-          .eq("id", esimData.package_id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        let packageData = null;
+        if (esimData?.package_id) {
+          const { data: pkgData } = await supabase
+            .from("airalo_packages")
+            .select("*")
+            .eq("id", esimData.package_id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          packageData = pkgData;
+        }
 
         setPackageData(packageData);
-        if (packageError) throw packageError;
         setOrderDetails({ ...orderData, esim: esimData || null });
         setOrderStatus("success");
       } catch (error) {

@@ -70,7 +70,7 @@ export default function SuccessPage() {
         // Retry jusqu'à 5x — race condition entre webhook et page success
         let orderData = null;
         let orderError = null;
-        for (let attempt = 0; attempt < 5; attempt++) {
+        for (let attempt = 0; attempt < 30; attempt++) {
           const { data, error } = await supabase
             .from("orders")
             .select("*")
@@ -82,7 +82,7 @@ export default function SuccessPage() {
           orderError = error;
           console.log("[success] attempt", attempt, "orderData:", !!data, "orderError:", error);
           if (data) break;
-          if (attempt < 4) await new Promise(r => setTimeout(r, 2000));
+          if (attempt < 29) await new Promise(r => setTimeout(r, 3000));
         }
         if (orderError || !orderData) return setOrderStatus("error");
 

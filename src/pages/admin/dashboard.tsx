@@ -305,7 +305,7 @@ function KpiCard({ label, value, sub, badge, warn, accent }: { label: string; va
 }
 
 function CostsImportSection({ onDone }: { onDone: () => void }) {
-  const [usdRate, setUsdRate] = useState("0.92");
+  const [usdRate, setUsdRate] = useState("0.852");
   const [result, setResult]   = useState<any>(null);
   const [loading, setLoading] = useState(false);
 

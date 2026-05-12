@@ -295,6 +295,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         );
 
       if (upsertErr) {
+        console.log("[stripe-import] upsert error:", chargeId, upsertErr.message);
         errors.push(`${chargeId}: ${upsertErr.message}`);
         continue;
       }

@@ -265,6 +265,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const chargeId = row["id"] ?? "";
       if (!chargeId.startsWith("ch_")) continue;
 
+      console.log("[row]", chargeId.slice(0,10), "status:", row["Status"], "keys:", Object.keys(row).length);
       if (row["Status"]?.toLowerCase() !== "paid") continue;
 
       const amountRaw = parseAmount(row["Amount"] ?? "0");

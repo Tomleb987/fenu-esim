@@ -24,14 +24,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
   if (authError || !user) return res.status(401).json({ error: "Token invalide" });
 
-  const { data: partner, error: partnerError } = await supabaseAdmin
-    .from("partner_profiles")
-    .select("id, partner_code, advisor_name, promo_code, is_active")
-    .eq("email", user.email)
-    .single();
+  // ── Admin (@fenuasim.com) bypass la vérification partenaire
+  const isAdmin = user.email?.endsWith("@fenuasim.com") ?? false;
 
-  if (partnerError || !partner || !partner.is_active)
-    return res.status(403).json({ error: "Compte partenaire introuvable ou inactif" });
+  let partner: { id: string; partner_code: string; advisor_name: string; promo_code: string | null; is_active: boolean } | null = null;
+
+  if (!isAdmin) {
+    const { data, error: partnerError } = await supabaseAdmin
+      .from("partner_profiles")
+      .select("id, partner_code, advisor_name, promo_code, is_active")
+      .eq("email", user.email)
+      .single();
+
+    if (partnerError || !data || !data.is_active)
+      return res.status(403).json({ error: "Compte partenaire introuvable ou inactif" });
+
+    partner = data;
+  }
 
   const { quoteData, clientEmail, clientNote, packageId } = req.body;
 
@@ -39,6 +48,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // CAS 1 : Flux eSIM partenaire (packageId présent)
   // ══════════════════════════════════════════════════
   if (packageId) {
+    if (!partner) return res.status(403).json({ error: "Accès réservé aux partenaires pour les commandes eSIM" });
     const { clientFirstName, clientLastName, clientPhone, destination, sellerName } = req.body;
 
     if (!clientFirstName || !clientLastName || !clientEmail)

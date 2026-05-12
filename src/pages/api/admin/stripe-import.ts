@@ -50,7 +50,7 @@ function parseLine(line: string): string[] {
   for (const char of line) {
     if (char === '"') {
       inQuotes = !inQuotes;
-    } else if (char === "," && !inQuotes) {
+    } else if ((char === "," || char === ";") && !inQuotes) {
       result.push(current);
       current = "";
     } else {

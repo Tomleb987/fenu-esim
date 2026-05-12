@@ -254,6 +254,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const errors: string[] = [];
 
   const rows = parseCSV(csv);
+  console.log("[stripe-import] rows:", rows.length, "first row keys:", rows[0] ? Object.keys(rows[0]).slice(0,5) : []);
 
   if (rows.length === 0) {
     return res.status(400).json({ error: "CSV vide ou format invalide" });

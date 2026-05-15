@@ -139,7 +139,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         body: JSON.stringify({
           sender: { name: "FENUA SIM", email: "hello@fenuasim.com" },
           to: [{ email: target.email, name }],
-          bcc: [{ email: "clients@fenua-sim.odoo.com" }],
           replyTo: { email: "hello@fenuasim.com", name: "FENUA SIM" },
           subject: `🌺 Votre voyage à ${destination} — Êtes-vous bien assuré ?`,
           htmlContent: html,

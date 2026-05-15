@@ -109,8 +109,9 @@ export default function AdminAssurance() {
   }, []);
 
   const loadOrders = async () => {
-    const { data } = await supabase.from("insurances").select("id, user_email, subscriber_first_name, subscriber_last_name, product_type, adhesion_number, contract_number, premium_ava, total_amount, status, start_date, end_date, contract_link, attestation_url, created_at").order("created_at", { ascending: false }).limit(100);
-    if (data) setOrders(data as InsuranceOrder[]);
+    const res = await fetch("/api/admin/get-insurances");
+    const data = await res.json();
+    if (Array.isArray(data)) setOrders(data as InsuranceOrder[]);
   };
 
   const exportCSV = () => {

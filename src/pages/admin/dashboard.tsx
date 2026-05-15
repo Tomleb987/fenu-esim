@@ -889,7 +889,6 @@ function VueStock({ stock, loading }: { stock: any[]; loading: boolean }) {
   );
 }
 
-// ── PAGE PRINCIPALE ────────────────────────────────────────────
 function VueConversations() {
   const [conversations, setConversations] = useState<any[]>([]);
   const [selected, setSelected] = useState<string | null>(null);

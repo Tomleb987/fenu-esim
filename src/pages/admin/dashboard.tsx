@@ -889,10 +889,11 @@ function VueStock({ stock, loading }: { stock: any[]; loading: boolean }) {
   );
 }
 
+
 function VueConversations() {
-  const [conversations, setConversations] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<any[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
-  const [messages, setMessages] = useState<any[]>([]);
+  const [msgs, setMsgs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -902,83 +903,63 @@ function VueConversations() {
       .order("created_at", { ascending: false })
       .then(({ data }) => {
         if (!data) return;
-        const sessions: Record<string, any> = {};
+        const map: Record<string, any> = {};
         data.forEach((r: any) => {
-          if (!sessions[r.session_id]) {
-            sessions[r.session_id] = {
-              session_id: r.session_id,
-              zone: r.zone,
-              created_at: r.created_at,
-              lead_detected: r.lead_detected,
-              count: 0,
-            };
-          }
-          sessions[r.session_id].count++;
-          if (r.lead_detected) sessions[r.session_id].lead_detected = true;
+          if (!map[r.session_id]) map[r.session_id] = { ...r, count: 0 };
+          map[r.session_id].count++;
+          if (r.lead_detected) map[r.session_id].lead_detected = true;
         });
-        setConversations(Object.values(sessions).sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+        setSessions(Object.values(map).sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
         setLoading(false);
       });
   }, []);
 
-  const loadMessages = async (sessionId: string) => {
-    setSelected(sessionId);
+  const loadMsgs = async (sid: string) => {
+    setSelected(sid);
     const { data } = await supabase
       .from("chat_conversations")
       .select("role, content, created_at")
-      .eq("session_id", sessionId)
+      .eq("session_id", sid)
       .order("created_at", { ascending: true });
-    setMessages(data || []);
+    setMsgs(data || []);
   };
 
-  if (loading) return <div className="flex justify-center py-8"><div className="w-7 h-7 border-2 border-purple-200 border-t-purple-600 rounded-full animate-spin" /></div>;
+  if (loading) return <Spinner />;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-50">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Sessions ({conversations.length})</p>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Sessions ({sessions.length})</p>
         </div>
-        <div className="divide-y divide-gray-50 max-h-[600px] overflow-y-auto">
-          {conversations.map((c: any) => (
-            <button key={c.session_id} onClick={() => loadMessages(c.session_id)}
-              className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors ${selected === c.session_id ? "bg-purple-50" : ""}`}>
+        <div className="divide-y divide-gray-50 max-h-96 overflow-y-auto">
+          {sessions.map((s: any) => (
+            <button key={s.session_id} onClick={() => loadMsgs(s.session_id)}
+              className={"w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors " + (selected === s.session_id ? "bg-purple-50" : "")}>
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-medium text-gray-700">{c.zone || "inconnu"}</span>
-                {c.lead_detected && <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-medium">🔥 Lead</span>}
+                <span className="text-xs font-medium text-gray-700">{s.zone || "inconnu"}</span>
+                {s.lead_detected && <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full">🔥 Lead</span>}
               </div>
-              <p className="text-xs text-gray-400">{new Date(c.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{c.count} messages</p>
+              <p className="text-xs text-gray-400">{new Date(s.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
+              <p className="text-xs text-gray-400 mt-0.5">{s.count} messages</p>
             </button>
           ))}
         </div>
       </div>
-
       <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         {!selected ? (
-          <div className="flex items-center justify-center h-full text-sm text-gray-400 py-20">
-            Sélectionne une conversation
-          </div>
+          <div className="flex items-center justify-center h-full text-sm text-gray-400 py-20">Sélectionne une conversation</div>
         ) : (
-          <>
-            <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Conversation</p>
-              <p className="text-xs text-gray-400">{selected}</p>
-            </div>
-            <div className="p-4 space-y-3 max-h-[600px] overflow-y-auto">
-              {messages.map((m: any, i: number) => (
-                <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm ${m.role === "user" ? "bg-purple-600 text-white rounded-br-none" : "bg-gray-100 text-gray-800 rounded-bl-none"}`}>
-                    <div dangerouslySetInnerHTML={{ __html: m.content.replace(/
-/g, "<br>") }} />
-                    <p className={`text-xs mt-1 ${m.role === "user" ? "text-purple-200" : "text-gray-400"}`}>
-                      {new Date(m.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
-                    </p>
-                  </div>
+          <div className="p-4 space-y-3 max-h-96 overflow-y-auto">
+            {msgs.map((m: any, i: number) => (
+              <div key={i} className={"flex " + (m.role === "user" ? "justify-end" : "justify-start")}>
+                <div className={"max-w-xs rounded-2xl px-4 py-2 text-sm " + (m.role === "user" ? "bg-purple-600 text-white rounded-br-none" : "bg-gray-100 text-gray-800 rounded-bl-none")}>
+                  <p>{m.content}</p>
+                  <p className={"text-xs mt-1 " + (m.role === "user" ? "text-purple-200" : "text-gray-400")}>{new Date(m.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</p>
                 </div>
-              ))}
-            </div>
-          </>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>
@@ -1149,6 +1130,178 @@ export default function AdminDashboard() {
           {activeTab === "bordereaux"  && <VueBordereaux anset={anset} loading={loading} onGeneratePdf={handleGenerateBordereau} onMarkPaid={handleMarkAnsetPaid} />}
           {activeTab === "stock"       && <VueStock stock={stock} loading={loading} />}
           {activeTab === "conversations" && <VueConversations />}
+
+          <p className="text-xs text-gray-300 text-center mt-10 mb-4">FENUASIM · Dashboard interne · {new Date().getFullYear()}</p>
+        </div>
+      </div>
+    </>
+  );
+}
+
+AdminDashboard.getLayout = (page: ReactElement) => pageexport default function AdminDashboard() {
+  const router = useRouter();
+  const [authChecked, setAuthChecked] = useState(false);
+  const [periodKey,   setPeriodKey]   = useState("auj");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd,   setCustomEnd]   = useState("");
+  const [showCustom,  setShowCustom]  = useState(false);
+  const [activeTab,   setActiveTab]   = useState<"global" | "partenaires" | "bordereaux" | "stock" | "conversations">("global");
+
+  const period = showCustom && customStart && customEnd ? { start: customStart, end: customEnd } : getPeriod(periodKey);
+  const { kpis, monthly, partners, anset, stock, expiringEsims, loading, error, reload } = useDashboard(period);
+
+  useEffect(() => {
+    if (!router.isReady) return;
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session || !isAdmin(session.user?.email)) router.push("/admin/login");
+      else setAuthChecked(true);
+    });
+  }, [router.isReady]);
+
+  const handleGenerateBordereau = async (p: string) => {
+    const res = await fetch("/api/admin/anset-bordereau", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ period: p }) });
+    if (!res.ok) { const e = await res.json(); alert(`Erreur : ${e.error}`); return; }
+    const blob = await res.blob(); const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = `bordereau-anset-${p}.pdf`; a.click(); URL.revokeObjectURL(url);
+  };
+
+  const handleMarkAnsetPaid = async (p: string) => {
+    const ref = prompt("Référence du virement ANSET :"); if (!ref) return;
+    const res  = await fetch("/api/admin/bordereaux", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "mark_anset_paid", period: p, reference: ref }) });
+    const data = await res.json();
+    if (data.success) { alert(`✅ Reversement ${p} marqué payé`); reload(); } else alert(`Erreur : ${data.error}`);
+  };
+
+  // ── CORRIGÉ : envoie la plage complète au lieu du mois seul ──
+  const handleGenerateCommissionPdf = async (partnerCode: string) => {
+    const res = await fetch("/api/admin/commission-pdf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        partner_code: partnerCode,
+        date_start: period.start,
+        date_end: period.end,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      alert(`Erreur PDF commission : ${err.error}`);
+      return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `commission-${partnerCode}-${period.start.slice(0, 7)}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleMarkCommissionPaid = async (partnerCode: string) => {
+    const ref = prompt(`Référence du virement pour ${partners.find(p => p.partner_code === partnerCode)?.partner_name} :`); if (!ref) return;
+    const res  = await fetch("/api/admin/bordereaux", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "mark_commission_paid", partner_code: partnerCode, period: period.start.slice(0, 7), reference: ref }) });
+    const data = await res.json();
+    if (data.success) { alert(`✅ Commission marquée payée`); reload(); } else alert(`Erreur : ${data.error}`);
+  };
+
+  if (!authChecked) return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="w-8 h-8 border-2 border-purple-200 border-t-purple-600 rounded-full animate-spin" />
+    </div>
+  );
+
+  const PERIODS = [{ key: "auj", label: "Auj." }, { key: "7j", label: "7j" }, { key: "30j", label: "30j" }, { key: "3m", label: "3 mois" }, { key: "ytd", label: "YTD" }];
+  const TABS = [
+    { key: "global",      label: "Vue globale",  icon: BarChart2 },
+    { key: "partenaires", label: "Partenaires",  icon: Users },
+    { key: "bordereaux",  label: "Bordereaux",   icon: FileText, badge: anset.filter(s => s.status !== "paid").length },
+    { key: "stock",       label: "Stock",        icon: Package },
+    { key: "conversations", label: "Conversations", icon: MessageCircle },
+  ] as const;
+
+  const urgentAlerts = [
+    kpis && kpis.insurance.pending_count > 0 && `${kpis.insurance.pending_count} reversement(s) ANSET en attente`,
+    expiringEsims.length > 0 && `${expiringEsims.length} eSIM(s) expirent dans 3 jours`,
+  ].filter(Boolean);
+
+  return (
+    <>
+      <Head><title>Dashboard — FENUA SIM</title><meta name="robots" content="noindex" /></Head>
+      <div className="min-h-screen bg-gray-50">
+        <div className="bg-white border-b border-gray-100 shadow-sm sticky top-0 z-30">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6">
+            <div className="flex items-center justify-between h-14 gap-4">
+              <div className="flex items-center gap-2.5 shrink-0">
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: G }}>
+                  <TrendingUp size={15} className="text-white" />
+                </div>
+                <div className="hidden sm:block">
+                  <span className="text-sm font-bold" style={{ background: G, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>FENUA</span>
+                  <span className="text-sm font-bold text-gray-400 mx-1">·</span>
+                  <span className="text-sm font-bold text-gray-600">Pilotage</span>
+                </div>
+              </div>
+
+              {urgentAlerts.length > 0 && (
+                <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-xl">
+                  <AlertTriangle size={12} className="text-amber-500 shrink-0" />
+                  <span className="text-xs text-amber-700">{urgentAlerts.join(" · ")}</span>
+                </div>
+              )}
+
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+                  {PERIODS.map(t => (
+                    <button key={t.key} onClick={() => { setPeriodKey(t.key); setShowCustom(false); }}
+                      className={`text-xs px-2.5 py-1.5 rounded-lg font-medium transition-all whitespace-nowrap ${periodKey === t.key && !showCustom ? "text-white shadow-sm" : "text-gray-500 hover:text-gray-800"}`}
+                      style={periodKey === t.key && !showCustom ? { background: G } : {}}>{t.label}</button>
+                  ))}
+                </div>
+                <button onClick={() => setShowCustom(!showCustom)} className={`flex items-center gap-1 text-xs px-2.5 py-2 border rounded-xl ${showCustom ? "bg-purple-50 border-purple-200 text-purple-700" : "bg-white border-gray-200 text-gray-500"}`}>
+                  <Calendar size={11} />
+                </button>
+                <button onClick={reload} className="flex items-center gap-1 text-xs px-2.5 py-2 border border-gray-200 rounded-xl bg-white text-gray-500">
+                  <RefreshCw size={11} className={loading ? "animate-spin" : ""} />
+                </button>
+                <button onClick={() => supabase.auth.signOut().then(() => router.push("/admin/login"))}
+                  className="flex items-center gap-1 text-xs px-2.5 py-2 border border-gray-200 rounded-xl bg-white text-gray-400 hover:text-red-500">
+                  <LogOut size={11} />
+                </button>
+              </div>
+            </div>
+
+            {showCustom && (
+              <div className="flex items-center gap-3 pb-3 flex-wrap">
+                <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="text-xs px-2 py-1.5 border border-gray-200 rounded-lg text-gray-700 bg-white" />
+                <span className="text-xs text-gray-400">→</span>
+                <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="text-xs px-2 py-1.5 border border-gray-200 rounded-lg text-gray-700 bg-white" />
+                {customStart && customEnd && <span className="text-xs text-purple-600 font-medium">{Math.round((new Date(customEnd).getTime() - new Date(customStart).getTime()) / 86400000) + 1} jours</span>}
+              </div>
+            )}
+
+            <div className="flex gap-1 -mb-px">
+              {TABS.map(t => (
+                <button key={t.key} onClick={() => setActiveTab(t.key as any)}
+                  className={`flex items-center gap-1.5 text-xs px-4 py-3 border-b-2 font-medium transition-all whitespace-nowrap ${activeTab === t.key ? "border-purple-600 text-purple-700" : "border-transparent text-gray-400 hover:text-gray-600"}`}>
+                  <t.icon size={13} />
+                  {t.label}
+                  {t.badge && t.badge > 0 && (
+                    <span className="bg-amber-100 text-amber-700 text-xs px-1.5 py-0.5 rounded-full font-bold">{t.badge}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+          {error && <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4 text-sm text-red-700">⚠️ {error}</div>}
+
+          {activeTab === "global"      && <VueGlobale kpis={kpis} monthly={monthly} loading={loading} expiringEsims={expiringEsims} />}
+          {activeTab === "partenaires" && <VuePartenaires partners={partners} loading={loading} onGeneratePdf={handleGenerateCommissionPdf} onMarkPaid={handleMarkCommissionPaid} />}
+          {activeTab === "bordereaux"  && <VueBordereaux anset={anset} loading={loading} onGeneratePdf={handleGenerateBordereau} onMarkPaid={handleMarkAnsetPaid} />}
+          {activeTab === "stock"       && <VueStock stock={stock} loading={loading} />}
+
 
           <p className="text-xs text-gray-300 text-center mt-10 mb-4">FENUASIM · Dashboard interne · {new Date().getFullYear()}</p>
         </div>

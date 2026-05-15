@@ -57,7 +57,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: "Messages invalides" });
   }
 
-  const { systemPrompt } = await import("../../app/api/assistant/systemPrompt");
+  const { systemPrompt } = await import("../../lib/systemPrompt");
 
   const result = streamText({
     model: anthropic("claude-haiku-4-5-20251001"),

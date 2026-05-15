@@ -12,8 +12,10 @@ export default function ChatWidget() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // --- CONFIGURATION DU CHAT ---
+  const sessionId = typeof window !== "undefined" ? (sessionStorage.getItem("chat_session") || (() => { const id = Math.random().toString(36).slice(2); sessionStorage.setItem("chat_session", id); return id; })()) : "";
   const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
     api: "/api/assistant",
+    body: { sessionId, zone },
     onError: (err) => console.error("Erreur Chat:", err),
     
     // ✅ MESSAGE D'ACCUEIL PERSONNALISÉ

@@ -52,12 +52,22 @@ export const config = { api: { bodyParser: true } };
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).end();
 
-  const { messages } = req.body;
+  const { messages, sessionId, zone } = req.body;
   if (!Array.isArray(messages) || messages.length === 0) {
     return res.status(400).json({ error: "Messages invalides" });
   }
 
   const { systemPrompt } = await import("../../lib/systemPrompt");
+
+  const lastUserMsg = messages[messages.length - 1];
+  if (lastUserMsg?.role === "user" && sessionId) {
+    supabase.from("chat_conversations").insert({
+      session_id: sessionId,
+      role: "user",
+      content: lastUserMsg.content,
+      zone: zone || null,
+    }).then(({ error }) => { if (error) console.error("[chat] save user:", error); });
+  }
 
   const result = streamText({
     model: anthropic("claude-haiku-4-5-20251001"),
@@ -158,7 +168,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
       }),
     },
-    onFinish: async ({ text }) => { await handleLeadDetection(text); },
+    onFinish: async ({ text }) => {
+      await handleLeadDetection(text);
+      // Sauvegarder la réponse assistant
+      if (sessionId) {
+        await supabase.from("chat_conversations").insert({
+          session_id: sessionId,
+          role: "assistant",
+          content: text,
+          zone: zone || null,
+          lead_detected: /\|\|LEAD\|/.test(text),
+        }).then(({ error }) => { if (error) console.error("[chat] save assistant msg:", error); });
+      }
+    },
   });
 
   result.pipeDataStreamToResponse(res);

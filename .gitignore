@@ -42,3 +42,5 @@ next-env.d.ts
 
 # Supabase Edge Functions (ne pas builder sur Vercel)
 supabase/functions/
+# Sentry Config File
+.env.sentry-build-plugin

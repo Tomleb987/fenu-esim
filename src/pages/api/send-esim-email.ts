@@ -66,7 +66,6 @@ export default async function handler(
     const mailOptions = {
       to: email,
       from: `"FENUA SIM" <hello@fenuasim.com>`,
-      bcc: "clients@fenua-sim.odoo.com",
       replyTo: `"FENUA SIM" <hello@fenuasim.com>`,
       subject: `Votre eSIM pour ${destinationName} est prête ! 🌐`,
       html: emailHTML,
@@ -97,7 +96,6 @@ export default async function handler(
         subject: mailOptions.subject,
         html: emailHTML,
         customer_name: customerName || "Client",
-        archived_odoo: false,
       },
     ]);
 

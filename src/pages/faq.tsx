@@ -8,7 +8,7 @@ import {
   MessageCircle, CheckCircle, Zap, RefreshCw
 } from "lucide-react";
 
-const ODOO_EMAIL = "sav@fenua-sim.odoo.com";
+const ODOO_EMAIL = "sav@fenuasim.com";
 const EMAIL_SUBJECT = "Question : Demande d'informations générales";
 const EMAIL_BODY = `Bonjour l'équipe Fenuasim,
 

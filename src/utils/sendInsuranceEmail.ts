@@ -26,7 +26,6 @@ export const sendInsuranceEmail = async ({ to, subject, html }: SendInsuranceEma
   const mailOptions = {
     from: `"FENUA SIM" <hello@fenuasim.com>`,
     to,
-    bcc: "clients@fenua-sim.odoo.com",
     replyTo: `"FENUA SIM" <hello@fenuasim.com>`,
     subject,
     html,

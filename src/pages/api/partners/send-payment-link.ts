@@ -55,7 +55,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const info = await transporter.sendMail({
       from: `"FENUA SIM" <hello@fenuasim.com>`,
       to: clientEmail,
-      bcc: "clients@fenua-sim.odoo.com",
       replyTo: `"FENUA SIM" <hello@fenuasim.com>`,
       subject: `Votre lien de paiement eSIM — ${destination || packageName}`,
       html: emailHTML,

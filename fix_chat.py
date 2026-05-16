@@ -47,4 +47,4 @@ content = content.replace(
 )
 
 open('src/components/ChatWidget.tsx', 'w').write(content)
-print("ChatWidget.tsx OK")
+print("ChatWidget.tsx OK")grep -rn "odoo\|clients@fenua-sim" --include="*.ts" --include="*.tsx" src/ | grep -v node_modules

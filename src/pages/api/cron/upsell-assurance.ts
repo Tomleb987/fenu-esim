@@ -33,9 +33,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const { data: insured } = await supabase
       .from("insurances")
-      .select("email")
-      .in("email", uniqueTargets.map((t) => t.email));
-    const insuredEmails = new Set((insured || []).map((i: any) => i.email));
+      .select("user_email")
+      .in("user_email", uniqueTargets.map((t) => t.email));
+    const insuredEmails = new Set((insured || []).map((i: any) => i.user_email));
 
     const { data: alreadySent } = await supabase
       .from("upsell_emails_sent")

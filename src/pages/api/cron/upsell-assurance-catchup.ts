@@ -26,7 +26,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (error) throw error;
     if (!targets || targets.length === 0) {
-      return res.status(200).json({ sent: 0, message: "Aucun client à contacter" });
+      return res.status(200).json({ sent: 0, message: "Aucun client a contacter" });
     }
 
     const uniqueTargets = Object.values(
@@ -55,7 +55,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     );
 
     if (toContact.length === 0) {
-      return res.status(200).json({ sent: 0, message: "Tous déjà contactés ou assurés" });
+      return res.status(200).json({ sent: 0, message: "Tous deja contactes ou assures" });
     }
 
     let sent = 0;
@@ -71,6 +71,49 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .maybeSingle();
       const destination = pkgData?.region_fr || pkgData?.region || "votre destination";
 
+      const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Etes-vous bien assure pour votre voyage ?</title>
+</head>
+<body style="margin:0;padding:0;font-family:Arial,sans-serif;line-height:1.6;color:#333;">
+  <div style="max-width:600px;margin:0 auto;padding:20px;background-color:#ffffff;">
+    <div style="text-align:center;padding:20px;border-bottom:2px solid #A020F0;">
+      <img src="https://www.fenuasim.com/logo.png" alt="FENUA SIM" style="height:50px;margin-bottom:12px;" />
+      <h1 style="color:#A020F0;font-size:26px;margin:0;font-weight:bold;">Votre voyage approche !</h1>
+      <p style="font-size:15px;color:#666;margin:10px 0 0 0;">
+        Bonjour ${name}, votre eSIM pour <strong>${destination}</strong> est active.<br>Etes-vous bien protege ?
+      </p>
+    </div>
+    <div style="padding:24px 20px;">
+      <div style="background-color:#f8fafc;padding:20px;border-radius:8px;margin-bottom:24px;border-left:4px solid #A020F0;">
+        <h2 style="font-size:18px;margin:0 0 12px 0;color:#374151;">Toutes nos formules incluent :</h2>
+        <table style="width:100%;font-size:14px;border-collapse:collapse;">
+          <tr><td style="padding:7px 0;color:#111827;"><strong>Frais medicaux a l etranger</strong> - consultation, hospitalisation, urgences</td></tr>
+          <tr><td style="padding:7px 0;color:#111827;"><strong>Rapatriement d urgence</strong> - retour pris en charge si necessaire</td></tr>
+          <tr><td style="padding:7px 0;color:#111827;"><strong>Assistance 24h/24</strong> - une equipe disponible partout dans le monde</td></tr>
+        </table>
+        <p style="font-size:13px;color:#6b7280;margin:12px 0 0 0;">Des options complementaires selon la formule choisie (annulation, bagages...).</p>
+      </div>
+      <div style="background-color:#fef3c7;padding:15px;border-radius:8px;margin-bottom:24px;border-left:4px solid #f59e0b;">
+        <p style="margin:0;font-size:14px;color:#92400e;"><strong>Saviez-vous que</strong> les frais medicaux a l etranger peuvent depasser 100 000 EUR ? Une assurance voyage vous protege pour quelques euros par jour.</p>
+      </div>
+      <div style="background:linear-gradient(135deg,#A020F0 0%,#FF7F11 100%);padding:24px;border-radius:12px;margin-bottom:24px;text-align:center;">
+        <h2 style="color:white;font-size:18px;margin:0 0 8px 0;">Souscription en 2 minutes</h2>
+        <p style="color:rgba(255,255,255,0.9);font-size:14px;margin:0 0 16px 0;">Depuis votre telephone, avant votre depart.</p>
+        <a href="https://www.fenuasim.com/assurance" style="display:inline-block;background-color:white;color:#A020F0;font-weight:bold;font-size:15px;padding:12px 28px;border-radius:8px;text-decoration:none;">Voir les formules</a>
+      </div>
+      <div style="border-top:1px solid #e5e7eb;padding-top:16px;font-size:12px;color:#6b7280;text-align:center;">
+        <p style="margin:0 0 6px 0;">FENUA SIM - <a href="https://www.fenuasim.com" style="color:#A020F0;">fenuasim.com</a></p>
+        <p style="margin:0;">Vous recevez cet email car vous avez recemment achete une eSIM FENUA SIM.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+
       const brevoRes = await fetch("https://api.brevo.com/v3/smtp/email", {
         method: "POST",
         headers: {
@@ -82,7 +125,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           to: [{ email: target.email, name }],
           replyTo: { email: "hello@fenuasim.com", name: "FENUA SIM" },
           subject: `Votre voyage a ${destination} - Etes-vous bien assure ?`,
-          htmlContent: `<p>Bonjour ${name}, votre eSIM pour ${destination} est active. Etes-vous bien protege ? <a href="https://www.fenuasim.com/assurance">Voir les formules</a></p>`,
+          htmlContent: html,
           tags: ["upsell-assurance-catchup"],
           trackOpens: true,
           trackClicks: true,

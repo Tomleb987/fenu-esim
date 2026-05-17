@@ -19,8 +19,7 @@ interface RegionStats {
   countryCode: string;
   originalRegion: string;
 }
-
-const TOP_DESTINATIONS = ["France", "Canada", "États-Unis", "Australie", "Nouvelle-Zélande"];
+const TOP_DESTINATIONS = ["États-Unis", "Nouvelle-Zélande", "Europe", "Indonésie", "Fidji", "Australie", "France"];
 
 const REGION_TRANSLATIONS: Record<string, string> = {
   "Discover Global": "Monde", "Asia": "Asie", "Europe": "Europe", "Japan": "Japon",

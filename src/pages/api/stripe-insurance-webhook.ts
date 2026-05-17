@@ -79,6 +79,11 @@ export default async function handler(
 
       // 4. Email de confirmation
       if (userEmail) {
+        const { data: insData } = await supabaseAdmin
+          .from("insurances")
+          .select("subscriber_first_name, subscriber_last_name")
+          .eq("adhesion_number", adhesionNumber)
+          .maybeSingle();
         await sendInsuranceEmail({
           to: userEmail,
           subject: "✅ Votre Assurance Voyage FENUASIM est active",
@@ -86,6 +91,8 @@ export default async function handler(
             adhesionNumber,
             certificatUrl: avaValidation.certificat_url,
             attestationUrl: avaValidation.attestation_url,
+            firstName: insData?.subscriber_first_name || "",
+            lastName: insData?.subscriber_last_name || "",
           }),
         });
       }

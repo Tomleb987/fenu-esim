@@ -50,13 +50,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const totalPremium    = contracts.reduce((s, c) => s + (c.premium_ava ?? 0), 0);
   const totalFees       = contracts.reduce((s, c) => s + (c.frais_distribution ?? 0), 0);
-  // Formule : premium_ava × 0.90
-  // premium_ava = prime déjà nette des frais de distribution
-  // commission_fenua = premium_ava × 10%
-  // amount_to_transfer = premium_ava × 0.90
-  const calcTransfer = (c: any) =>
-    c.amount_to_transfer ?? ((c.premium_ava ?? 0) * 0.90);
+  // Nouvelle formule : reverser 100% de la prime AVA à ANSET
+  // ANSET reverse ensuite la commission à FENUASIM
+  // commission_fenua = premium_ava × 10% (affiché à titre informatif)
+  const calcTransfer = (c: any) => c.premium_ava ?? 0;
   const totalToTransfer = contracts.reduce((s, c) => s + calcTransfer(c), 0);
+  const totalCommission = totalPremium * 0.10;
 
   const MONTH_FR = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
   const periodLabel = `${MONTH_FR[month - 1]} ${year}`;
@@ -148,8 +147,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const boxW = (W - 28 - 8) / 3;
     const boxes = [
       { label: "PRIMES ENCAISSÉES", value: fmtEur(totalPremium), sub: "Pour compte ANSET", highlight: false },
-      { label: "FRAIS DISTRIBUTION", value: fmtEur(totalFees), sub: "CA Fenua Sim conservé", highlight: false },
-      { label: "MONTANT À REVERSER", value: fmtEur(totalToTransfer), sub: "À virer à ANSET", highlight: true },
+      { label: "COMMISSION FENUASIM (10%)", value: fmtEur(totalCommission), sub: "À recevoir d'ANSET", highlight: false },
+      { label: "MONTANT À REVERSER", value: fmtEur(totalToTransfer), sub: "100% prime à ANSET", highlight: true },
     ];
 
     boxes.forEach((box, i) => {
@@ -214,7 +213,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const adhesion   = (c.adhesion_number ?? "-").slice(0, 18);
       const product    = (c.product_type ?? "-").slice(0, 18);
       const premium    = fmtEur(c.premium_ava ?? 0);
-      const toTransfer = fmtEur(c.amount_to_transfer ?? ((c.premium_ava ?? 0) * 0.90));
+      const toTransfer = fmtEur(c.premium_ava ?? 0);
 
       doc.setFont("helvetica", "normal");
       doc.setFontSize(7);
@@ -254,6 +253,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     doc.text("Ce bordereau récapitule les primes d'assurance encaissées pour le compte d'ANSET.", 14, y);
     y += 4;
     doc.text(`Le montant de ${fmtEur(totalToTransfer)} doit être viré à ANSET dans les délais contractuels.`, 14, y);
+    y += 4;
+    doc.text(`ANSET reversera la commission FENUASIM de ${fmtEur(totalCommission)} (10%) après réception.`, 14, y);
 
     // Pied de page
     const footerY = 287;

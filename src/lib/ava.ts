@@ -323,7 +323,7 @@ export async function validateAvaAdhesion(adhesionNumber: string) {
         return {
             success: true,
             certificat_url: certificatUrl,
-            attestation_url: null, // envoi manuel — ne pas transmettre l'URL AVA directe
+            attestation_url: attestationUrlRaw,
             attestation_url_ava: attestationUrlRaw, // conservé pour usage interne/admin
             message,
         };

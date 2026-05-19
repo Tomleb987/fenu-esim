@@ -194,9 +194,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     doc.setTextColor(...WHITE);
     doc.text("Date",        16,       y + 4.5);
     doc.text("Assuré",      37,       y + 4.5);
-    doc.text("N° adhésion", 95,       y + 4.5);
-    doc.text("Produit",     130,      y + 4.5);
-    doc.text("Prime",       177,      y + 4.5, { align: "right" });
+    doc.text("N° adhésion", 90,       y + 4.5);
+    doc.text("Produit",     125,      y + 4.5);
+    doc.text("Frais distrib.", 152,   y + 4.5, { align: "right" });
+    doc.text("Prime",       172,      y + 4.5, { align: "right" });
     doc.text("À reverser",  W - 16,   y + 4.5, { align: "right" });
     y += 7;
 
@@ -218,11 +219,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       doc.setFont("helvetica", "normal");
       doc.setFontSize(7);
       doc.setTextColor(...DARK);
+      const fraisDistrib = fmtEur(c.frais_distribution ?? 0);
       doc.text(date,              16,       y + 4.2);
-      doc.text(name.slice(0, 25), 37,       y + 4.2);
-      doc.text(adhesion,          95,       y + 4.2);
-      doc.text(product,           130,      y + 4.2);
-      doc.text(premium,           177,      y + 4.2, { align: "right" });
+      doc.text(name.slice(0, 22), 37,       y + 4.2);
+      doc.text(adhesion,          90,       y + 4.2);
+      doc.text(product,           125,      y + 4.2);
+      doc.text(fraisDistrib,      152,      y + 4.2, { align: "right" });
+      doc.text(premium,           172,      y + 4.2, { align: "right" });
 
       doc.setFont("helvetica", "bold");
       doc.setTextColor(...VIOLET);
